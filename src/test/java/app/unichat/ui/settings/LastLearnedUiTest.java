@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Ajustes → Escribir con IA's "Lo último que aprendió": what changed, undoing it, and the corrections still waiting. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class LastLearnedUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private Stage stage;
 
     @BeforeAll
@@ -45,9 +46,8 @@ class LastLearnedUiTest {
 
     @AfterEach
     void close() throws Exception {
-        fx(() -> {
+        onFx(() -> {
             if (stage != null) stage.close();
-            return null;
         });
         WritingStyle.get().forget();
     }

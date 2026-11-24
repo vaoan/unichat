@@ -11,6 +11,7 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -58,17 +59,16 @@ class SaveFailureToastUiTest {
         } finally {
             Files.setPosixFilePermissions(dir, PosixFilePermissions.fromString("rwxr-xr-x"));
             svc.stop();
-            fx(() -> {
+            FxWait.onFx(() -> {
                 ((MainView) scene.getRoot()).dispose();
                 ((Stage) scene.getWindow()).close();
-                return null;
             });
         }
     }
 
     private static Label toast(Scene scene) { return (Label) scene.getRoot().lookup(".toast"); }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> call) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> call) throws E, InterruptedException {
         return FxWait.fx(call);
     }
 }

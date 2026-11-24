@@ -44,10 +44,10 @@ public final class GifGrid extends VBox {
     private static final int TILE_H = 100;
     private static final int LIMIT = 24;
 
-    private final Supplier<String> takeReply;
+    private final Supplier<@Nullable String> takeReply;
     private final ChatService svc;
     private final MediaLibrary library;
-    private final Supplier<Chat> chat;
+    private final Supplier<@Nullable Chat> chat;
     private final Consumer<String> toast;
     private final TextField search = new TextField();
     private final VBox content = new VBox(10);
@@ -61,7 +61,7 @@ public final class GifGrid extends VBox {
     private long resultsAt;
     private static final long RESULTS_LAST_MS = 10 * 60_000;
 
-    public GifGrid(ChatService svc, MediaLibrary library, Supplier<Chat> chat, Supplier<String> takeReply, Consumer<String> toast) {
+    public GifGrid(ChatService svc, MediaLibrary library, Supplier<@Nullable Chat> chat, Supplier<@Nullable String> takeReply, Consumer<String> toast) {
         super(8);
         this.takeReply = takeReply;
         this.svc = svc;

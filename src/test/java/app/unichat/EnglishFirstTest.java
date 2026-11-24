@@ -1,6 +1,7 @@
 package app.unichat;
 
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -94,7 +95,7 @@ class EnglishFirstTest {
     }
 
     /** The entry that lets {@code text} in file {@code rel} be Spanish, or null. */
-    static Allowed allowedFor(String rel, String text) {
+    static @Nullable Allowed allowedFor(String rel, String text) {
         return ALLOWED.stream().filter(a -> a.allows(rel, text)).findFirst().orElse(null);
     }
 

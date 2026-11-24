@@ -253,7 +253,7 @@ public final class ChatListPane extends VBox {
         if (list.getSelectionModel().isEmpty() && !items.isEmpty()) list.getSelectionModel().select(0);
     }
 
-    public void setSelected(String chatId) {
+    public void setSelected(@Nullable String chatId) {
         selectedId = chatId;
         selectInList();
         folderView.select(chatId);

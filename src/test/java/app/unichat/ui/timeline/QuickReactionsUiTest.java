@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import app.unichat.ui.FxWait;
 import app.unichat.ui.MainView;
 import app.unichat.ui.desktop.Notifier;
@@ -14,6 +15,7 @@ import javafx.scene.Scene;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,20 +50,19 @@ class QuickReactionsUiTest {
                 stage.setScene(new Scene(view, 1100, 700));
                 stage.show();
                 view.openChatId("!family:demo");
-                return find(view);
+                return Present.of(find(view));
             });
             MessageActionsUi actions = thread.actions();
             assertEquals(EmojiPicker.QUICK, FxWait.fx(actions::quick), "no history: the usual six");
             List<Message> msgs = svc.messages("!family:demo");
             Message a = msgs.get(msgs.size() - 1);
             Message b = msgs.get(msgs.size() - 2);
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 actions.react(a, "🔥"); // added: counts
                 actions.react(a, "🔥"); // taken away: doesn't
                 actions.react(b, "🫠");
                 actions.react(b, "🫠");
                 actions.react(a, "🫠"); // 🫠 added twice, 🔥 once
-                return null;
             });
             List<String> quick = FxWait.fx(actions::quick);
             assertEquals(List.of("🫠", "🔥"), quick.subList(0, 2), "most first; a removal isn't a use");
@@ -73,7 +74,7 @@ class QuickReactionsUiTest {
         }
     }
 
-    private static ThreadPane find(Node n) {
+    private static @Nullable ThreadPane find(Node n) {
         if (n instanceof ThreadPane t) return t;
         if (n instanceof Parent p) for (Node c : p.getChildrenUnmodifiable()) {
             ThreadPane t = find(c);

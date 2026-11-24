@@ -12,6 +12,7 @@ import javafx.scene.control.skin.VirtualFlow;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.input.ScrollEvent;
+import org.jspecify.annotations.Nullable;
 
 import java.util.function.BooleanSupplier;
 
@@ -29,7 +30,7 @@ final class TimelineScroll {
     private final Runnable atTop;
     private final FollowIndicator indicator;
     /** The newest message when the person went up to older ones: what arrives after it is counted as new below. */
-    private String seenId;
+    private @Nullable String seenId;
     /**
      * True while the viewport follows new messages. Only the person going towards older messages (wheel or trackpad up,
      * the keys up, dragging the scrollbar) unpins it, at once; it pins again when the newest message is wholly in view,
@@ -45,7 +46,7 @@ final class TimelineScroll {
      * Reading older messages: the message held in place and where its top was in the window, not in the list: the
      * header growing with the text (9 px with Linux's fonts) moved the list, and the message with it.
      */
-    private String anchorId;
+    private @Nullable String anchorId;
     private double anchorY;
     /**
      * Leaving the bottom with the wheel: where the newest message's top should land (its top then plus the turn). The
@@ -106,7 +107,7 @@ final class TimelineScroll {
         indicator.show(false, newBelow());
     }
 
-    private String newestId() {
+    private @Nullable String newestId() {
         for (int i = rows.size() - 1; i >= 0; i--) {
             if (rows.get(i) instanceof ThreadRows.MessageRow mr) return mr.message().id();
         }
@@ -125,9 +126,10 @@ final class TimelineScroll {
     /** After every layout, before the frame is drawn. */
     private void afterLayout() {
         if (!chatOpen.getAsBoolean() || rows.isEmpty() || !(list.lookup(".virtual-flow") instanceof VirtualFlow<?> flow)) return;
+        Double gap = pinnedBottom || dragging ? null : newestGap(flow);
         if (pinnedBottom) {
             keepBottom(flow);
-        } else if (!dragging && newestGap(flow) != null && (newestGap(flow) <= 1 || flow.getPosition() >= 1 - 1e-9)) {
+        } else if (gap != null && (gap <= 1 || flow.getPosition() >= 1 - 1e-9)) {
             // Its end is the newest reached too: dragged to the bottom with rows the flow's estimate got wrong (110 %,
             // Linux's fonts), the list ended with the newest a few pixels cut, and never followed again.
             // Down to the newest message by any means (the wheel, the keys, the thumb): following it again.
@@ -220,7 +222,7 @@ final class TimelineScroll {
         }
     }
 
-    private static IndexedCell<?> cellOf(VirtualFlow<?> flow, String id) {
+    private static @Nullable IndexedCell<?> cellOf(VirtualFlow<?> flow, @Nullable String id) {
         IndexedCell<?> first = flow.getFirstVisibleCell();
         IndexedCell<?> last = flow.getLastVisibleCell();
         if (first == null || last == null) return null;
@@ -231,7 +233,7 @@ final class TimelineScroll {
         return null;
     }
 
-    private int indexOf(String id) {
+    private int indexOf(@Nullable String id) {
         for (int i = 0; i < rows.size(); i++) {
             if (rows.get(i) instanceof ThreadRows.MessageRow mr && mr.message().id().equals(id)) return i;
         }
@@ -239,7 +241,7 @@ final class TimelineScroll {
     }
 
     /** How far the newest row's bottom is below the viewport's (px), or null when it isn't drawn. */
-    private Double newestGap(VirtualFlow<?> flow) {
+    private @Nullable Double newestGap(VirtualFlow<?> flow) {
         IndexedCell<?> last = flow.getLastVisibleCell();
         if (last == null || last.getIndex() != rows.size() - 1) return null;
         return top(last, flow) + last.getHeight() - flow.getHeight();

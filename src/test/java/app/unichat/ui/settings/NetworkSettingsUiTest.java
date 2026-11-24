@@ -1,5 +1,6 @@
 package app.unichat.ui.settings;
 
+import app.unichat.Present;
 import app.unichat.ui.FxWait;
 import app.unichat.service.MockChatService;
 import app.unichat.settings.Settings;
@@ -10,6 +11,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CountDownLatch;
 
@@ -33,50 +35,48 @@ class NetworkSettingsUiTest {
 
     @AfterEach
     void close() throws Exception {
-        fx(() -> {
-            if (SettingsWindow.current() != null) SettingsWindow.current().close();
-            return null;
+        FxWait.onFx(() -> {
+            Stage settings = SettingsWindow.current();
+            if (settings != null) settings.close();
         });
         Settings.get().set("whatsapp.animatedStickers", null);
     }
 
     private static ToggleButton option(String text) {
-        return (ToggleButton) SettingsWindow.current().getScene().getRoot().lookupAll(".toggle-button").stream()
+        return (ToggleButton) Present.of(SettingsWindow.current()).getScene().getRoot().lookupAll(".toggle-button").stream()
                 .filter(n -> text.equals(n.getAccessibleText())).findFirst().orElseThrow();
     }
 
     @Test
     void whatsappAnimatedStickersCanGoAsGifOrVideo() throws Exception {
-        fx(() -> {
+        FxWait.onFx(() -> {
             Stage owner = new Stage();
             owner.setOpacity(0);
             owner.show();
             SettingsWindow.show(owner, new MockChatService(), () -> { }, () -> { }, id -> { }, t -> { });
             SettingsWindow.select("networks");
-            return null;
         });
         FxWait.until("the WhatsApp options show", () -> option("Enviar stickers animados de WhatsApp como Sticker") != null);
         assertTrue(fx(() -> option("Enviar stickers animados de WhatsApp como Sticker").isSelected()), "sticker by default");
         FxWait.onFx(() -> option("Enviar stickers animados de WhatsApp como GIF").fire());
-        assertEquals("GIF", Settings.get().getString("whatsapp.animatedStickers", null));
+        assertEquals("GIF", Settings.get().getString("whatsapp.animatedStickers"));
         FxWait.onFx(() -> option("Enviar stickers animados de WhatsApp como Video").fire());
-        assertEquals("VIDEO", Settings.get().getString("whatsapp.animatedStickers", null));
+        assertEquals("VIDEO", Settings.get().getString("whatsapp.animatedStickers"));
     }
 
     /** Every option's name reads whole: never cut ("Borrar fotos y video…") nor squeezed to a letter a line. */
     @Test
     void everyOptionsNameReadsWhole() throws Exception {
-        fx(() -> {
+        FxWait.onFx(() -> {
             Stage owner = new Stage();
             owner.setOpacity(0);
             owner.show();
             SettingsWindow.show(owner, new MockChatService(), () -> { }, () -> { }, id -> { }, t -> { });
             SettingsWindow.select("networks");
-            return null;
         });
-        FxWait.until("the page shows", () -> !SettingsWindow.current().getScene().getRoot().lookupAll(".settings-label").isEmpty());
+        FxWait.until("the page shows", () -> !Present.of(SettingsWindow.current()).getScene().getRoot().lookupAll(".settings-label").isEmpty());
         FxWait.settled();
-        java.util.List<String> bad = fx(() -> SettingsWindow.current().getScene().getRoot().lookupAll(".settings-label").stream()
+        java.util.List<String> bad = fx(() -> Present.of(SettingsWindow.current()).getScene().getRoot().lookupAll(".settings-label").stream()
                 .map(n -> (javafx.scene.control.Label) n)
                 .filter(l -> l.isTextTruncated() || l.getWidth() + 1 < longestWord(l))
                 .map(l -> l.getText() + " (" + Math.round(l.getWidth()) + " px)").toList());
@@ -93,7 +93,7 @@ class NetworkSettingsUiTest {
         return widest;
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

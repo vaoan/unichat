@@ -9,6 +9,7 @@ import org.w3c.dom.NodeList;
 
 import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
+import org.jspecify.annotations.Nullable;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.nio.file.Files;
@@ -83,7 +84,7 @@ class BuildRulesTest {
         Element path = elements(child(configuration("maven-compiler-plugin"), "annotationProcessorPaths"), "path").stream()
                 .filter(p -> "com.google.errorprone".equals(text(p, "groupId")) && "error_prone_core".equals(text(p, "artifactId")))
                 .findFirst().orElseThrow(() -> new AssertionError("error_prone_core is on javac's processor path"));
-        assertTrue(text(path, "version").matches("\\d+\\.\\d+\\.\\d+"), "pinned, as the Enforcer wants plugins: " + text(path, "version"));
+        assertTrue(Present.of(text(path, "version")).matches("\\d+\\.\\d+\\.\\d+"), "pinned, as the Enforcer wants plugins: " + text(path, "version"));
     }
 
     @Test
@@ -129,11 +130,11 @@ class BuildRulesTest {
         Element path = elements(child(configuration("maven-compiler-plugin"), "annotationProcessorPaths"), "path").stream()
                 .filter(p -> "com.uber.nullaway".equals(text(p, "groupId")) && "nullaway".equals(text(p, "artifactId")))
                 .findFirst().orElseThrow(() -> new AssertionError("nullaway is on javac's processor path, beside Error Prone"));
-        assertTrue(text(path, "version").matches("\\d+\\.\\d+\\.\\d+"), "pinned: " + text(path, "version"));
+        assertTrue(Present.of(text(path, "version")).matches("\\d+\\.\\d+\\.\\d+"), "pinned: " + text(path, "version"));
         Element jspecify = elements(child(POM.getDocumentElement(), "dependencies"), "dependency").stream()
                 .filter(d -> "org.jspecify".equals(text(d, "groupId")) && "jspecify".equals(text(d, "artifactId")))
                 .findFirst().orElseThrow(() -> new AssertionError("JSpecify's annotations are a dependency"));
-        assertTrue(text(jspecify, "version").matches("\\d+\\.\\d+\\.\\d+"), "pinned: " + text(jspecify, "version"));
+        assertTrue(Present.of(text(jspecify, "version")).matches("\\d+\\.\\d+\\.\\d+"), "pinned: " + text(jspecify, "version"));
         assertNull(text(jspecify, "scope"), "main code is marked with them, so they're no test-only dependency");
     }
 
@@ -218,7 +219,7 @@ class BuildRulesTest {
         assertEquals("initialize", text(agent, "phase"), "the agent is on surefire's command line before the tests");
         assertEquals("test", text(report, "phase"), "the report on every build that runs the tests, verify or not");
         assertEquals("verify", text(check, "phase"));
-        assertTrue(text(configuration("maven-surefire-plugin"), "argLine").startsWith("@{argLine} "),
+        assertTrue(Present.of(text(configuration("maven-surefire-plugin"), "argLine")).startsWith("@{argLine} "),
                 "surefire's command line starts with what prepare-agent set (late, so the agent and headless-ui's flags both get in)");
         assertTrue(texts(child(POM.getDocumentElement(), "properties"), "argLine").getFirst().isEmpty(),
                 "argLine starts empty: only headless-ui's flags and the agent go in it");
@@ -418,7 +419,7 @@ class BuildRulesTest {
         Element findSecBugs = elements(child(config, "plugins"), "plugin").stream()
                 .filter(p -> "com.h3xstream.findsecbugs".equals(text(p, "groupId")) && "findsecbugs-plugin".equals(text(p, "artifactId")))
                 .findFirst().orElseThrow(() -> new AssertionError("FindSecBugs is one of SpotBugs' plugins"));
-        assertTrue(text(findSecBugs, "version").matches("\\d+\\.\\d+\\.\\d+"), "pinned: " + text(findSecBugs, "version"));
+        assertTrue(Present.of(text(findSecBugs, "version")).matches("\\d+\\.\\d+\\.\\d+"), "pinned: " + text(findSecBugs, "version"));
         List<Element> configs = new ArrayList<>(List.of(config));
         for (Element e : elements(child(plugin("spotbugs-maven-plugin"), "executions"), "execution")) configs.addAll(elements(e, "configuration"));
         for (Element c : configs) {
@@ -457,7 +458,7 @@ class BuildRulesTest {
         assertEquals(List.of("${project.build.directory}/spotbugs-cache/skip-" + RUN + ".properties"),
                 texts(child(child(decision, "configuration"), "files"), "file"), "only this run's decision: a run whose check"
                         + " didn't run finds none and stops, never an earlier run's");
-        assertTrue(text(child(POM.getDocumentElement(), "properties"), "maven.build.timestamp.format").matches("[yMdHms\\-S]+"),
+        assertTrue(Present.of(text(child(POM.getDocumentElement(), "properties"), "maven.build.timestamp.format")).matches("[yMdHms\\-S]+"),
                 "the run's name is its start, to the millisecond, as a file name on every system");
         for (String plugin : List.of("exec-maven-plugin", "properties-maven-plugin")) {
             for (String quiet : List.of("skip", "quiet")) {
@@ -498,6 +499,21 @@ class BuildRulesTest {
         }
     }
 
+    /** Null checks that stay on: SpotBugs' second look at a {@code @Nullable} value dereferenced, beside NullAway's. */
+    private static final List<String> NULL_PATTERNS_KEPT = List.of("NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE");
+
+    @Test
+    void spotBugsNullChecksAreNeverLeftOut() {
+        for (Element m : elements(read("spotbugs-exclude.xml").getDocumentElement(), "Match")) {
+            for (Element bug : elements(m, "Bug")) {
+                for (String pattern : bug.getAttribute("pattern").split(",")) {
+                    assertFalse(NULL_PATTERNS_KEPT.contains(pattern.strip()), pattern + " stays on: a getter read twice goes through a"
+                            + " local (.claude/rules/nullness.md), never a pattern left out");
+                }
+            }
+        }
+    }
+
     @Test
     void checkstyleChecksMainAndTestCodeAndFailsOnAnyFinding() {
         Element execution = execution("maven-checkstyle-plugin", "check");
@@ -518,7 +534,7 @@ class BuildRulesTest {
         }
         Element tool = elements(child(plugin("maven-checkstyle-plugin"), "dependencies"), "dependency").stream()
                 .filter(d -> "checkstyle".equals(text(d, "artifactId"))).findFirst().orElseThrow();
-        assertTrue(text(tool, "version").matches("\\d+\\.\\d+\\.\\d+"), "Checkstyle itself pinned, not the plugin's old default");
+        assertTrue(Present.of(text(tool, "version")).matches("\\d+\\.\\d+\\.\\d+"), "Checkstyle itself pinned, not the plugin's old default");
     }
 
     @Test
@@ -601,7 +617,7 @@ class BuildRulesTest {
     }
 
     /** The value of the module's own property {@code name}, or null. */
-    private static String property(Element module, String name) {
+    private static @Nullable String property(Element module, String name) {
         return elements(module, "property").stream().filter(p -> name.equals(p.getAttribute("name")))
                 .map(p -> p.getAttribute("value")).findFirst().orElse(null);
     }
@@ -684,7 +700,7 @@ class BuildRulesTest {
         return found.getFirst();
     }
 
-    private static String text(Element parent, String tag) {
+    private static @Nullable String text(Element parent, String tag) {
         List<Element> found = elements(parent, tag);
         return found.isEmpty() ? null : found.getFirst().getTextContent().trim();
     }
@@ -694,7 +710,7 @@ class BuildRulesTest {
     }
 
     /** The direct children named {@code tag} (any, when null). */
-    private static List<Element> elements(Element parent, String tag) {
+    private static List<Element> elements(Element parent, @Nullable String tag) {
         List<Element> out = new ArrayList<>();
         NodeList all = parent.getChildNodes();
         for (int i = 0; i < all.getLength(); i++) {

@@ -98,9 +98,8 @@ class SeenAnimationsUiTest {
 
         FxWait.onFx(() -> stage.setIconified(true));
         FxWait.until("resting while its window is minimised", () -> !spinning.call());
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             task.bar.setProgress(javafx.scene.control.ProgressBar.INDETERMINATE_PROGRESS); // told again meanwhile
-            return null;
         });
         assertFalse(FxWait.fx(spinning::call), "told to move while minimised, it still rests");
         FxWait.onFx(() -> stage.setIconified(false));
@@ -120,11 +119,10 @@ class SeenAnimationsUiTest {
         List<Boolean> underSeensLock = new ArrayList<>();
         window(FxWait.fx(() -> new StackPane(node)));
         Runnable look = () -> underSeensLock.add(Thread.holdsLock(Seen.get()));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Showing.whileShowing(node, look, look);
             underSeensLock.clear(); // the first start, from whileShowing itself
             Seen.reset(false);
-            return null;
         });
         FxWait.onFx(() -> Seen.reset(true));  // after the stop handed on by the first has run
         FxWait.fx(() -> null); // and the start

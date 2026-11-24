@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.service.MockChatService;
 import javafx.application.Platform;
@@ -22,9 +23,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class NotificationOpenUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private Stage stage;
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private MainView view;
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private Scene scene;
 
     @BeforeAll
@@ -42,9 +47,8 @@ class NotificationOpenUiTest {
     @AfterEach
     void close() throws Exception {
         svc.stop();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             stage.close();
-            return null;
         });
     }
 
@@ -77,7 +81,7 @@ class NotificationOpenUiTest {
 
     /** As UnichatApp.showWindow then the notification's chat: two runLaters, in that order. */
     private void clickNotification(String chatId) throws InterruptedException {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Platform.runLater(() -> {
                 stage.show();
                 stage.setIconified(false);
@@ -85,9 +89,8 @@ class NotificationOpenUiTest {
                 stage.requestFocus();
             });
             Platform.runLater(() -> view.openChatId(chatId));
-            return null;
         });
-        FxWait.until("the chat open", () -> view.currentChatId() != null && view.currentChatId().equals(chatId));
+        FxWait.until("the chat open", () -> chatId.equals(view.currentChatId()));
         FxWait.settled();
     }
 
@@ -111,7 +114,7 @@ class NotificationOpenUiTest {
                 String before = box();
                 FxWait.onFx(stage::hide);
                 FxWait.settled();
-                clickNotification(view.currentChatId().equals("!mom:demo") ? "!family:demo" : "!mom:demo");
+                clickNotification(Present.of(view.currentChatId()).equals("!mom:demo") ? "!family:demo" : "!mom:demo");
                 String after = box();
                 if (!after.equals(before)) seen.append(w).append(": ").append(before).append(" -> ").append(after).append('\n');
             }
@@ -167,13 +170,12 @@ class NotificationOpenUiTest {
         open();
         FxWait.onFx(stage::hide);
         FxWait.settled();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Platform.runLater(() -> {
                 stage.show();
                 stage.toFront();
             });
             Platform.runLater(() -> view.openChatId("!srv-memes:demo"));
-            return null;
         });
         FxWait.settled();
         FxWait.until("the channel is the open chat", () -> {
@@ -191,10 +193,9 @@ class NotificationOpenUiTest {
     void aNoticeAboutAMessageGoesToThatMessage() throws Exception {
         open();
         String older = FxWait.fx(() -> svc.messages("!mom:demo").get(0).id()); // far from the newest the chat opens at
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             view.openChatId("!mom:demo");
             view.showMessage("!mom:demo", older);
-            return null;
         });
         FxWait.settled();
         FxWait.until("the message is selected", () -> {

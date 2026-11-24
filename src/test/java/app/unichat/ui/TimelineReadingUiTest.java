@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.service.ScriptedChatService;
 import java.util.concurrent.ExecutionException;
@@ -24,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class TimelineReadingUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TimelineWindow w;
 
     @AfterEach
@@ -133,7 +135,7 @@ class TimelineReadingUiTest {
         assertTrue(w.svc.historyAsked(CHAT), "precondition: at the top, the history is asked for");
         FxWait.settled();
         String read = FxWait.fx(w::readMessage);
-        TimelineWindow.Frames frames = w.watch(w.stays(read, FxWait.fx(() -> w.yOf(read))));
+        TimelineWindow.Frames frames = w.watch(w.stays(read, Present.of(FxWait.fx(() -> w.yOf(read)))));
         history.release();
         FxWait.until("the older messages arrived", () -> w.svc.messages(CHAT).getFirst().body().startsWith("Antiguo"));
         FxWait.until("and are listed", () -> w.list().getItems().size() > 40);
@@ -207,7 +209,7 @@ class TimelineReadingUiTest {
         w.wheel(30);
         FxWait.settled();
         String read = FxWait.fx(w::readMessage);
-        TimelineWindow.Frames frames = w.watch(w.stays(read, FxWait.fx(() -> w.yOf(read))));
+        TimelineWindow.Frames frames = w.watch(w.stays(read, Present.of(FxWait.fx(() -> w.yOf(read)))));
         FxWait.pulses(10); // the frames in which it used to be pulled back
         frames.stop("a small turn of the wheel up");
         assertTrue(FxWait.fx(w::jumpDownShown), "and the way back down is offered");
@@ -248,7 +250,10 @@ class TimelineReadingUiTest {
 
     private void tinyTrackpadUpAndDown() throws InterruptedException {
         for (int i = 0; i < 6; i++) w.wheel(3);
-        assertTrue(FxWait.fx(() -> w.newestGap() == null || w.newestGap() > 1), "precondition: moved up a little");
+        assertTrue(FxWait.fx(() -> {
+            Double gap = w.newestGap();
+            return gap == null || gap > 1;
+        }), "precondition: moved up a little");
         for (int i = 0; i < 6; i++) w.wheel(-3);
         double gap = w.untilAtBottom();
         assertFalse(FxWait.fx(w::jumpDownShown), "down at the newest: following it");
@@ -310,10 +315,9 @@ class TimelineReadingUiTest {
     void theJumpDownButtonWhileMessagesKeepArriving() throws Exception {
         w = TimelineWindow.open(30);
         w.scrollUp();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             w.scene.getRoot().lookup(".jump-down").fireEvent(new javafx.event.ActionEvent());
             w.svc.receive(CHAT, "llega en el mismo instante");
-            return null;
         });
         w.svc.receive(CHAT, "y otro después");
         FxWait.until("both show", () -> "y otro después".equals(w.newest().body()) && w.showsNewest());
@@ -355,7 +359,7 @@ class TimelineReadingUiTest {
         w.dragScrollbar(0.3);
         assertTrue(FxWait.fx(w::jumpDownShown), "dragged up: reading older ones");
         String read = FxWait.fx(w::readMessage);
-        TimelineWindow.Frames frames = w.watch(w.stays(read, FxWait.fx(() -> w.yOf(read))));
+        TimelineWindow.Frames frames = w.watch(w.stays(read, Present.of(FxWait.fx(() -> w.yOf(read)))));
         w.svc.receive(CHAT, "mientras arrastraba");
         FxWait.until("it's listed", w::showsNewest);
         frames.stop("a message arriving after dragging up");
@@ -381,11 +385,10 @@ class TimelineReadingUiTest {
     void switchingChatsQuickly() throws Exception {
         w = TimelineWindow.open(30);
         w.scrollUp();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             w.view.openChatId("!family:demo");
             w.view.openChatId(CHAT);
             w.view.openChatId("!family:demo");
-            return null;
         });
         w.openChat();
         assertFalse(FxWait.fx(w::jumpDownShown), "each chat opens at its newest");

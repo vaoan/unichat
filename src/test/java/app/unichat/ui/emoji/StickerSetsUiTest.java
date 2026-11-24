@@ -99,14 +99,13 @@ class StickerSetsUiTest {
                     default -> m.invoke(mock, args);
                 });
         MediaLibrary library = new MediaLibrary(dir.resolve("lib.json"));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             grid = new StickerGrid(svc, library, () -> chat, () -> null, t -> { });
             stage = new Stage();
             stage.setOpacity(0);
             stage.setScene(new Scene(grid, 400, 600));
             stage.show();
             grid.refresh();
-            return null;
         });
     }
 
@@ -139,9 +138,8 @@ class StickerSetsUiTest {
         FxWait.until("its stickers", () -> stickersOf("Gatitos").size() == 2);
         Node first = stickersOf("Gatitos").get(0);
         assertTrue(FxWait.fx(first::getAccessibleText).contains("Gatitos"), FxWait.fx(first::getAccessibleText));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(first, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-            return null;
         });
         FxWait.until("sent", () -> sent.size() == 1);
         assertTrue(sent.get(0).url().endsWith("g1.png"));

@@ -1,5 +1,6 @@
 package app.unichat.ui.settings;
 
+import app.unichat.Present;
 import app.unichat.cloud.Cloud;
 import app.unichat.cloud.VaultFixture;
 import app.unichat.gif.GifProviders;
@@ -22,6 +23,7 @@ import javafx.scene.layout.VBox;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Files;
 import java.util.ArrayList;
@@ -67,7 +69,7 @@ class VaultPageUiTest extends VaultPageTestBase {
     @Test
     void withoutAVaultTheKeysAreEnteredByHandAsToday() throws Exception {
         CloudPage.use(account.cloud());
-        String local = Settings.get().getString("server.local", null);
+        String local = Settings.get().getString("server.local");
         try {
             Settings.get().setLocalServer(true); // where Telegram's keys are typed
             assertEquals(Cloud.VaultState.NONE, round());
@@ -94,19 +96,19 @@ class VaultPageUiTest extends VaultPageTestBase {
                 return o;
             });
             FxWait.onFx(() -> SettingsWindow.select("networks"));
-            FxWait.until("Telegram's keys", () -> SettingsWindow.current().getScene().getRoot().lookup(".telegram-api-id") != null);
-            TextField id = FxWait.fx(() -> (TextField) SettingsWindow.current().getScene().getRoot().lookup(".telegram-api-id"));
+            FxWait.until("Telegram's keys", () -> Present.of(SettingsWindow.current()).getScene().getRoot().lookup(".telegram-api-id") != null);
+            TextField id = FxWait.fx(() -> (TextField) Present.of(SettingsWindow.current()).getScene().getRoot().lookup(".telegram-api-id"));
             assertTrue(FxWait.fx(() -> id.isEditable() && !id.isDisabled()), where + ": Telegram's keys typed here");
             FxWait.onFx(() -> SettingsWindow.select("gifs"));
             String keyOf = I18n.t("settings.gifs.keyOf", gif.name());
-            FxWait.until("the GIF key's field", () -> SettingsWindow.current().getScene().getRoot().lookupAll(".password-field").stream()
+            FxWait.until("the GIF key's field", () -> Present.of(SettingsWindow.current()).getScene().getRoot().lookupAll(".password-field").stream()
                 .anyMatch(p -> keyOf.equals(p.getAccessibleText())));
-            PasswordField key = FxWait.fx(() -> SettingsWindow.current().getScene().getRoot().lookupAll(".password-field").stream()
+            PasswordField key = FxWait.fx(() -> Present.of(SettingsWindow.current()).getScene().getRoot().lookupAll(".password-field").stream()
                 .map(n -> (PasswordField) n).filter(p -> keyOf.equals(p.getAccessibleText())).findFirst().orElseThrow());
             FxWait.onFx(() -> key.setText("clave-" + where));
-            assertEquals("clave-" + where, Settings.get().getString("gif." + gif.id() + ".key", null), where + ": kept here as before");
+            assertEquals("clave-" + where, Settings.get().getString("gif." + gif.id() + ".key"), where + ": kept here as before");
             FxWait.onFx(() -> {
-                SettingsWindow.current().close();
+                Present.of(SettingsWindow.current()).close();
                 owner.close();
             });
         } finally {
@@ -371,10 +373,9 @@ class VaultPageUiTest extends VaultPageTestBase {
 
     /** Fires the button a screen reader names {@code accessible}. */
     private void clickNamed(String accessible) throws InterruptedException {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             showing().stream().filter(n -> n instanceof ButtonBase b && accessible.equals(b.getAccessibleText())).map(n -> (ButtonBase) n)
                 .findFirst().orElseThrow(() -> new AssertionError("no button named " + accessible)).fire();
-            return null;
         });
     }
 
@@ -652,7 +653,7 @@ class VaultPageUiTest extends VaultPageTestBase {
     @Test
     void itFitsAt160Percent() throws Exception {
         CloudPage.use(account.cloud());
-        String scale = Settings.get().getString("ui.fontScale", null);
+        String scale = Settings.get().getString("ui.fontScale");
         MockChatService svc = new MockChatService();
         List<String> bad = new ArrayList<>();
         try {
@@ -695,7 +696,7 @@ class VaultPageUiTest extends VaultPageTestBase {
     }
 
     /** The same, measured once a label saying {@code until} shows (null: a code, or a confirmation). */
-    private List<String> squeezedUntil(MockChatService svc, String where, String until, String... presses) throws InterruptedException {
+    private List<String> squeezedUntil(MockChatService svc, String where, @Nullable String until, String... presses) throws InterruptedException {
         Stage owner = FxWait.fx(() -> {
             Stage o = new Stage();
             o.setOpacity(0);
@@ -705,24 +706,23 @@ class VaultPageUiTest extends VaultPageTestBase {
             SettingsWindow.select("cloud");
             return o;
         });
-        FxWait.until("the vault drawn", () -> SettingsWindow.current().getScene().getRoot().lookup(".vault-page") instanceof VBox v
+        FxWait.until("the vault drawn", () -> Present.of(SettingsWindow.current()).getScene().getRoot().lookup(".vault-page") instanceof VBox v
             && !v.getChildren().isEmpty() && !v.lookupAll(".button").isEmpty());
         for (String press : presses) {
-            FxWait.fx(() -> {
-                ((ButtonBase) SettingsWindow.current().getScene().getRoot().lookupAll(".button").stream()
+            FxWait.onFx(() -> {
+                ((ButtonBase) Present.of(SettingsWindow.current()).getScene().getRoot().lookupAll(".button").stream()
                     .filter(n -> press.equals(((ButtonBase) n).getText())).findFirst().orElseThrow()).fire();
-                return null;
             });
         }
         if (presses.length > 0) {
             Set<String> steps = until != null ? Set.of(until) : Set.of(I18n.t("settings.vault.change.receive"), I18n.t("settings.vault.turnOffWhat"));
-            FxWait.until("the step shown", () -> SettingsWindow.current().getScene().getRoot().lookup(".recovery-code-sheet") != null
-                || SettingsWindow.current().getScene().getRoot().lookupAll(".label").stream().anyMatch(n -> steps.contains(((Labeled) n).getText())));
+            FxWait.until("the step shown", () -> Present.of(SettingsWindow.current()).getScene().getRoot().lookup(".recovery-code-sheet") != null
+                || Present.of(SettingsWindow.current()).getScene().getRoot().lookupAll(".label").stream().anyMatch(n -> steps.contains(((Labeled) n).getText())));
         }
         FxWait.settled();
-        List<String> bad = FxWait.fx(() -> SettingsLayoutUiTest.squeezed(SettingsWindow.current().getScene().getRoot(), where));
+        List<String> bad = FxWait.fx(() -> SettingsLayoutUiTest.squeezed(Present.of(SettingsWindow.current()).getScene().getRoot(), where));
         FxWait.onFx(() -> {
-            SettingsWindow.current().close();
+            Present.of(SettingsWindow.current()).close();
             owner.close();
         });
         return bad;

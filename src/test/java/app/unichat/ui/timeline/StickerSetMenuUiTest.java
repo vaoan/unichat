@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.Message;
 import app.unichat.service.MockChatService;
@@ -17,6 +18,7 @@ import javafx.scene.control.MenuItem;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -55,11 +57,11 @@ class StickerSetMenuUiTest {
         try {
             List<Message> msgs = svc.messages("!family:demo");
             Message sticker = msgs.get(msgs.size() - 1);
-            ThreadPane thread = FxWait.fx(() -> find(view, ThreadPane.class));
+            ThreadPane thread = Present.of(FxWait.fx(() -> find(view, ThreadPane.class)));
             MenuItem show = FxWait.fx(() -> thread.actions().messageMenu(sticker).getItems().stream()
                     .filter(i -> "Ver el set de este sticker".equals(i.getText())).findFirst().orElseThrow());
             FxWait.onFx(show::fire);
-            SidePanel panel = FxWait.fx(() -> find(view, SidePanel.class));
+            SidePanel panel = Present.of(FxWait.fx(() -> find(view, SidePanel.class)));
             FxWait.until("the Stickers tab", () -> FxWait.fx(panel::current) == SidePanel.Tab.STICKERS);
             FxWait.until("that set, open", () -> FxWait.fx(() -> find(panel, Button.class, "gatitos")) != null);
             // The demo has no Telegram: the set says it couldn't be fetched rather than loading for ever.
@@ -74,20 +76,20 @@ class StickerSetMenuUiTest {
             FxWait.onFx(big::fire);
             // The viewer is a window of its own (no owner, by design): found by its title.
             FxWait.until("the viewer", () -> FxWait.fx(() -> viewer() != null));
-            FxWait.onFx(() -> viewer().close());
+            FxWait.onFx(() -> Present.of(viewer()).close());
         } finally {
             svc.stop();
             FxWait.onFx(window[0]::close);
         }
     }
 
-    private static Stage viewer() {
+    private static @Nullable Stage viewer() {
         return javafx.stage.Window.getWindows().stream()
                 .filter(w -> w instanceof Stage st && st.isShowing() && "Sticker".equals(st.getTitle()))
                 .map(Stage.class::cast).findFirst().orElse(null);
     }
 
-    private static <T> T find(Node n, Class<T> type) {
+    private static <T> @Nullable T find(Node n, Class<T> type) {
         if (type.isInstance(n)) return type.cast(n);
         if (n instanceof Parent p) for (Node c : p.getChildrenUnmodifiable()) {
             T t = find(c, type);
@@ -96,7 +98,7 @@ class StickerSetMenuUiTest {
         return null;
     }
 
-    private static Button find(Node n, Class<Button> type, String text) {
+    private static @Nullable Button find(Node n, Class<Button> type, String text) {
         if (n instanceof Button b && text.equals(b.getText())) return b;
         if (n instanceof javafx.scene.control.ScrollPane s && s.getContent() != null) return find(s.getContent(), type, text);
         if (n instanceof Parent p) for (Node c : p.getChildrenUnmodifiable()) {

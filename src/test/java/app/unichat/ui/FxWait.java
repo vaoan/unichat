@@ -3,6 +3,7 @@ package app.unichat.ui;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.animation.AnimationTimer;
 import javafx.application.Platform;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
@@ -29,13 +30,13 @@ public final class FxWait {
 
     /** Work for the FX thread that may throw {@code E}: a lambda that throws nothing checked makes it no exception at all. */
     @FunctionalInterface
-    public interface FxCall<T, E extends Exception> {
+    public interface FxCall<T extends @Nullable Object, E extends Exception> {
         T call() throws E;
     }
 
     /** Runs {@code c} on the FX thread and returns its result (or rethrows what it threw). */
     @SuppressFBWarnings(value = {"BC_UNCONFIRMED_CAST_OF_RETURN_VALUE", "THROWS_METHOD_THROWS_RUNTIMEEXCEPTION"}, justification = "the task's checked exception can only be the E its FxCall declares; the task's own unchecked exception, thrown again as it was")
-    public static <T, E extends Exception> T fx(FxCall<T, E> c) throws E, InterruptedException {
+    public static <T extends @Nullable Object, E extends Exception> T fx(FxCall<T, E> c) throws E, InterruptedException {
         if (Platform.isFxApplicationThread()) return c.call();
         CompletableFuture<T> f = new CompletableFuture<>();
         Platform.runLater(() -> {

@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.service.MockChatService;
 import app.unichat.ui.FxWait;
@@ -18,6 +19,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -34,7 +36,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class NoAccidentalReactionUiTest {
     private static final String CHAT = "!family:demo";
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private Stage stage;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private MainView view;
     private ThreadPane thread;
 
@@ -61,7 +65,7 @@ class NoAccidentalReactionUiTest {
             stage.setScene(new Scene(view, 900, 700));
             stage.show();
             view.openChatId(CHAT);
-            return find(view);
+            return Present.of(find(view));
         });
         FxWait.settled();
     }
@@ -69,15 +73,14 @@ class NoAccidentalReactionUiTest {
     @AfterEach
     void close() throws Exception {
         svc.stop();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             view.dispose();
             stage.close();
             stage.getScene().setRoot(new javafx.scene.layout.Pane());
-            return null;
         });
     }
 
-    private static ThreadPane find(Node n) {
+    private static @Nullable ThreadPane find(Node n) {
         if (n instanceof ThreadPane t) return t;
         if (n instanceof Parent p) for (Node c : p.getChildrenUnmodifiable()) {
             ThreadPane t = find(c);
@@ -94,7 +97,7 @@ class NoAccidentalReactionUiTest {
     void aDoubleClickOnAMessageNeverReacts() throws Exception {
         Map<String, Set<String>> before = reactions();
         List<Node> bubbles = FxWait.fx(() -> List.copyOf(thread.lookupAll(".bubble")));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             for (Node b : bubbles) {
                 javafx.geometry.Bounds at = b.localToScene(b.getBoundsInLocal());
                 for (int clicks = 1; clicks <= 2; clicks++) {
@@ -102,7 +105,6 @@ class NoAccidentalReactionUiTest {
                             MouseButton.PRIMARY, clicks, false, false, false, false, true, false, false, true, false, false, null));
                 }
             }
-            return null;
         });
         FxWait.settled();
         assertEquals(before, reactions(), "a double click on every message, photos too, reacted to none");
@@ -113,12 +115,11 @@ class NoAccidentalReactionUiTest {
         Map<String, Set<String>> before = reactions();
         FxWait.onFx(thread::focusTimeline);
         for (var type : List.of(javafx.scene.input.KeyEvent.KEY_PRESSED, javafx.scene.input.KeyEvent.KEY_TYPED)) {
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 Node target = stage.getScene().getFocusOwner() != null ? stage.getScene().getFocusOwner() : stage.getScene().getRoot();
                 boolean typed = type == javafx.scene.input.KeyEvent.KEY_TYPED;
                 Event.fireEvent(target, new javafx.scene.input.KeyEvent(type, typed ? "1" : "", typed ? "" : "1",
                         typed ? javafx.scene.input.KeyCode.UNDEFINED : javafx.scene.input.KeyCode.DIGIT1, false, false, false, false));
-                return null;
             });
         }
         FxWait.settled();

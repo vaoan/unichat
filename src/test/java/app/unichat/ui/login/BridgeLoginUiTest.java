@@ -93,9 +93,8 @@ class BridgeLoginUiTest {
         scanned.countDown();
         server.stop(0);
         // A window left open goes on being drawn for every test after this one.
-        fx(() -> {
+        FxWait.onFx(() -> {
             if (stage != null) stage.close();
-            return null;
         });
     }
 

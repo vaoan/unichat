@@ -61,12 +61,11 @@ class SidePanelUiTest {
         FxWait.until("the list builds its emojis", () -> shown(scene).lookupAll(".emoji-button").stream()
                 .anyMatch(n -> n.isVisible() && n.getProperties().containsKey("emoji")));
 
-        fx(() -> {
+        FxWait.onFx(() -> {
             // A real one: the list also holds a hidden button that only measures the size.
             Button smile = (Button) shown(scene).lookupAll(".emoji-button").stream()
                     .filter(n -> n.isVisible() && n.getProperties().containsKey("emoji")).findFirst().orElseThrow();
             smile.fire();
-            return null;
         });
         String typed = fx(() -> ((TextArea) scene.getRoot().lookup(".composer-input")).getText());
         assertFalse(typed.isEmpty(), "the emoji went into the message box");
@@ -81,11 +80,10 @@ class SidePanelUiTest {
         });
         FxWait.onFx(() -> view[0].togglePanel(SidePanel.Tab.PROFILE));
         assertEquals(SidePanel.Tab.STICKERS, SidePanel.lastMediaTab());
-        fx(() -> {
+        FxWait.onFx(() -> {
             scene.getRoot().lookupAll(".icon-button").stream()
                     .filter(n -> "Emojis, stickers y GIFs".equals(n.getAccessibleText())).findFirst()
                     .map(Button.class::cast).orElseThrow().fire();
-            return null;
         });
         assertEquals(SidePanel.Tab.STICKERS, fx(() -> shown(scene).current()), "opens where it was left");
         assertTrue(fx(() -> scene.getRoot().lookupAll(".gif-button").isEmpty()), "no separate GIF button any more");
@@ -121,25 +119,23 @@ class SidePanelUiTest {
         FxWait.onFx(() -> view[0].showPanel(SidePanel.Tab.STICKERS));
         FxWait.until("the stickers tab lists its tiles", () -> shown(scene).lookup(".sticker-tile") != null);
         int before = fx(() -> Present.of(svc.chat("!family:demo")).lastPreview().length());
-        fx(() -> {
+        FxWait.onFx(() -> {
             Node tile = shown(scene).lookup(".sticker-tile");
             assertNotNull(tile, "the favourite is listed");
             assertEquals("Sticker favorito, enviar", tile.getAccessibleText());
             tile.fireEvent(new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED, "", "",
                     javafx.scene.input.KeyCode.ENTER, false, false, false, false));
-            return null;
         });
         FxWait.until("the sticker is sent", () -> "Sticker".equals(Present.of(svc.chat("!family:demo")).lastPreview()));
         assertEquals("Sticker", fx(() -> Present.of(svc.chat("!family:demo")).lastPreview()), "sent to the open chat");
         assertTrue(before >= 0);
 
         // Right-click offers to see it big, and that opens it in its own window.
-        fx(() -> {
+        FxWait.onFx(() -> {
             Node tile = shown(scene).lookup(".sticker-tile");
             var b = tile.localToScreen(tile.getBoundsInLocal());
             tile.fireEvent(new javafx.scene.input.ContextMenuEvent(javafx.scene.input.ContextMenuEvent.CONTEXT_MENU_REQUESTED,
                     5, 5, b.getMinX() + 5, b.getMinY() + 5, false, null));
-            return null;
         });
         FxWait.until("the context menu shows", () -> javafx.stage.Window.getWindows().stream()
                 .anyMatch(w -> w instanceof javafx.scene.control.ContextMenu));
@@ -158,14 +154,13 @@ class SidePanelUiTest {
                 .map(Stage.class::cast).findFirst().orElse(null));
         assertTrue(big != null && fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage).count()) > windows,
                 "a window shows the sticker");
-        FxWait.onFx(big::close);
+        FxWait.onFx(Present.of(big)::close);
 
         // A network that rejects stickers: shown dimmed, with the reason, and nothing is sent.
-        fx(() -> {
+        FxWait.onFx(() -> {
             Present.of(svc.chat("!family:demo")).setFeatures(app.unichat.model.RoomFeatures.parse(
                     new com.fasterxml.jackson.databind.ObjectMapper().readTree("{\"id\":\"gm\",\"file\":{\"m.image\":{\"mime_types\":{\"image/*\":2}}}}")));
             view[0].showPanel(SidePanel.Tab.STICKERS);
-            return null;
         });
         FxWait.until("the tile tells why it's dimmed",
                 () -> shown(scene).lookup(".sticker-tile").getAccessibleText().contains("no acepta stickers"));
@@ -218,7 +213,7 @@ class SidePanelUiTest {
         return Present.of(panel(s));
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

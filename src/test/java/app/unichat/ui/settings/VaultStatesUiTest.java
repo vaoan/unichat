@@ -45,7 +45,7 @@ class VaultStatesUiTest extends VaultPageTestBase {
         assertEquals(Cloud.VaultState.MISSING, round());
         page();
         waitFor(I18n.t("settings.vault.missing"));
-        assertNotNull(Settings.get().getString("cloud.vault.key", null), "its key kept meanwhile");
+        assertNotNull(Settings.get().getString("cloud.vault.key"), "its key kept meanwhile");
         click(I18n.t("settings.vault.missingLeave"));
         waitFor(I18n.t("settings.vault.missingAsk"));
         click(I18n.t("folders.dialog.cancel"));

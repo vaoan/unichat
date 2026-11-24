@@ -74,7 +74,7 @@ public final class NewChatPane extends VBox {
     private ChatService.@Nullable Listener pendingListener;
     private @Nullable PauseTransition pendingTimeout;
 
-    public NewChatPane(ChatService svc, Network preferred, Consumer<String> openChatId, Runnable close, Consumer<String> toast) {
+    public NewChatPane(ChatService svc, @Nullable Network preferred, Consumer<String> openChatId, Runnable close, Consumer<String> toast) {
         super(10);
         this.svc = svc;
         this.openChatId = openChatId;

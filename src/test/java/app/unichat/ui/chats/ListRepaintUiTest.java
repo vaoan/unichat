@@ -66,9 +66,8 @@ class ListRepaintUiTest {
     @AfterEach
     void close() throws Exception {
         svc.stop();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             stage.close();
-            return null;
         });
     }
 
@@ -110,9 +109,8 @@ class ListRepaintUiTest {
                 .map(n -> ((ChatRowCell) n).getItem().id()).distinct().limit(2).toList());
         assertEquals(2, onScreen.size(), "two chats on screen: " + onScreen);
         svc.setMarkedUnread(onScreen.get(1), true).get();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             view.openChatId(onScreen.get(0));
-            return null;
         });
         FxWait.settled();
         Map<Node, Object[]> before = badgeIcons();
@@ -120,9 +118,8 @@ class ListRepaintUiTest {
         List<Node> favorites = favoriteTiles();
         assertFalse(before.isEmpty());
 
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             view.openChatId(onScreen.get(1)); // unread: opening it marks it read, a change to the list
-            return null;
         });
         FxWait.settled();
 

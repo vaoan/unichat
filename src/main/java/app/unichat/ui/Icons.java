@@ -3,13 +3,14 @@ package app.unichat.ui;
 import javafx.scene.Node;
 import javafx.scene.layout.Region;
 import javafx.scene.shape.SVGPath;
+import org.jspecify.annotations.Nullable;
 
 /** Line icons drawn from 24x24 SVG paths, colored by the {@code .icon} CSS class (-fx-background-color). */
 public final class Icons {
     private Icons() {}
 
     /** A button showing only an icon; {@code tooltip} is also what a screen reader says. */
-    public static javafx.scene.control.Button iconButton(String icon, String tooltip, Runnable action) {
+    public static javafx.scene.control.Button iconButton(String icon, String tooltip, @Nullable Runnable action) {
         javafx.scene.control.Button b = new javafx.scene.control.Button();
         b.setGraphic(icon(icon, 18));
         b.getStyleClass().add("icon-button");

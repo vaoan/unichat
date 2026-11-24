@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class PinnedMessagesUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TimelineWindow w;
 
     @BeforeAll
@@ -43,9 +44,8 @@ class PinnedMessagesUiTest {
     }
 
     private void clickBar() throws InterruptedException {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             ((Button) bar().lookup(".pinned-go")).fire();
-            return null;
         });
     }
 
@@ -78,9 +78,8 @@ class PinnedMessagesUiTest {
     void oneFromLongAgoIsFoundLoadingTheHistory() throws Exception {
         w = TimelineWindow.open(60, "mensaje %d");
         Message first = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(m -> "mensaje 0".equals(m.body())).findFirst().orElseThrow());
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             PinnedMessages.get().pin(CHAT, first);
-            return null;
         });
         int loaded = FxWait.fx(() -> w.svc.messages(CHAT).size());
         w.svc.holdBack(CHAT, loaded - 15); // only the newest 15 are loaded: the pinned one is ~5 pages back
@@ -99,10 +98,9 @@ class PinnedMessagesUiTest {
         // "mensaje 10", "mensaje 13"
         Message a = mine.get(1);
         Message b = mine.get(4);
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             PinnedMessages.get().pin(CHAT, a);
             PinnedMessages.get().pin(CHAT, b);
-            return null;
         });
         FxWait.until("the newest pin first, and how many", () -> barText().contains("mensaje 13")
                 && ((Label) bar().lookup(".pinned-count")).getText().equals("1 de 2"));
@@ -113,9 +111,8 @@ class PinnedMessagesUiTest {
         clickBar();
         FxWait.until("to the next", () -> shown(a));
         FxWait.until("and round again to the first", () -> barText().contains("mensaje 13"));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             ((Button) bar().lookup(".pinned-unpin")).fire(); // the one on the bar
-            return null;
         });
         assertFalse(FxWait.fx(() -> PinnedMessages.get().isPinned(CHAT, b.id())), "the ✕ unpins the one shown");
         assertTrue(FxWait.fx(() -> PinnedMessages.get().isPinned(CHAT, a.id())));

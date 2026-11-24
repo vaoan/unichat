@@ -14,6 +14,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,13 +33,13 @@ final class VaultPage {
     private final Cloud cloud;
     private final VBox body = new VBox();
     /** The state last drawn; a round finding another redraws the page, unless a step is under way (a code on screen). */
-    private Cloud.VaultState shown;
+    private Cloud.@Nullable VaultState shown;
     private boolean inStep;
     /** Which reload is the last asked for: an older answer, or one landing on a step begun since, draws nothing. */
     private int asked;
     /** Why turning the vault off ended as it did, said above the page while it shows {@link #noticeFor}: a redraw keeps it. */
-    private String notice;
-    private Cloud.VaultState noticeFor;
+    private @Nullable String notice;
+    private Cloud.@Nullable VaultState noticeFor;
 
     private VaultPage(Cloud cloud) {
         this.cloud = cloud;
@@ -97,8 +98,10 @@ final class VaultPage {
             case DECLINED -> drawDeclined(v);
             case OPEN -> drawOpen(v);
         }
-        if (notice != null && v.state() != noticeFor) notice = null; // another state since: no longer what it's about
-        if (notice != null) body.getChildren().add(0, actions(KeyChangeFlow.warning(notice)));
+        String said = notice;
+        if (said != null && v.state() != noticeFor) said = null; // another state since: no longer what it's about
+        notice = said;
+        if (said != null) body.getChildren().add(0, actions(KeyChangeFlow.warning(said)));
     }
 
     /** No vault yet: what it is, and "Crear bóveda". */
@@ -174,7 +177,7 @@ final class VaultPage {
     }
 
     /** A step that changes how the vault stands here: done, a round and the page drawn again; failed, why and "Intentar de nuevo". */
-    private void job(java.util.concurrent.CompletableFuture<Void> step) {
+    private void job(java.util.concurrent.CompletableFuture<@Nullable Void> step) {
         show(line(I18n.t("settings.vault.reading")));
         var _ = step.whenComplete((ok, err) -> Platform.runLater(() -> {
             if (err != null) {
@@ -271,7 +274,7 @@ final class VaultPage {
      * "Cambiar la llave", or taking {@code removing} out with it: the computers read again (the page may have been drawn
      * long ago, and only those listed now get the key), confirmed, then what came of it.
      */
-    private void changeKey(VaultView.Computer removing) {
+    private void changeKey(VaultView.@Nullable Computer removing) {
         inStep = true;
         show(line(I18n.t("settings.vault.reading")));
         var _ = cloud.vault().vaultView().whenComplete((now, err) -> Platform.runLater(() -> {

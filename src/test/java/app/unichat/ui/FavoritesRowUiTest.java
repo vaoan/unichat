@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.service.MockChatService;
 import app.unichat.settings.Settings;
@@ -25,7 +26,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** The favorites: tiles of one width, each name inside its tile, centered, cut with "…" when long; at any text size. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class FavoritesRowUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private Stage stage;
     private double scale;
 
@@ -45,9 +48,8 @@ class FavoritesRowUiTest {
     void close() throws Exception {
         Settings.get().setFontScale(scale);
         svc.stop();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             stage.close();
-            return null;
         });
     }
 
@@ -55,7 +57,7 @@ class FavoritesRowUiTest {
         scale = Settings.get().fontScale();
         Settings.get().setFontScale(fontScale);
         svc = new MockChatService();
-        svc.chat("!gaming:demo").setTitle("La Fiera de Cali y sus amigos");
+        Present.of(svc.chat("!gaming:demo")).setTitle("La Fiera de Cali y sus amigos");
         svc.setFavorite("!gaming:demo", true).get();
         Scene scene = FxWait.fx(() -> {
             stage = new Stage();
@@ -104,7 +106,7 @@ class FavoritesRowUiTest {
     void aFavoriteFolderShowsAmongTheFavoritesAndOpensTheFolder() throws Exception {
         Scene scene = open(1.0);
         String id = svc.createFolder("Trabajo");
-        svc.setInFolder(id, svc.chat("!devs:demo"), true);
+        svc.setInFolder(id, Present.of(svc.chat("!devs:demo")), true);
         svc.setFolderFavorite(id, true);
         FxWait.until("the folder among the favorites", () -> scene.getRoot().lookup(".favorite-tile.favorite-folder") != null);
         FxWait.settled(); // drawn, to be measured
@@ -112,10 +114,9 @@ class FavoritesRowUiTest {
         assertEquals("Trabajo", FxWait.fx(() -> ((Label) tile.lookup(".favorite-name")).getText()));
         assertTrue(FxWait.fx(() -> tile.getAccessibleText().contains("Trabajo")));
         check(scene); // like the chats' tiles
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             javafx.event.Event.fireEvent(tile, new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED, "", "",
                     javafx.scene.input.KeyCode.ENTER, false, false, false, false));
-            return null;
         });
         FxWait.until("the folder open", () -> scene.getRoot().lookupAll(".folder-title").stream()
                 .anyMatch(n -> n.isVisible() && "Trabajo".equals(((Label) n).getText())));
@@ -184,10 +185,9 @@ class FavoritesRowUiTest {
                 .filter(Node::isVisible).filter(n -> !n.getStyleClass().contains("favorite-more")).count());
         Node more = FxWait.fx(() -> scene.getRoot().lookup(".favorite-more"));
         assertEquals("+" + (all - shown), FxWait.fx(() -> ((Label) more.lookup(".favorite-more-count")).getText()));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             javafx.event.Event.fireEvent(more, new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED, "", "",
                     javafx.scene.input.KeyCode.ENTER, false, false, false, false));
-            return null;
         });
         FxWait.until("the Favorites view", () -> scene.getRoot().lookupAll(".pane-title").stream()
                 .anyMatch(n -> n instanceof Label l && l.getText().equals(app.unichat.support.I18n.t("chatList.title.favorites"))));

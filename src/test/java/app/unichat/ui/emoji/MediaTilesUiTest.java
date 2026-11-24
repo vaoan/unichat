@@ -21,6 +21,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 
 import javax.imageio.ImageIO;
+import org.jspecify.annotations.Nullable;
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -73,13 +74,12 @@ class MediaTilesUiTest {
                     if (m.getName().equals("media")) asked.incrementAndGet();
                     return m.invoke(mock, args);
                 });
-        fx(() -> {
+        FxWait.onFx(() -> {
             grid = new StickerGrid(svc, library, () -> null, () -> null, t -> { });
             stage = new Stage();
             stage.setScene(new Scene(grid, 400, 400));
             stage.show();
             grid.refresh();
-            return null;
         });
     }
 
@@ -132,7 +132,7 @@ class MediaTilesUiTest {
         assertNotNull(shown);
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

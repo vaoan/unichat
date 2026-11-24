@@ -13,6 +13,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +28,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class AiReplyUiTest {
     private static final String CHAT = "!family:demo";
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it
     private Composer composer;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it
     private Stage stage;
     private final List<String> errors = new ArrayList<>();
     private final List<String> prompts = new ArrayList<>();
@@ -47,23 +50,21 @@ class AiReplyUiTest {
     @BeforeEach
     void open() throws Exception {
         svc = new MockChatService();
-        fx(() -> {
+        FxWait.onFx(() -> {
             AiReplyButton.SHOWN.set(true);
             composer = new Composer(svc, errors::add);
             composer.setChat(CHAT);
             stage = new Stage();
             stage.setScene(new Scene(composer, 700, 120));
             stage.show();
-            return null;
         });
     }
 
     @AfterEach
     void close() throws Exception {
-        fx(() -> {
+        FxWait.onFx(() -> {
             stage.close();
             AiReplyButton.SHOWN.set(false);
-            return null;
         });
     }
 
@@ -256,9 +257,9 @@ class AiReplyUiTest {
         CountDownLatch release = new CountDownLatch(1);
         List<Boolean> cancelled = new ArrayList<>();
         write("ola");
-        fx(() -> {
+        FxWait.onFx(() -> {
             composer.useFixWriter(() -> new AiReplyButton.Writer() {
-                @Override public String write(String p) {
+                @Override public @Nullable String write(String p) {
                     try {
                         release.await();
                     } catch (InterruptedException e) {
@@ -274,13 +275,11 @@ class AiReplyUiTest {
             });
             composer.aiKeyPressed(javafx.scene.input.KeyCode.O);
             composer.aiKeyPressed(javafx.scene.input.KeyCode.O);
-            return null;
         });
         assertTrue(cancelled.isEmpty(), "a repeat of the same press");
-        fx(() -> {
+        FxWait.onFx(() -> {
             composer.aiKeyReleased(javafx.scene.input.KeyCode.O);
             composer.aiKeyPressed(javafx.scene.input.KeyCode.O);
-            return null;
         });
         assertEquals(1, cancelled.size(), "a new press cancels, as the button does");
     }
@@ -359,7 +358,7 @@ class AiReplyUiTest {
     void pressedAgainItCancelsAndFailuresAreSaid() throws Exception {
         CountDownLatch cancelled = new CountDownLatch(1);
         writer(new AiReplyButton.Writer() {
-            @Override public String write(String p) throws ReplyWriter.Failure {
+            @Override public @Nullable String write(String p) throws ReplyWriter.Failure {
                 try {
                     cancelled.await();
                 } catch (InterruptedException ignored) {
@@ -554,7 +553,7 @@ class AiReplyUiTest {
         assertFalse(fx(() -> button().isVisible()));
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

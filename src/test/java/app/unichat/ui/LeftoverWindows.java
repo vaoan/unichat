@@ -8,6 +8,7 @@ import javafx.stage.Window;
 import org.junit.jupiter.api.extension.AfterEachCallback;
 import org.junit.jupiter.api.extension.BeforeEachCallback;
 import org.junit.jupiter.api.extension.ExtensionContext;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.IdentityHashMap;
@@ -63,7 +64,7 @@ public final class LeftoverWindows implements BeforeEachCallback, AfterEachCallb
      * exited (a test's last window closed with implicit exit on), when {@code runLater} drops the task silently and a
      * wait for it would never end.
      */
-    private static <T> T onFx(Callable<T> c) throws InterruptedException, ExecutionException {
+    private static <T> @Nullable T onFx(Callable<T> c) throws InterruptedException, ExecutionException {
         boolean fxThread = Thread.getAllStackTraces().keySet().stream()
                 .anyMatch(t -> t.isAlive() && "JavaFX Application Thread".equals(t.getName()));
         if (!fxThread) return null;

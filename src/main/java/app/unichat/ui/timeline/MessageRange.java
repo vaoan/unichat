@@ -1,4 +1,5 @@
 package app.unichat.ui.timeline;
+import org.jspecify.annotations.Nullable;
 
 import java.util.HashSet;
 import java.util.List;
@@ -11,14 +12,14 @@ import java.util.Set;
  * chat's order; pure.
  */
 final class MessageRange {
-    private String start;
-    private String end;
+    private @Nullable String start;
+    private @Nullable String end;
     /** The chat's order when the ends were last placed: a message between them deleted later still leaves the rest in. */
     private List<String> order = List.of();
 
-    String start() { return start; }
+    @Nullable String start() { return start; }
 
-    String end() { return end; }
+    @Nullable String end() { return end; }
 
     boolean hasStart() { return start != null; }
 

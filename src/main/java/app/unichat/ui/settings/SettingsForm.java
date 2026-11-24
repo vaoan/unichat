@@ -10,6 +10,7 @@ import javafx.scene.control.ToggleGroup;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -37,7 +38,7 @@ final class SettingsForm {
         return new VBox(6, t, box);
     }
 
-    static Node row(String label, String help, Node control) {
+    static Node row(String label, @Nullable String help, Node control) {
         Label l = new Label(label);
         l.getStyleClass().add("settings-label");
         l.setWrapText(true); // beside a wide control (chips) a long name goes on two lines, never "Borrar fotos y video…"
@@ -53,7 +54,7 @@ final class SettingsForm {
     }
 
     /** A row with its control under the text, for one too wide to sit beside it (beside, the label was squeezed). */
-    static Node stacked(String label, String help, Node control) {
+    static Node stacked(String label, @Nullable String help, Node control) {
         Label l = new Label(label);
         l.getStyleClass().add("settings-label");
         VBox box = new VBox(2, l);

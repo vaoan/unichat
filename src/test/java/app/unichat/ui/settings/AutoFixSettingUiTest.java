@@ -27,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class AutoFixSettingUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private Stage stage;
 
     @BeforeAll
@@ -43,9 +44,8 @@ class AutoFixSettingUiTest {
 
     @AfterEach
     void close() throws Exception {
-        fx(() -> {
+        onFx(() -> {
             if (stage != null) stage.close();
-            return null;
         });
         AiSettings.setFixMode(AiSettings.FixMode.OFF);
         AiSettings.setKeepThread(true);

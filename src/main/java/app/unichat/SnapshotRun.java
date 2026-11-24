@@ -9,6 +9,7 @@ import javafx.animation.PauseTransition;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.Scene;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 
@@ -21,12 +22,12 @@ import java.io.File;
  * {@code -Dunichat.network=<protocol id>} filters the inbox to one network, {@code -Dunichat.search=<text>} searches it.
  */
 final class SnapshotRun {
-    private final MainView mainView;
+    private final @Nullable MainView mainView;
     private final Scene scene;
     private final Runnable quit;
 
     /** {@code mainView} null: logged out, the window is shot as it is. */
-    SnapshotRun(MainView mainView, Scene scene, Runnable quit) {
+    SnapshotRun(@Nullable MainView mainView, Scene scene, Runnable quit) {
         this.mainView = mainView;
         this.scene = scene;
         this.quit = quit;
@@ -35,7 +36,8 @@ final class SnapshotRun {
     void start(String out) {
         PauseTransition wait = new PauseTransition(Duration.seconds(1.5));
         wait.setOnFinished(e -> {
-            if (mainView != null) setUp();
+            MainView view = mainView;
+            if (view != null) setUp(view);
             PauseTransition shoot = new PauseTransition(Duration.seconds(Double.parseDouble(System.getProperty("unichat.snapshotDelay", "1.5"))));
             shoot.setOnFinished(ev -> shoot(out));
             shoot.play();
@@ -43,52 +45,58 @@ final class SnapshotRun {
         wait.play();
     }
 
-    private void setUp() {
+    private void setUp(MainView view) {
         String chatId = System.getProperty("unichat.openChat");
-        if (chatId != null) mainView.openChatId(chatId);
-        if (Boolean.getBoolean("unichat.info")) mainView.toggleInfo();
+        if (chatId != null) view.openChatId(chatId);
+        if (Boolean.getBoolean("unichat.info")) view.toggleInfo();
         String panelTab = System.getProperty("unichat.panel");
-        if (panelTab != null) mainView.showPanel(SidePanel.Tab.valueOf(panelTab));
+        if (panelTab != null) view.showPanel(SidePanel.Tab.valueOf(panelTab));
         String stickerSet = System.getProperty("unichat.stickerSet");
-        if (stickerSet != null) mainView.showStickerSet(stickerSet);
+        if (stickerSet != null) view.showStickerSet(stickerSet);
         String net = System.getProperty("unichat.network");
-        if (net != null) mainView.showNetwork(Network.fromProtocolId(net));
+        if (net != null) view.showNetwork(Network.fromProtocolId(net)); // an unknown id: every network
         String space = System.getProperty("unichat.openSpace");
-        if (space != null) mainView.showSpace(space);
+        if (space != null) view.showSpace(space);
         String folder = System.getProperty("unichat.openFolder");
-        if (folder != null || Boolean.getBoolean("unichat.openFolders")) mainView.showFolders(folder);
+        if (folder != null || Boolean.getBoolean("unichat.openFolders")) view.showFolders(folder);
         String draft = System.getProperty("unichat.draft"); // text in the message box: the send button shows
-        if (draft != null) mainView.type(draft);
+        if (draft != null) view.type(draft);
         String search = System.getProperty("unichat.search"); // text in the chat list's search box: its ✕ shows
         if (search != null && scene.getRoot().lookup(".search-box .search-field") instanceof javafx.scene.control.TextField f) f.setText(search);
         String upload = System.getProperty("unichat.upload"); // files sent as a batch to the open chat: the upload bar
-        if (upload != null) mainView.sendFiles(java.util.Arrays.stream(upload.split(",")).map(File::new).toList(),
+        if (upload != null) view.sendFiles(java.util.Arrays.stream(upload.split(",")).map(File::new).toList(),
                 // -Dunichat.uploadAs=PHOTO|DOCUMENT (-Dunichat.uploadAsDocument=true, as before, is DOCUMENT)
                 Boolean.getBoolean("unichat.uploadAsDocument") ? app.unichat.service.SendAs.DOCUMENT
                         : app.unichat.service.SendAs.valueOf(System.getProperty("unichat.uploadAs", "AS_IS")));
-        showOverlay(System.getProperty("unichat.overlay", ""));
+        showOverlay(view, System.getProperty("unichat.overlay", ""));
     }
 
     /** -Dunichat.overlay: the one sheet, window or dialog to show over the main view. */
-    private void showOverlay(String overlay) {
-        if (overlay.equals("command")) mainView.showCommandBar();
-        else if (overlay.equals("newchat")) mainView.showNewChat();
-        else if (overlay.equals("add")) mainView.showAccounts();
-        else if (overlay.startsWith("folder")) mainView.showFolderDialog(overlay.equals("folderDelete"));
-        else if (overlay.equals("picker")) mainView.showAccounts().showPicker();
-        else if (overlay.equals("cloak")) mainView.showProtectPhoto();
-        else if (overlay.equals("chatOptions")) mainView.showChatOptions();
-        else if (overlay.equals("forward") || overlay.equals("select")) mainView.showForwarding(overlay.equals("select"));
-        else if (overlay.equals("delete")) mainView.showDeleting();
-        else if (overlay.startsWith("savedText")) mainView.showSavedText(overlay.equals("savedText:none"));
-        else if (overlay.equals("fixing")) mainView.showFixing();
-        else if (overlay.equals("queue")) mainView.showQueue();
-        else if (overlay.startsWith("capture")) mainView.showCapture(overlay.equals("capture:sheet"));
-        else if (overlay.startsWith("login:")) mainView.addAccount(Network.fromProtocolId(overlay.substring(6)));
+    private static void showOverlay(MainView view, String overlay) {
+        if (overlay.equals("command")) view.showCommandBar();
+        else if (overlay.equals("newchat")) view.showNewChat();
+        else if (overlay.equals("add")) view.showAccounts();
+        else if (overlay.startsWith("folder")) view.showFolderDialog(overlay.equals("folderDelete"));
+        else if (overlay.equals("picker")) view.showAccounts().showPicker();
+        else if (overlay.equals("cloak")) view.showProtectPhoto();
+        else if (overlay.equals("chatOptions")) view.showChatOptions();
+        else if (overlay.equals("forward") || overlay.equals("select")) view.showForwarding(overlay.equals("select"));
+        else if (overlay.equals("delete")) view.showDeleting();
+        else if (overlay.startsWith("savedText")) view.showSavedText(overlay.equals("savedText:none"));
+        else if (overlay.equals("fixing")) view.showFixing();
+        else if (overlay.equals("queue")) view.showQueue();
+        else if (overlay.startsWith("capture")) view.showCapture(overlay.equals("capture:sheet"));
+        else if (overlay.startsWith("login:")) addAccount(view, overlay.substring(6));
         else if (overlay.startsWith("settings")) {
-            mainView.showSettings();
+            view.showSettings();
             if (overlay.contains(":")) SettingsWindow.select(overlay.substring(overlay.indexOf(':') + 1));
         }
+    }
+
+    /** -Dunichat.overlay=login:<net>: that network's login; an unknown id shows no login. */
+    private static void addAccount(MainView view, String protocolId) {
+        Network n = Network.fromProtocolId(protocolId);
+        if (n != null) view.addAccount(n);
     }
 
     @SuppressFBWarnings(value = "INFORMATION_EXPOSURE_THROUGH_AN_ERROR_MESSAGE", justification = "the snapshot skill's own run: the trace goes to its stderr, read by whoever ran it")

@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.service.MockChatService;
 import app.unichat.support.I18n;
 import app.unichat.ui.desktop.Notifier;
@@ -51,11 +52,10 @@ class AccountsShortcutUiTest {
                 FxWait.until("the accounts page in " + lang, () -> "accounts".equals(SettingsWindow.currentPage()));
                 assertEquals("accounts", FxWait.fx(SettingsWindow::currentPage));
                 assertNotNull(FxWait.fx(SettingsWindow::accountsPage), lang);
-                FxWait.fx(() -> {
-                    SettingsWindow.current().close();
+                FxWait.onFx(() -> {
+                    Present.of(SettingsWindow.current()).close();
                     view.dispose();
                     stage[0].close();
-                    return null;
                 });
             }
         } finally {

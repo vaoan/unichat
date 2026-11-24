@@ -29,7 +29,9 @@ class ComposerSelectionUiTest {
     private static final int LINE_2 = TEXT.indexOf("segunda");
     private static final int LINE_3 = TEXT.indexOf("tercera");
 
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private Stage stage;
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TextArea box;
 
     private void open(String text, double width) throws InterruptedException {

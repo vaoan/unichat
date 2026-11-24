@@ -195,9 +195,10 @@ final class BridgeLoginPane extends StackPane {
 
     private Node displayAndWait(BridgeLogin.Step s) {
         BridgeLogin.Display d = s.display();
+        String data = d == null ? null : d.data();
         Node shown;
-        if (d != null && "qr".equals(d.type()) && d.data() != null) {
-            ImageView qr = new ImageView(qr(d.data(), 260));
+        if (d != null && "qr".equals(d.type()) && data != null) {
+            ImageView qr = new ImageView(qr(data, 260));
             qr.setAccessibleText(I18n.t("login.wizard.qrA11y", network.displayName()));
             StackPane boxed = new StackPane(qr);
             boxed.getStyleClass().add("qr-box");
@@ -205,17 +206,17 @@ final class BridgeLoginPane extends StackPane {
             Label renew = new Label(I18n.t("login.pane.qrRenews"));
             renew.getStyleClass().add("settings-help");
             shown = new VBox(8, boxed, renew);
-        } else if (d != null && ("code".equals(d.type()) || "emoji".equals(d.type())) && d.data() != null) {
-            Label code = new Label(d.data());
+        } else if (d != null && ("code".equals(d.type()) || "emoji".equals(d.type())) && data != null) {
+            Label code = new Label(data);
             code.getStyleClass().add("emoji".equals(d.type()) ? "login-emoji" : "login-code");
-            code.setAccessibleText("emoji".equals(d.type()) ? I18n.t("login.pane.emojiA11y", d.data()) : I18n.t("login.pane.codeA11y", d.data()));
+            code.setAccessibleText("emoji".equals(d.type()) ? I18n.t("login.pane.emojiA11y", data) : I18n.t("login.pane.codeA11y", data));
             HBox row = new HBox(12, code);
             row.setAlignment(Pos.CENTER_LEFT);
             if ("code".equals(d.type())) {
                 Button copy = new Button(I18n.t("common.copy"));
                 copy.getStyleClass().add("secondary-button");
                 copy.setOnAction(e -> {
-                    Clipboards.copy(d.data());
+                    Clipboards.copy(data);
                     copy.setText(I18n.t("common.copied"));
                 });
                 row.getChildren().add(copy);

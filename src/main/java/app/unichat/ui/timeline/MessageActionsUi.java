@@ -19,7 +19,6 @@ import app.unichat.model.MessageType;
 import app.unichat.service.ChatService;
 import app.unichat.stt.Transcripts;
 import app.unichat.support.I18n;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.geometry.Pos;
 import javafx.geometry.Side;
 import javafx.scene.Node;
@@ -37,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import javafx.scene.Scene;
+import org.jspecify.annotations.Nullable;
 import java.util.function.Supplier;
 import java.util.function.Function;
 
@@ -46,10 +46,10 @@ final class MessageActionsUi {
     private final Consumer<String> toast;
     private final Composer composer;
     private final MessageMedia media;
-    private final Supplier<Chat> chat;
+    private final Supplier<@Nullable Chat> chat;
     private final MediaLibrary library;
     private final Supplier<Scene> scene;
-    private final Function<String, Member> member;
+    private final Function<String, @Nullable Member> member;
     private final Consumer<Message> jumpTo;
     private Consumer<String> onShowStickerSet = url -> { };
     /** Links offered in a message's menu: the keyboard has no other way to them. */
@@ -66,7 +66,7 @@ final class MessageActionsUi {
         this.onCapture = capture;
     }
 
-    private MessageFixer fixer;
+    private @Nullable MessageFixer fixer;
 
     /** "Corregir con IA": corrects a message already sent, apart from the message box. */
     void setFixer(MessageFixer fixer) {
@@ -97,8 +97,8 @@ final class MessageActionsUi {
     /** Where "see this sticker's set" opens it (the side panel's Stickers tab). */
     void setOnShowStickerSet(Consumer<String> c) { this.onShowStickerSet = c; }
 
-    MessageActionsUi(ChatService svc, Consumer<String> toast, Composer composer, MessageMedia media, Supplier<Chat> chat,
-                     MediaLibrary library, Supplier<Scene> scene, Function<String, Member> member, Consumer<Message> jumpTo) {
+    MessageActionsUi(ChatService svc, Consumer<String> toast, Composer composer, MessageMedia media, Supplier<@Nullable Chat> chat,
+                     MediaLibrary library, Supplier<Scene> scene, Function<String, @Nullable Member> member, Consumer<Message> jumpTo) {
         this.jumpTo = jumpTo;
         this.svc = svc;
         this.toast = toast;
@@ -225,9 +225,10 @@ final class MessageActionsUi {
     }
 
     /** The message {@code m} answers, if it's in the timeline to go to. */
-    private Message replied(Message m) {
-        if (m.replyToId() == null) return null;
-        for (Message x : svc.messages(m.chatId())) if (x.id().equals(m.replyToId())) return x;
+    private @Nullable Message replied(Message m) {
+        String id = m.replyToId();
+        if (id == null) return null;
+        for (Message x : svc.messages(m.chatId())) if (x.id().equals(id)) return x;
         return null;
     }
 
@@ -286,8 +287,8 @@ final class MessageActionsUi {
     }
 
     /** The menu's items for {@code act}, which {@code m} allows. */
-    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "the fixer is optional (setFixer): the item is offered only when it isn't null, and it's never set back to null")
     private List<MenuItem> itemsFor(MessageActions.Action act, Message m) {
+        MessageFixer fix = fixer; // optional (setFixer): the item is offered only with one
         return switch (act) {
             case SAVE_LINK -> AutoSave.links(m).stream().limit(MENU_LINKS)
                     .map(url -> ChatMenus.item(I18n.t("message.saveLink", RichText.shown(url, 40)), () -> saveLink(m, url))).toList();
@@ -312,8 +313,8 @@ final class MessageActionsUi {
             case EDIT -> List.of(item("message.edit", act, m));
             case CAPTURE -> List.of(ChatMenus.item(I18n.t("message.capture"), () -> onCapture.accept(m)));
             // With the AI turned on, and not twice: its row already says it's being corrected.
-            case FIX -> fixer == null || !AiReplyButton.SHOWN.get() || fixer.fixing(m.id()) ? List.of()
-                    : List.of(ChatMenus.item(I18n.t("message.fix"), () -> { var _ = fixer.fix(m); }));
+            case FIX -> fix == null || !AiReplyButton.SHOWN.get() || fix.fixing(m.id()) ? List.of()
+                    : List.of(ChatMenus.item(I18n.t("message.fix"), () -> { var _ = fix.fix(m); }));
             case SAVED_TEXT -> List.of(ChatMenus.item(I18n.t(m.deleted() ? "message.savedText" : "message.versions"), () -> onSavedText.accept(m)));
             case DELETE_FOR_EVERYONE, DELETE_FOR_ME -> List.of();
         };

@@ -95,9 +95,8 @@ class FoldersUiTest {
     @AfterEach
     void closeWindow() throws Exception {
         svc.stop();
-        fx(() -> {
+        FxWait.onFx(() -> {
             ((Stage) scene.getWindow()).close();
-            return null;
         });
     }
 
@@ -163,7 +162,7 @@ class FoldersUiTest {
         clickCell(".folder-list", "Trabajo");
 
         clickCell(".folder-chats", title(FAMILIA));
-        assertEquals(FAMILIA, fx(() -> thread().chat().id()));
+        assertEquals(FAMILIA, fx(() -> Present.of(thread().chat()).id()));
         assertTrue(fx(() -> showing(folderChats())), "still inside the folder");
         assertEquals("Trabajo", fx(() -> folderTitle().getText()));
     }
@@ -219,9 +218,8 @@ class FoldersUiTest {
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
 
-        fx(() -> {
+        FxWait.onFx(() -> {
             ((TextField) scene.getRoot().lookup(".search-field")).setText(title(FAMILIA));
-            return null;
         });
         FxWait.settled();
         assertFalse(fx(pane::foldersOpen));
@@ -250,9 +248,8 @@ class FoldersUiTest {
     void aNetworkFilterDoesNotHideChatsFromFolders() throws Exception {
         String work = svc.createFolder("Trabajo");
         svc.setInFolder(work, Present.of(svc.chat(SERVER)), true);
-        fx(() -> {
+        FxWait.onFx(() -> {
             pane.goTo(pane.filterProperty().get().switchTo(app.unichat.model.Network.TELEGRAM, null));
-            return null;
         });
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
@@ -267,25 +264,23 @@ class FoldersUiTest {
         String home = svc.createFolder("Casa");
         svc.setInFolder(home, Present.of(svc.chat(FAMILIA)), true);
 
-        Menu menu = fx(() -> foldersMenu(chatMenu(Present.of(svc.chat(FAMILIA)))));
+        Menu menu = Present.of(fx(() -> foldersMenu(chatMenu(Present.of(svc.chat(FAMILIA))))));
         assertFalse(fx(() -> check(menu, "Trabajo").isSelected()));
         assertTrue(fx(() -> check(menu, "Casa").isSelected()));
         assertTrue(fx(() -> menu.getItems().stream().anyMatch(i -> "Nueva carpeta…".equals(i.getText()))));
 
-        fx(() -> {
+        FxWait.onFx(() -> {
             CheckMenuItem item = check(menu, "Trabajo");
             item.setSelected(true);
             item.fire();
-            return null;
         });
         String key = Present.of(svc.chat(FAMILIA)).prefKey();
         assertTrue(folder(work).chatKeys().contains(key));
 
-        fx(() -> {
+        FxWait.onFx(() -> {
             CheckMenuItem item = check(menu, "Casa");
             item.setSelected(false);
             item.fire();
-            return null;
         });
         assertFalse(folder(home).chatKeys().contains(key));
 
@@ -330,9 +325,8 @@ class FoldersUiTest {
 
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
-        fx(() -> {
+        FxWait.onFx(() -> {
             Present.of(itemNamed(pane.menuFor(Present.of(svc.chat(FAMILIA))), "Quitar de esta carpeta")).fire();
-            return null;
         });
         assertTrue(folder(work).chatKeys().isEmpty());
         eventually("it leaves the list", () -> folderChats().getItems().isEmpty());
@@ -345,9 +339,8 @@ class FoldersUiTest {
         fire(fx(() -> buttons("Nueva carpeta").get(0)));
         Button save = fx(() -> buttons("Crear").get(0));
         assertTrue(fx(save::isDisabled), "a folder needs a name");
-        fx(() -> {
+        FxWait.onFx(() -> {
             nameField().setText("  Amigos  ");
-            return null;
         });
         assertFalse(fx(save::isDisabled));
         fire(save);
@@ -358,12 +351,11 @@ class FoldersUiTest {
 
     @Test
     void theChatMenuCreatesAFolderWithTheChatInside() throws Exception {
-        fx(() -> {
+        FxWait.onFx(() -> {
             MenuItem create = Present.of(foldersMenu(chatMenu(Present.of(svc.chat(FAMILIA))))).getItems().stream()
                     .filter(i -> "Nueva carpeta…".equals(i.getText())).findFirst().orElseThrow();
             create.fire();
             nameField().setText("Amigos");
-            return null;
         });
         fire(fx(() -> buttons("Crear").get(0)));
         assertEquals(List.of(Present.of(svc.chat(FAMILIA)).prefKey()), svc.folders().get(0).chatKeys());
@@ -374,22 +366,19 @@ class FoldersUiTest {
         String work = svc.createFolder("Trabajo");
         svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
         fire(railButton("Carpetas"));
-        fx(() -> {
+        FxWait.onFx(() -> {
             folderList().getSelectionModel().select(0);
-            return null;
         });
 
         key(fx(this::folderList), KeyCode.F2);
-        fx(() -> {
+        FxWait.onFx(() -> {
             nameField().setText("Oficina");
-            return null;
         });
         fire(fx(() -> buttons("Guardar").get(0)));
         assertEquals("Oficina", svc.folders().get(0).name());
 
-        fx(() -> {
+        FxWait.onFx(() -> {
             folderList().getSelectionModel().select(0);
-            return null;
         });
         key(fx(this::folderList), KeyCode.DELETE);
         assertTrue(fx(() -> scene.getRoot().lookupAll("Label").stream().anyMatch(n -> n instanceof Label l
@@ -397,9 +386,8 @@ class FoldersUiTest {
         fire(fx(() -> buttons("Cancelar").get(0)));
         assertEquals(1, svc.folders().size(), "cancel keeps it");
 
-        fx(() -> {
+        FxWait.onFx(() -> {
             folderList().getSelectionModel().select(0);
-            return null;
         });
         key(fx(this::folderList), KeyCode.DELETE);
         fire(fx(() -> buttons("Eliminar").get(0)));
@@ -418,10 +406,9 @@ class FoldersUiTest {
         assertEquals(FAMILIA, fx(() -> folderChats().getSelectionModel().getSelectedItem().id()));
 
         fire(fx(() -> buttons("Volver a carpetas").get(0)));
-        fx(() -> {
+        FxWait.onFx(() -> {
             folderList().getSelectionModel().select(0);
             pane.refresh();
-            return null;
         });
         assertEquals("Trabajo", fx(() -> folderList().getSelectionModel().getSelectedItem().name()));
     }
@@ -447,18 +434,16 @@ class FoldersUiTest {
         String work = svc.createFolder("Trabajo");
         svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
         fire(railButton("Carpetas"));
-        fx(() -> {
+        FxWait.onFx(() -> {
             pane.move(1, false);
-            return null;
         });
         assertNull(fx(() -> thread().chat()), "on the names there's nothing to move through");
 
         clickCell(".folder-list", "Trabajo");
-        fx(() -> {
+        FxWait.onFx(() -> {
             pane.move(1, false);
-            return null;
         });
-        assertEquals(FAMILIA, fx(() -> thread().chat().id()));
+        assertEquals(FAMILIA, fx(() -> Present.of(thread().chat()).id()));
     }
 
     @Test
@@ -481,9 +466,8 @@ class FoldersUiTest {
         String channel = fx(() -> channels.getItems().stream().filter(c -> c.prefKey() != null).findFirst().orElseThrow().id());
         assertTrue(menuKeyOn(channels, channel).contains("Carpetas"), "a server's channels");
 
-        fx(() -> {
+        FxWait.onFx(() -> {
             folderChats().getSelectionModel().clearSelection();
-            return null;
         });
         assertTrue(menuKey(fx(this::folderChats)).isEmpty(), "nothing selected: no menu");
     }
@@ -497,14 +481,13 @@ class FoldersUiTest {
         clickCell(".folder-list", "Trabajo");
 
         clickCell(".folder-chats", title(FAMILIA));
-        assertEquals(FAMILIA, fx(() -> thread().chat().id()));
+        assertEquals(FAMILIA, fx(() -> Present.of(thread().chat()).id()));
         assertEquals(ChatFilter.View.INBOX, fx(() -> pane.filterProperty().get().view()));
 
         TextField search = fx(() -> (TextField) scene.getRoot().lookup(".search-field"));
-        fx(() -> {
+        FxWait.onFx(() -> {
             search.setText("x");
             search.clear();
-            return null;
         });
         assertEquals(ChatFilter.View.INBOX, fx(() -> pane.filterProperty().get().view()), "search then clear lands in the inbox");
         assertEquals("Bandeja", fx(() -> title().getText()));
@@ -540,9 +523,8 @@ class FoldersUiTest {
         svc.createFolder("Trabajo");
         eventually("the name shows", () -> !folderList().getItems().isEmpty());
         assertNull(fx(create::getAccessibleHelp), "it isn't true any more");
-        fx(() -> {
+        FxWait.onFx(() -> {
             pane.focusList();
-            return null;
         });
         assertEquals(fx(this::folderList), fx(scene::getFocusOwner));
     }
@@ -556,11 +538,11 @@ class FoldersUiTest {
         clickCell(".folder-list", "Trabajo");
         clickCell(".folder-chats", title(SERVER));
         clickCell(".space-list", "#general");
-        assertEquals("!srv-general:demo", fx(() -> thread().chat().id()));
+        assertEquals("!srv-general:demo", fx(() -> Present.of(thread().chat()).id()));
 
         key(fx(() -> scene.getRoot().lookup(".space-list")), KeyCode.ESCAPE);
         assertEquals(SERVER, fx(() -> folderChats().getSelectionModel().getSelectedItem().id()));
-        assertEquals("!srv-general:demo", fx(() -> thread().chat().id()), "going back closes nothing");
+        assertEquals("!srv-general:demo", fx(() -> Present.of(thread().chat()).id()), "going back closes nothing");
     }
 
     @Test
@@ -571,9 +553,8 @@ class FoldersUiTest {
         clickCell(".folder-list", "Trabajo");
         Chat last = fx(() -> folderChats().getItems().getLast());
         assertTrue(texts(".folder-chats").stream().noneMatch(t -> t.startsWith(last.title())), "the folder must be longer than the window");
-        fx(() -> {
+        FxWait.onFx(() -> {
             pane.setSelected(last.id());
-            return null;
         });
         fire(fx(() -> buttons("Volver a carpetas").get(0)));
 
@@ -599,12 +580,11 @@ class FoldersUiTest {
 
     /** Selects {@code chatId} and presses the menu key: what the menu that opens offers. */
     private List<String> menuKeyOn(ListView<Chat> list, String chatId) throws InterruptedException {
-        fx(() -> {
+        FxWait.onFx(() -> {
             int row = -1;
             for (int i = 0; i < list.getItems().size(); i++) if (list.getItems().get(i).id().equals(chatId)) row = i;
             assertTrue(row >= 0, "no row " + chatId);
             list.getSelectionModel().select(row);
-            return null;
         });
         return menuKey(list);
     }
@@ -736,7 +716,7 @@ class FoldersUiTest {
     }
 
     private void clickCell(String list, String startsWith) throws InterruptedException {
-        fx(() -> {
+        FxWait.onFx(() -> {
             scene.getRoot().applyCss();
             scene.getRoot().layout();
             Node cell = scene.getRoot().lookupAll(list + " .list-cell").stream()
@@ -746,23 +726,20 @@ class FoldersUiTest {
                     }).findFirst().orElseThrow(() -> new AssertionError("no row " + startsWith + " in " + texts0(list)));
             Event.fireEvent(cell, new MouseEvent(MouseEvent.MOUSE_CLICKED, 0, 0, 0, 0, MouseButton.PRIMARY, 1,
                     false, false, false, false, true, false, false, false, false, false, null));
-            return null;
         });
         FxWait.settled();
     }
 
     private static void fire(Button b) throws InterruptedException {
-        fx(() -> {
+        FxWait.onFx(() -> {
             b.fire();
-            return null;
         });
         FxWait.settled();
     }
 
     private static void key(Node target, KeyCode code) throws InterruptedException {
-        fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false));
-            return null;
         });
         FxWait.settled();
     }
@@ -772,7 +749,7 @@ class FoldersUiTest {
         FxWait.until(what, condition);
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

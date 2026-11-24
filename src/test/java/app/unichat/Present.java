@@ -3,7 +3,7 @@ package app.unichat;
 import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
+import org.junit.jupiter.api.Assumptions;
 
 /**
  * A value a test goes on with: the test fails when it's null, else it's given back as not null. For a call that may
@@ -19,7 +19,7 @@ public final class Present {
 
     /** A tool this computer may lack ({@code Ffmpeg.find()}): the test is skipped, saying {@code why}, when it's null. */
     public static <T> T orSkip(@Nullable T value, String why) {
-        assumeTrue(value != null, why);
+        if (value == null) return Assumptions.abort(why); // skipped: NullAway doesn't read assumeTrue
         return value;
     }
 

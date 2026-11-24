@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -24,6 +25,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class DeleteMessagesUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TimelineWindow w;
 
     @BeforeAll
@@ -42,16 +44,14 @@ class DeleteMessagesUiTest {
 
     /** The sheet's red button: "Borrar…" first, then "Sí, borrar para todos". */
     private void danger() throws InterruptedException {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             ((Button) sheet().lookup(".danger-button")).fire();
-            return null;
         });
     }
 
     private void cancel() throws InterruptedException {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             ((Button) sheet().lookup(".secondary-button")).fire();
-            return null;
         });
     }
 
@@ -98,15 +98,13 @@ class DeleteMessagesUiTest {
         Button delete = FxWait.fx(() -> (Button) w.scene.getRoot().lookup(".thread-header .selection-bar .danger-button"));
         assertNotNull(delete, "the bar deletes, in red");
         assertEquals("Eliminar para todos", FxWait.fx(delete::getText));
-        FxWait.fx(() -> {
-            TimelineWindow.press(w.cellOf(theirs), false); // someone else's can't be deleted for everyone: not picked
-            TimelineWindow.press(w.cellOf(last), true);    // with Shift, mine from the first to the last
-            return null;
+        FxWait.onFx(() -> {
+            TimelineWindow.press(Present.of(w.cellOf(theirs)), false); // someone else's can't be deleted for everyone: not picked
+            TimelineWindow.press(Present.of(w.cellOf(last)), true);    // with Shift, mine from the first to the last
         });
         assertEquals("3 seleccionados", FxWait.fx(() -> ((Label) w.scene.getRoot().lookup(".selection-count")).getText()));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             delete.fire();
-            return null;
         });
         assertEquals("¿Eliminar 3 mensajes para todos?", title());
         assertEquals("“mensaje 1” y 2 más", FxWait.fx(() -> ((Label) sheet().lookup(".delete-preview")).getText()));

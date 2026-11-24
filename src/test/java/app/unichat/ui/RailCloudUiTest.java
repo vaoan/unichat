@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.ui.settings.SettingsWindow;
 import app.unichat.cloud.Cloud;
@@ -63,10 +64,9 @@ class RailCloudUiTest {
 
         FxWait.onFx(gear::fire);
         FxWait.until("Ajustes opens on Nube", () -> "cloud".equals(SettingsWindow.currentPage()));
-        FxWait.fx(() -> {
-            SettingsWindow.current().close();
+        FxWait.onFx(() -> {
+            Present.of(SettingsWindow.current()).close();
             view.cloudChanged(new Cloud.Status(true, Instant.now(), null, 12, 0));
-            return null;
         });
         assertFalse(FxWait.fx(ring::isVisible), "done: the ring goes");
         assertEquals("Ajustes", FxWait.fx(() -> gear.getTooltip().getText()));

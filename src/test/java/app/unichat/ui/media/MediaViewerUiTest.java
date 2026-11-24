@@ -24,6 +24,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 
 import javax.imageio.ImageIO;
+import org.jspecify.annotations.Nullable;
 import java.awt.image.BufferedImage;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -63,33 +64,30 @@ class MediaViewerUiTest {
     void open() throws Exception {
         Path png = dir.resolve("foto.png");
         ImageIO.write(new BufferedImage(1600, 1200, BufferedImage.TYPE_INT_RGB), "png", png.toFile());
-        fx(() -> {
+        FxWait.onFx(() -> {
             owner = new Stage();
             owner.setScene(new Scene(new StackPane(), 1000, 800));
             owner.show();
             MediaViewer.show(owner, CompletableFuture.completedFuture(png), "Foto", () -> saves++);
-            return null;
         });
         waitFor(() -> fx(() -> viewer().isPresent() && photo().getWidth() > 0 && photo().view().getImage() != null));
     }
 
     @AfterEach
     void close() throws Exception {
-        fx(() -> {
+        FxWait.onFx(() -> {
             viewer().ifPresent(Window::hide);
             owner.close();
-            return null;
         });
     }
 
     @Test
     void fullScreenFillsTheScreen() throws Exception {
         Stage v = (Stage) fx(() -> viewer().orElseThrow());
-        fx(() -> {
+        FxWait.onFx(() -> {
             // F, as the person presses it; an owned window hung in setFullScreen on macOS
             Event.fireEvent(v.getScene().getRoot(), new KeyEvent(KeyEvent.KEY_PRESSED,
                     "", "f", KeyCode.F, false, false, false, false));
-            return null;
         });
         double screenWidth = fx(() -> javafx.stage.Screen.getScreensForRectangle(v.getX(), v.getY(), 1, 1).get(0).getBounds().getWidth());
         FxWait.until("the window fills the screen (" + screenWidth + " wide)", () -> v.isFullScreen() && v.getWidth() >= screenWidth - 1);
@@ -101,10 +99,9 @@ class MediaViewerUiTest {
     void aTallPictureLeavesRoomForTheControls() throws Exception {
         Path tall = dir.resolve("alta.png");
         ImageIO.write(new BufferedImage(300, 5000, BufferedImage.TYPE_INT_RGB), "png", tall.toFile());
-        fx(() -> {
+        FxWait.onFx(() -> {
             viewer().ifPresent(Window::hide);
             MediaViewer.show(owner, CompletableFuture.completedFuture(tall), "Alta", () -> saves++);
-            return null;
         });
         FxWait.until("the tall picture shows", () -> viewer().isPresent() && photo().view().getImage() != null
                 && photo().view().getImage().getHeight() > 1000);
@@ -174,11 +171,10 @@ class MediaViewerUiTest {
     @Test
     void theWheelZoomsAndTheNodeFollows() throws Exception {
         double before = fx(() -> photo().view().getFitWidth());
-        fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(photo(), new ScrollEvent(ScrollEvent.SCROLL, 100, 100, 100, 100, false, false, false, false,
                     false, false, 0, 120, 0, 120, ScrollEvent.HorizontalTextScrollUnits.NONE, 0,
                     ScrollEvent.VerticalTextScrollUnits.NONE, 0, 0, null));
-            return null;
         });
         assertTrue(fx(() -> photo().view().getFitWidth()) > before);
     }
@@ -187,13 +183,12 @@ class MediaViewerUiTest {
     void draggingMovesThePictureAndDoesNotCloseTheWindow() throws Exception {
         key("1", KeyCode.DIGIT1);
         double left = fx(() -> photo().view().getLayoutX());
-        fx(() -> {
+        FxWait.onFx(() -> {
             PhotoPane pane = photo();
             fire(pane, MouseEvent.MOUSE_PRESSED, 300, 1, true);
             fire(pane, MouseEvent.MOUSE_DRAGGED, 250, 1, false);
             fire(pane, MouseEvent.MOUSE_RELEASED, 250, 1, false);
             fire(pane, MouseEvent.MOUSE_CLICKED, 250, 1, false);
-            return null;
         });
         assertEquals(left - 50, (double) fx(() -> photo().view().getLayoutX()), 1e-6);
         assertTrue(fx(() -> viewer().isPresent()), "the end of a drag is no click beside the picture");
@@ -201,28 +196,24 @@ class MediaViewerUiTest {
 
     @Test
     void aClickBesideThePictureClosesAndOnItDoesNot() throws Exception {
-        fx(() -> {
+        FxWait.onFx(() -> {
             fire(photo().view(), MouseEvent.MOUSE_CLICKED, 300, 1, true);
-            return null;
         });
         assertTrue(fx(() -> viewer().isPresent()));
-        fx(() -> {
+        FxWait.onFx(() -> {
             fire(photo(), MouseEvent.MOUSE_CLICKED, 1, 1, true);
-            return null;
         });
         assertFalse(fx(() -> viewer().isPresent()));
     }
 
     @Test
     void aDoubleClickTogglesRealSize() throws Exception {
-        fx(() -> {
+        FxWait.onFx(() -> {
             fire(photo().view(), MouseEvent.MOUSE_CLICKED, 300, 2, true);
-            return null;
         });
         assertEquals(100, (int) fx(() -> photo().zoom().percent()));
-        fx(() -> {
+        FxWait.onFx(() -> {
             fire(photo().view(), MouseEvent.MOUSE_CLICKED, 300, 2, true);
-            return null;
         });
         assertTrue(fx(() -> photo().zoom().isFitted()));
     }
@@ -234,9 +225,8 @@ class MediaViewerUiTest {
         for (Button b : buttons) {
             assertTrue(b.getAccessibleText() != null || !b.getText().isEmpty(), String.valueOf(b));
         }
-        fx(() -> {
+        FxWait.onFx(() -> {
             buttons.stream().filter(b -> "Guardar como…".equals(b.getText())).findFirst().orElseThrow().fire();
-            return null;
         });
         assertEquals(1, saves);
     }
@@ -254,10 +244,9 @@ class MediaViewerUiTest {
     }
 
     private void key(String text, KeyCode code) throws InterruptedException {
-        fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(viewer().orElseThrow().getScene(),
                     new KeyEvent(KeyEvent.KEY_PRESSED, KeyEvent.CHAR_UNDEFINED, text, code, false, false, false, false));
-            return null;
         });
     }
 
@@ -290,7 +279,7 @@ class MediaViewerUiTest {
                 .toList());
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

@@ -16,6 +16,7 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CountDownLatch;
 
@@ -55,13 +56,12 @@ class MenuDismissUiTest {
         });
         FxWait.settled();
         for (String how : new String[] {"a click outside", "Esc"}) {
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 var p = emoji.localToScreen(5, 5);
                 Event.fireEvent(emoji, new ContextMenuEvent(ContextMenuEvent.CONTEXT_MENU_REQUESTED, 5, 5, p.getX(), p.getY(), false, null));
-                return null;
             });
             FxWait.until("the menu is open", () -> open() != null);
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 Robot r = new Robot();
                 if (how.equals("Esc")) {
                     r.keyPress(KeyCode.ESCAPE);
@@ -70,7 +70,6 @@ class MenuDismissUiTest {
                     r.mouseMove(stage[0].getX() + 300, stage[0].getY() + 250);
                     r.mouseClick(MouseButton.PRIMARY);
                 }
-                return null;
             });
             FxWait.until(how + " closes it", () -> open() == null);
         }
@@ -78,7 +77,7 @@ class MenuDismissUiTest {
         assertFalse(FxWait.fx(() -> open() != null));
     }
 
-    private static ContextMenu open() throws InterruptedException {
+    private static @Nullable ContextMenu open() throws InterruptedException {
         return FxWait.fx(() -> Window.getWindows().stream().filter(w -> w instanceof ContextMenu && w.isShowing())
                 .map(w -> (ContextMenu) w).findFirst().orElse(null));
     }

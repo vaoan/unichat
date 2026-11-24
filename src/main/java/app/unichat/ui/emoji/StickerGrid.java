@@ -48,10 +48,10 @@ public final class StickerGrid extends ScrollPane {
     /** The most a search shows (each tile loads its picture): a few screens; more words narrow it. */
     static final int MOST_FOUND = 60;
 
-    private final Supplier<String> takeReply;
+    private final Supplier<@Nullable String> takeReply;
     private final ChatService svc;
     private final MediaLibrary library;
-    private final Supplier<Chat> chat;
+    private final Supplier<@Nullable Chat> chat;
     private final Consumer<String> toast;
     private final VBox content = new VBox(10);
     private final TileCache tiles = new TileCache();
@@ -71,7 +71,7 @@ public final class StickerGrid extends ScrollPane {
         refreshed = r;
     }
 
-    public StickerGrid(ChatService svc, MediaLibrary library, Supplier<Chat> chat, Supplier<String> takeReply, Consumer<String> toast) {
+    public StickerGrid(ChatService svc, MediaLibrary library, Supplier<@Nullable Chat> chat, Supplier<@Nullable String> takeReply, Consumer<String> toast) {
         this.takeReply = takeReply;
         this.svc = svc;
         this.library = library;

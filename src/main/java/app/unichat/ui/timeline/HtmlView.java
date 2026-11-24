@@ -17,6 +17,7 @@ import javafx.scene.text.TextFlow;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Element;
 import org.jsoup.nodes.TextNode;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
@@ -78,7 +79,7 @@ final class HtmlView {
     }
 
     /** What's inherited from the tags around some text. */
-    private record Look(boolean bold, boolean italic, boolean underline, boolean strike, boolean code, boolean pre, double scale, String color) {
+    private record Look(boolean bold, boolean italic, boolean underline, boolean strike, boolean code, boolean pre, double scale, @Nullable String color) {
         static final Look PLAIN = new Look(false, false, false, false, false, false, 1, null);
 
         Look bolder() { return new Look(true, italic, underline, strike, code, pre, scale, color); }
@@ -95,7 +96,7 @@ final class HtmlView {
     private static final class Blocks {
         final VBox target;
         final double width;
-        TextFlow run;
+        @Nullable TextFlow run;
 
         Blocks(VBox target, double width) {
             this.target = target;
@@ -177,7 +178,7 @@ final class HtmlView {
     }
 
     /** How a tag of the text's own (bold, italic, code…) changes the look; null for any other tag. */
-    private static Look textLook(String tag, Look look) {
+    private static @Nullable Look textLook(String tag, Look look) {
         return switch (tag) {
             case "b", "strong", "th" -> look.bolder();
             case "i", "em", "cite", "dfn", "var" -> look.slanted();
@@ -209,7 +210,7 @@ final class HtmlView {
         }
     }
 
-    private void nested(Element e, Blocks b, Look look, String style) {
+    private void nested(Element e, Blocks b, Look look, @Nullable String style) {
         VBox box = new VBox(4);
         if (style != null) box.getStyleClass().add(style);
         contents(e, box, b.width, look);
@@ -322,7 +323,7 @@ final class HtmlView {
         Hyperlink veil = new Hyperlink(reason.isBlank() ? I18n.t("html.spoiler") : I18n.t("html.spoilerReason", reason));
         veil.getStyleClass().addAll("msg-link", "html-spoiler");
         b.inline(veil);
-        TextFlow flow = b.run;
+        TextFlow flow = java.util.Objects.requireNonNull(b.run, "inline() has just put the veil in a run");
         veil.setOnAction(a -> {
             VBox holder = new VBox();
             Blocks hidden = new Blocks(holder, b.width);
@@ -336,7 +337,7 @@ final class HtmlView {
     }
 
     /** The first that's a plain color: these go into a style, and whoever wrote them isn't to be trusted with that. */
-    private static String color(String... candidates) {
+    private static @Nullable String color(String... candidates) {
         for (String c : candidates) if (c.matches("#[0-9A-Fa-f]{6}")) return c;
         return null;
     }

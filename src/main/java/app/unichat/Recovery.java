@@ -2,6 +2,8 @@ package app.unichat;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
+import org.jspecify.annotations.Nullable;
+
 import java.lang.management.ManagementFactory;
 import java.lang.management.MemoryNotificationInfo;
 import java.lang.management.MemoryPoolMXBean;
@@ -204,7 +206,7 @@ final class Recovery {
         return usedAfter.getAsLong() >= limit;
     }
 
-    private static MemoryPoolMXBean oldGeneration() {
+    private static @Nullable MemoryPoolMXBean oldGeneration() {
         for (MemoryPoolMXBean pool : ManagementFactory.getMemoryPoolMXBeans()) {
             if (pool.getType() == MemoryType.HEAP && pool.isCollectionUsageThresholdSupported()
                     && pool.getName().toLowerCase(Locale.ROOT).contains("old") && pool.getCollectionUsageThreshold() > 0) {

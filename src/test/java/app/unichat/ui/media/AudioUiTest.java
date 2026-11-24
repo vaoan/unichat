@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 import app.unichat.Present;
+import org.jspecify.annotations.Nullable;
 
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -71,7 +72,7 @@ class AudioUiTest {
         });
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
@@ -162,10 +163,9 @@ class AudioUiTest {
         await(() -> playback.state() == AudioPlayback.State.PAUSED, "the bar pauses it");
         FxWait.onFx(() -> ((Button) bar.lookup(".audio-toggle")).fire());
         awaitPlaying(a);
-        fx(() -> {
+        FxWait.onFx(() -> {
             javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(stage.getScene().snapshot(null), null), "png",
                     Path.of(System.getProperty("java.io.tmpdir"), "unichat-audio-bar.png").toFile());
-            return null;
         });
         FxWait.onFx(() -> bar.getChildren().stream().filter(n -> n instanceof Button).map(n -> (Button) n).forEach(Button::fire));
         assertNull(fx(playback::current));
@@ -194,10 +194,9 @@ class AudioUiTest {
         FxWait.onFx(() -> ((Button) view.lookup(".timeline .audio-toggle")).fire());
         await(() -> audio.state() == AudioPlayback.State.PLAYING, "plays");
         assertEquals("!family:demo", fx(() -> Present.of(audio.chat()).id()));
-        fx(() -> {
+        FxWait.onFx(() -> {
             javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(view.getScene().snapshot(null), null), "png",
                     Path.of(System.getProperty("java.io.tmpdir"), "unichat-audio-window.png").toFile());
-            return null;
         });
 
         // Paused first: the demo note lasts 2 s, so "still playing" after changing chats depended on how loaded the

@@ -1,5 +1,6 @@
 package app.unichat.ui.emoji;
 
+import app.unichat.Present;
 import app.unichat.ui.FxWait;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
@@ -55,11 +56,10 @@ class EmojiPickerUiTest {
             return btn;
         });
         FxWait.settled();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             var p = b.localToScreen(5, 5);
             javafx.event.Event.fireEvent(b, new javafx.scene.input.ContextMenuEvent(javafx.scene.input.ContextMenuEvent.CONTEXT_MENU_REQUESTED,
                     5, 5, p.getX(), p.getY(), false, null));
-            return null;
         });
         FxWait.settled();
         javafx.scene.control.ContextMenu menu = FxWait.fx(() -> javafx.stage.Window.getWindows().stream()
@@ -113,7 +113,7 @@ class EmojiPickerUiTest {
             });
             FxWait.onFx(() -> list.scrollTo(row));
             FxWait.until(e + " on screen", () -> button(grid, e) != null);
-            Button b = FxWait.fx(() -> button(grid, e));
+            Button b = Present.of(FxWait.fx(() -> button(grid, e)));
             boolean picture = !e.equals("🫠");
             assertEquals(picture, FxWait.fx(() -> b.getGraphic() instanceof ImageView), e + (picture ? " drawn as a picture" : " drawn as text"));
         }
@@ -152,10 +152,9 @@ class EmojiPickerUiTest {
         List<?> rows = FxWait.fx(() -> List.copyOf(list.getItems()));
         assertEquals(new EmojiRows.Title("Resultados"), rows.get(0));
         assertEquals(List.of("🫠"), rows.stream().filter(r -> r instanceof EmojiRows.Emojis).flatMap(r -> ((EmojiRows.Emojis) r).emoji().stream()).toList());
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             javafx.event.Event.fireEvent(grid.searchField(), new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED,
                     "", "", javafx.scene.input.KeyCode.ENTER, false, false, false, false));
-            return null;
         });
         assertEquals("🫠", picked.get());
         FxWait.onFx(() -> grid.searchField().setText("zzqx"));

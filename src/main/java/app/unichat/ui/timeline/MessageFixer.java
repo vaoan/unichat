@@ -135,7 +135,8 @@ final class MessageFixer implements ChatService.Listener {
         runner.execute(() -> {
             CompletableFuture<Void> edited;
             Correction.Result r = Correction.of(writers.get(), original);
-            if (r.failure() == null) edited = apply(m, original, r.text(), quiet);
+            String fixed = r.text(); // null exactly when it failed
+            if (fixed != null) edited = apply(m, original, fixed, quiet);
             else {
                 tell.accept(I18n.t("messageFix.failed", r.failure()));
                 edited = CompletableFuture.completedFuture(null);

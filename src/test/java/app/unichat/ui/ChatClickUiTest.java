@@ -15,6 +15,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -29,8 +30,11 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class ChatClickUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private Stage stage;
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private MainView view;
     private final List<Throwable> failures = new CopyOnWriteArrayList<>();
 
@@ -50,9 +54,8 @@ class ChatClickUiTest {
     @AfterEach
     void close() throws Exception {
         svc.stop();
-        fx(() -> {
+        FxWait.onFx(() -> {
             stage.close();
-            return null;
         });
     }
 
@@ -90,10 +93,9 @@ class ChatClickUiTest {
         });
         assertTrue(focused, "the list has the focus");
         if (unreadOnly) {
-            fx(() -> {
+            FxWait.onFx(() -> {
                 ChatListPane pane = (ChatListPane) scene.getRoot().lookup(".chat-list-pane");
                 pane.filterProperty().set(pane.filterProperty().get().withUnreadOnly(true));
-                return null;
             });
             FxWait.settled();
         }
@@ -129,7 +131,7 @@ class ChatClickUiTest {
                 true, false, false, true, false, true, null);
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

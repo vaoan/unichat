@@ -28,6 +28,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -65,7 +66,7 @@ public final class CaptureSheet {
     private final Consumer<Node> show;
     private final Runnable hide;
     private final Consumer<String> toast;
-    private Function<Window, File> chooseFolder = w -> {
+    private Function<@Nullable Window, @Nullable File> chooseFolder = w -> {
         javafx.stage.DirectoryChooser c = new javafx.stage.DirectoryChooser();
         c.setTitle(I18n.t("capture.save"));
         return c.showDialog(w);
@@ -79,7 +80,7 @@ public final class CaptureSheet {
     }
 
     /** Tests: where "Guardar…" saves, without a folder dialog. */
-    void useFolderChooser(Function<Window, File> choose) {
+    void useFolderChooser(Function<@Nullable Window, @Nullable File> choose) {
         chooseFolder = choose;
     }
 
@@ -105,7 +106,7 @@ public final class CaptureSheet {
         final Button send = new Button(I18n.t("capture.sendToChats"));
         final Button copy = new Button(I18n.t("capture.copy"));
         final Button save = new Button(I18n.t("capture.save"));
-        ConversationShot.Shot shot;
+        ConversationShot.@Nullable Shot shot;
         List<Image> pictures = List.of();
         /** Which take is the latest: an older one finishing later (the footer changed twice) is ignored. */
         int takes;
@@ -208,7 +209,7 @@ public final class CaptureSheet {
          * The pictures as PNG files, in order, into {@code dir} (never over a file there); null: a folder of their own
          * with what's made for sending, which is swept after a day: a capture of a private chat never stays for good.
          */
-        CompletableFuture<List<Path>> files(Path dir) {
+        CompletableFuture<List<Path>> files(@Nullable Path dir) {
             List<Image> now = pictures;
             String base = I18n.t("capture.fileName", app.unichat.autosave.FileNames.folder(chat.title()), LocalDate.now(ZoneId.systemDefault()));
             return CompletableFuture.supplyAsync(() -> {
@@ -243,7 +244,7 @@ public final class CaptureSheet {
         }
 
         void save() {
-            File folder = chooseFolder.apply(card.getScene() == null ? null : card.getScene().getWindow());
+            File folder = chooseFolder.apply(app.unichat.ui.Nodes.window(card));
             if (folder == null) return;
             // Straight into the folder chosen: no copy of the chat left anywhere else.
             var _ = files(folder.toPath()).whenComplete((fs, err) -> Platform.runLater(() -> toast.accept(err != null

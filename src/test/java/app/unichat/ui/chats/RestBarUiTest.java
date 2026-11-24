@@ -78,10 +78,9 @@ class RestBarUiTest {
     }
 
     private static void close(RestBar bar) throws InterruptedException {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             bar.dispose();
             bar.getScene().getWindow().hide();
-            return null;
         });
     }
 

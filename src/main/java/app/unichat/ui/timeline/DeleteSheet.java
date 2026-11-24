@@ -89,7 +89,9 @@ public final class DeleteSheet {
     /** The first message quoted (its text, else its file's name or what it is), and how many more go with it. */
     static String preview(List<Message> messages) {
         Message m = messages.getFirst();
-        String text = m.body() == null || m.body().isBlank() ? m.fileName() == null ? "" : m.fileName() : m.body();
+        String body = m.body();
+        String name = m.fileName();
+        String text = body == null || body.isBlank() ? name == null ? "" : name : body;
         text = text.strip().replaceAll("\\s+", " ");
         if (text.codePointCount(0, text.length()) > QUOTE) text = text.substring(0, text.offsetByCodePoints(0, QUOTE)) + "…";
         String quote = I18n.t("delete.preview", text);

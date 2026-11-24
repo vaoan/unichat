@@ -16,6 +16,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import app.unichat.Present;
+import org.jspecify.annotations.Nullable;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -41,7 +42,7 @@ class TypingDotsUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
@@ -105,10 +106,9 @@ class TypingDotsUiTest {
         assertNotNull(fx(line::getGraphic));
         assertEquals("Laura está escribiendo", fx(line::getText));
         assertTrue(fx(line::getAccessibleText).contains("escribiendo"));
-        fx(() -> {
+        FxWait.onFx(() -> {
             javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(view.getScene().snapshot(null), null), "png",
                     java.nio.file.Path.of(System.getProperty("java.io.tmpdir"), "unichat-typing.png").toFile());
-            return null;
         });
         FxWait.onFx(() -> {
             chat.setTyping(Set.of());

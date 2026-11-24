@@ -17,6 +17,7 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.concurrent.CountDownLatch;
@@ -121,7 +122,7 @@ class TimelineWidthUiTest {
     }
 
     /** What the timeline shows for message {@code id}. */
-    private static Node row(ThreadPane thread, String id) {
+    private static @Nullable Node row(ThreadPane thread, String id) {
         return thread.lookupAll(".row-cell").stream().map(n -> (ListCell<?>) n)
                 .filter(c -> c.getItem() instanceof ThreadRows.MessageRow r && r.message().id().equals(id))
                 .map(ListCell::getGraphic).findFirst().orElse(null);

@@ -44,8 +44,8 @@ public final class I18n {
     }
 
     /** {@code key.one} when {@code count} is 1, else {@code key.other}; {@code {0}} is the count. */
-    public static String n(String key, long count, Object... more) {
-        Object[] args = new Object[more.length + 1];
+    public static String n(String key, long count, @Nullable Object... more) {
+        @Nullable Object[] args = new Object[more.length + 1];
         args[0] = count;
         System.arraycopy(more, 0, args, 1, more.length);
         return t(key + (count == 1 ? ".one" : ".other"), args);

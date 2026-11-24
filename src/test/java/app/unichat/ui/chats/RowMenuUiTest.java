@@ -23,6 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import app.unichat.Present;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -72,10 +73,9 @@ class RowMenuUiTest {
     @AfterEach
     void closeWindow() throws Exception {
         svc.stop();
-        fx(() -> {
+        FxWait.onFx(() -> {
             openMenus().forEach(ContextMenu::hide);
             ((Stage) scene.getWindow()).close();
-            return null;
         });
     }
 
@@ -85,18 +85,16 @@ class RowMenuUiTest {
         svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
 
         assertMenuSurvivesRefresh(".chat-list");
-        fx(() -> {
+        FxWait.onFx(() -> {
             scene.getRoot().lookupAll(".rail-button").stream()
                     .filter(n -> "Carpetas".equals(((javafx.scene.control.Button) n).getTooltip().getText()))
                     .findFirst().map(javafx.scene.control.Button.class::cast).orElseThrow().fire();
-            return null;
         });
         FxWait.until("the folder list shows", () -> firstRow(".folder-list") != null);
         assertMenuSurvivesRefresh(".folder-list");
-        fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(firstRow(".folder-list"), new MouseEvent(MouseEvent.MOUSE_CLICKED, 0, 0, 0, 0, MouseButton.PRIMARY, 1,
                     false, false, false, false, true, false, false, false, false, false, null));
-            return null;
         });
         FxWait.until("the folder's chats show", () -> firstRow(".folder-chats") != null);
         assertMenuSurvivesRefresh(".folder-chats");
@@ -105,18 +103,16 @@ class RowMenuUiTest {
     /** The person's usual state: a chat open, the list scrolled elsewhere, and other chats moving as messages arrive. */
     @Test
     void aRowsMenuStaysOpenWithAChatOpenAndTheListScrolled() throws Exception {
-        fx(() -> {
+        FxWait.onFx(() -> {
             scene.getWindow().setHeight(300);
-            return null;
         });
         ChatListPane pane = fx(() -> (ChatListPane) scene.getRoot().lookupAll("*").stream()
                 .filter(ChatListPane.class::isInstance).findFirst().orElseThrow());
-        fx(() -> {
+        FxWait.onFx(() -> {
             pane.setSelected(FAMILIA);
-            return null;
         });
         FxWait.settled();
-        fx(() -> {
+        FxWait.onFx(() -> {
             @SuppressWarnings("unchecked") // lookup() gives a Node: the list found by its style class is that ListView
             javafx.scene.control.ListView<app.unichat.model.Chat> l =
                     (javafx.scene.control.ListView<app.unichat.model.Chat>) scene.getRoot().lookup(".chat-list");
@@ -125,10 +121,9 @@ class RowMenuUiTest {
             int last = l.getItems().size() - 1;
             while (last > 0 && pane.rowMenu(l.getItems().get(last)) == null) last--;
             l.scrollTo(last);
-            return null;
         });
         FxWait.settled();
-        fx(() -> {
+        FxWait.onFx(() -> {
             scene.getRoot().applyCss();
             scene.getRoot().layout();
             List<Node> rows = scene.getRoot().lookupAll(".chat-list .list-cell").stream()
@@ -137,14 +132,12 @@ class RowMenuUiTest {
             for (int i = rows.size() - 1; i >= 0 && openMenus().isEmpty(); i--) {
                 Event.fireEvent(rows.get(i), new ContextMenuEvent(ContextMenuEvent.CONTEXT_MENU_REQUESTED, 0, 0, 0, 0, false, null));
             }
-            return null;
         });
         assertFalse(fx(() -> openMenus().isEmpty()), () -> "no row opened a menu; rows: " + rowsDebug());
         ContextMenu menu = fx(() -> openMenus().get(0));
         Throwable[] closedBy = new Throwable[1];
-        fx(() -> {
+        FxWait.onFx(() -> {
             menu.setOnHidden(e -> closedBy[0] = new Throwable());
-            return null;
         });
         for (int i = 0; i < 6; i++) {
             svc.setPinned(FAMILIA, i % 2 == 0).get();
@@ -154,11 +147,10 @@ class RowMenuUiTest {
     }
 
     private void assertMenuSurvivesRefresh(String list) throws InterruptedException, ExecutionException {
-        fx(() -> {
+        FxWait.onFx(() -> {
             scene.getRoot().applyCss();
             scene.getRoot().layout();
             Event.fireEvent(firstRow(list), new ContextMenuEvent(ContextMenuEvent.CONTEXT_MENU_REQUESTED, 0, 0, 0, 0, false, null));
-            return null;
         });
         assertFalse(fx(RowMenuUiTest::openMenus).isEmpty(), "the menu of " + list + " opens");
         for (int i = 0; i < 3; i++) { // refreshes are coalesced: let each one land before the next
@@ -166,9 +158,8 @@ class RowMenuUiTest {
             FxWait.settled();
         }
         boolean open = fx(() -> !openMenus().isEmpty());
-        fx(() -> {
+        FxWait.onFx(() -> {
             openMenus().forEach(ContextMenu::hide);
-            return null;
         });
         assertTrue(open, "the menu of " + list + " closed when the list refreshed");
     }
@@ -194,7 +185,7 @@ class RowMenuUiTest {
                 .map(ContextMenu.class::cast).toList();
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

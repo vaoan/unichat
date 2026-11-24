@@ -21,6 +21,7 @@ import javafx.scene.control.TextField;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.List;
@@ -40,22 +41,24 @@ import static app.unichat.ui.settings.SettingsForm.toggle;
  */
 public final class CloudPage {
     /** The app's sync, given when the window is built; null in a session without one (the demo). */
-    private static Cloud cloud;
+    private static @Nullable Cloud cloud;
 
     private CloudPage() {}
 
-    public static void use(Cloud c) {
+    public static void use(@Nullable Cloud c) {
         cloud = c;
     }
 
     static Node build(Consumer<String> toast) {
         Label intro = Labels.help(I18n.t("settings.cloud.intro"));
-        if (cloud == null) return page(I18n.t("settings.nav.cloud"), intro, Labels.help(I18n.t("settings.cloud.unavailable")));
+        Cloud shown = cloud; // the session's when the window is built
+        if (shown == null) return page(I18n.t("settings.nav.cloud"), intro, Labels.help(I18n.t("settings.cloud.unavailable")));
         VBox account = new VBox();
         Runnable[] redraw = {null};
         redraw[0] = () -> {
-            if (CloudAccount.saved() == null) account.getChildren().setAll(connectForm(toast, redraw[0]));
-            else account.getChildren().setAll(new VBox(16, connected(redraw[0]), VaultPage.build(cloud)));
+            CloudAccount saved = CloudAccount.saved();
+            if (saved == null) account.getChildren().setAll(connectForm(shown, toast, redraw[0]));
+            else account.getChildren().setAll(new VBox(16, connected(shown, saved, redraw[0]), VaultPage.build(shown)));
         };
         redraw[0].run();
         return page(I18n.t("settings.nav.cloud"), intro, account,
@@ -70,7 +73,7 @@ public final class CloudPage {
      * Which service. pCloud: "Conectar con pCloud" signs in in the browser (works with two-step verification); the rest:
      * address (typed only for "Otro"), login and password or key, tried by "Conectar".
      */
-    private static Node connectForm(Consumer<String> toast, Runnable redraw) {
+    private static Node connectForm(Cloud c, Consumer<String> toast, Runnable redraw) {
         Service[] chosen = {Service.PCLOUD};
         Label status = Labels.help("");
         Nodes.show(status, false);
@@ -83,7 +86,7 @@ public final class CloudPage {
                 }
                 ok.save();
                 toast.accept(I18n.t("settings.cloud.connected", I18n.t("settings.cloud.service." + ok.service().name())));
-                var _ = cloud.syncNow();
+                var _ = c.syncNow();
                 redraw.run();
             }));
         };
@@ -205,10 +208,11 @@ public final class CloudPage {
                 actions(connect));
     }
 
-    /** Who's connected, how the last round went (kept current while shown), "Sincronizar ahora" and "Desconectar". */
-    private static Node connected(Runnable redraw) {
-        Cloud c = cloud; // this page's: the field may be another session's (or none) by the time a round tells
-        CloudAccount a = CloudAccount.saved();
+    /**
+     * Who's connected, how the last round went (kept current while shown), "Sincronizar ahora" and "Desconectar". {@code c} is this
+     * page's: the field may be another session's (or none) by the time a round tells.
+     */
+    private static Node connected(Cloud c, CloudAccount a, Runnable redraw) {
         Label who = new Label(I18n.t("settings.cloud.as", I18n.t("settings.cloud.service." + a.service().name()), a.user()));
         who.setWrapText(true);
         who.setMinHeight(Region.USE_PREF_SIZE);

@@ -7,6 +7,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.StackPane;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The ✕ of every search box: shown while there's text, it clears it and leaves the focus in the box. From the keyboard,
@@ -41,7 +42,7 @@ public final class SearchFields {
     }
 
     /** Esc in a search box with text: empties it and says so (true). Esc in an empty one goes on as usual. */
-    static boolean clearOnEscape(Node focused) {
+    static boolean clearOnEscape(@Nullable Node focused) {
         if (!(focused instanceof TextField f) || !f.getStyleClass().contains(CLEARABLE) || f.getText().isEmpty()) return false;
         f.clear();
         return true;

@@ -7,6 +7,7 @@ import java.io.IOException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,9 +20,10 @@ public final class Theme {
 
     private static final List<Scene> SCENES = new ArrayList<>();
     private static final String CSS = Objects.requireNonNull(Theme.class.getResource("/app/unichat/css/app.css")).toExternalForm();
-    private static Boolean systemDark;
-    private static Boolean systemContrast;
-    private static Boolean systemReducedMotion;
+    /** What the system says, asked once until {@link #applyAll}; null: not asked yet. */
+    private static @Nullable Boolean systemDark;
+    private static @Nullable Boolean systemContrast;
+    private static @Nullable Boolean systemReducedMotion;
 
     /**
      * Styles {@code scene} and keeps it in step with theme changes while its window shows. A closed window keeps its
@@ -35,7 +37,8 @@ public final class Theme {
             if (w == null) SCENES.remove(scene);
             else followShowing(w, scene);
         });
-        if (scene.getWindow() != null) followShowing(scene.getWindow(), scene);
+        javafx.stage.Window shown = scene.getWindow();
+        if (shown != null) followShowing(shown, scene);
         apply(scene);
     }
 

@@ -7,6 +7,8 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
@@ -18,28 +20,20 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Which code NullAway checks ({@code OnlyNullMarked}): the packages done so far, each marked {@code @NullMarked} on its
- * {@code package-info.java}, and nothing marked or left out anywhere else. {@code BuildRulesTest} checks NullAway's options.
+ * Which code NullAway checks ({@code OnlyNullMarked}): every package, main and test, has its {@code package-info.java}
+ * marked {@code @NullMarked} (a package with main code in {@code src/main/java}, a package only tests have in
+ * {@code src/test/java}), so a new package is checked from its first class; one exception, {@link #UNMARKED}.
+ * {@code BuildRulesTest} checks NullAway's options.
  */
 class NullMarkedTest {
-    /**
-     * The packages NullAway checks so far, each with its subpackages: a package joins with its {@code package-info.java}
-     * marked {@code @NullMarked}, and its name goes here. Once every package has, this is {@code app.unichat} alone.
-     */
-    private static final List<String> NULL_MARKED = List.of("app.unichat.support", "app.unichat.model", "app.unichat.settings",
-            "app.unichat.service", "app.unichat.cloud", "app.unichat.matrix", "app.unichat.server", "app.unichat.assist",
-            "app.unichat.autosave", "app.unichat.bridge", "app.unichat.cloak", "app.unichat.gif", "app.unichat.links", "app.unichat.login",
-            "app.unichat.stt", "app.unichat.update", "app.unichat.video", "app.unichat.voice", "app.unichat.ui.chats",
-            "app.unichat.ui.desktop", "app.unichat.ui.emoji", "app.unichat.ui.login", "app.unichat.ui.media");
+    /** The one package left unmarked, with why: it has no package-info at all, so nothing in it reaches for JSpecify. */
+    private static final Map<String, String> UNMARKED = Map.of("app.unichat.claude",
+            "run by Java's source launcher with no classpath (.claude/hooks/java.sh); JSpecify isn't on it");
 
     /** The mark, by its simple or its qualified name, however it's spaced. */
     private static final Pattern MARK = Pattern.compile("@\\s*(org\\s*\\.\\s*jspecify\\s*\\.\\s*annotations\\s*\\.\\s*)?NullMarked\\b");
     private static final Pattern PACKAGE = Pattern.compile("\\bpackage\\s+([\\w.\\s]+?)\\s*;");
     private static final Pattern IMPORTED = Pattern.compile("\\bimport\\s+org\\s*\\.\\s*jspecify\\s*\\.\\s*annotations\\s*\\.\\s*(NullMarked|\\*)\\s*;");
-
-    private static boolean done(String pkg) {
-        return NULL_MARKED.stream().anyMatch(d -> pkg.equals(d) || pkg.startsWith(d + "."));
-    }
 
     /** Whether a {@code package-info.java}'s package declaration carries the mark, in code (not a comment or a string). */
     static boolean marksItsPackage(String text) {
@@ -74,30 +68,48 @@ class NullMarkedTest {
     }
 
     @Test
-    void everyPackageDoneIsNullMarked() throws IOException {
-        Set<String> marked = new TreeSet<>();
-        for (String pkg : BuildRulesTest.mainPackages()) {
-            Path info = Path.of("src/main/java", pkg.split("\\.")).resolve("package-info.java");
-            boolean isMarked = Files.exists(info) && marksItsPackage(Files.readString(info));
-            if (isMarked) marked.add(pkg);
-            assertEquals(done(pkg), isMarked, pkg + (done(pkg) ? " is done, so its package-info.java is @NullMarked (each subpackage"
-                    + " has its own)" : " is marked: add it to NULL_MARKED"));
+    void everyPackageMainAndTestIsNullMarked() throws IOException {
+        Set<String> main = BuildRulesTest.mainPackages();
+        Set<String> all = new TreeSet<>(main);
+        all.addAll(packagesUnder(Path.of("src/test/java")));
+        List<String> unmarked = new ArrayList<>();
+        for (String pkg : all) {
+            if (UNMARKED.containsKey(pkg)) continue;
+            Path info = Path.of(main.contains(pkg) ? "src/main/java" : "src/test/java", pkg.split("\\.")).resolve("package-info.java");
+            if (!Files.exists(info) || !marksItsPackage(Files.readString(info))) unmarked.add(info.toString());
         }
-        assertFalse(marked.isEmpty(), "the packages done so far are marked");
+        assertEquals(List.of(), unmarked, "each package's package-info.java is @NullMarked (each subpackage has its own;"
+                + " one only tests have, under src/test/java): NullAway checks only what is marked");
+        assertTrue(all.containsAll(List.of("app.unichat", "app.unichat.ui", "app.unichat.build")), "main and test packages are read");
     }
 
     @Test
-    void noClassIsMarkedOutsideThePackagesDone() throws IOException {
-        List<String> outside = new ArrayList<>();
-        for (Path f : javaFiles()) {
-            if (f.getFileName().toString().equals("package-info.java")) continue;
-            String text = Files.readString(f);
-            Matcher pkg = PACKAGE.matcher(SuppressionsHaveReasonsTest.code(text));
-            String name = pkg.find() ? pkg.group(1).replaceAll("\\s", "") : "";
-            if (!done(name) && marksAClass(text)) outside.add(f.toString());
+    void theUnmarkedPackageHasNoPackageInfo() {
+        for (Map.Entry<String, String> unmarked : UNMARKED.entrySet()) {
+            String pkg = unmarked.getKey();
+            Path folder = Path.of("src/test/java", pkg.split("\\."));
+            assertFalse(Files.exists(folder.resolve("package-info.java")), pkg + " has no package-info.java: " + unmarked.getValue());
+            assertTrue(Files.isDirectory(folder), pkg + " is still there; once gone, it leaves UNMARKED");
         }
-        assertEquals(List.of(), outside, "a class marked @NullMarked in a package not done: the package joins whole"
-                + " (its package-info.java, and NULL_MARKED)");
+    }
+
+    @Test
+    void aPackageIsMarkedOnlyOnce() throws IOException {
+        List<String> twice = new ArrayList<>();
+        for (String pkg : BuildRulesTest.mainPackages()) {
+            Path inTests = Path.of("src/test/java", pkg.split("\\.")).resolve("package-info.java");
+            if (Files.exists(inTests)) twice.add(inTests.toString());
+        }
+        assertEquals(List.of(), twice, "a package with main code is marked in src/main/java alone: its tests share that mark");
+    }
+
+    @Test
+    void noClassMarksItselfItsPackageDoes() throws IOException {
+        List<String> marked = new ArrayList<>();
+        for (Path f : javaFiles()) {
+            if (!isPackageInfo(f) && marksAClass(Files.readString(f))) marked.add(f.toString());
+        }
+        assertEquals(List.of(), marked, "a class marked @NullMarked by itself: its package's package-info.java says it for all");
     }
 
     @Test
@@ -106,6 +118,20 @@ class NullMarkedTest {
             String text = Files.readString(f);
             assertFalse(text.contains("Null" + "Unmarked"), f + " leaves code out of NullAway: a finding is fixed, or"
                     + " suppressed on one member with its reason");
+        }
+    }
+
+    private static boolean isPackageInfo(Path f) {
+        return "package-info.java".equals(String.valueOf(f.getFileName()));
+    }
+
+    /** The packages with a class under {@code root}. */
+    private static Set<String> packagesUnder(Path root) throws IOException {
+        try (Stream<Path> files = Files.walk(root)) {
+            return files.filter(f -> f.toString().endsWith(".java") && !isPackageInfo(f))
+                    .map(f -> root.relativize(Objects.requireNonNull(f.getParent(), "a file found under root is in a folder"))
+                            .toString().replace(f.getFileSystem().getSeparator(), "."))
+                    .collect(TreeSet::new, Set::add, Set::addAll);
         }
     }
 

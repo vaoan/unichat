@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.TestPictures;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
@@ -16,6 +17,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,6 +36,7 @@ import static org.junit.jupiter.api.Assumptions.assumeTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class TimelineMediaUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TimelineWindow w;
     private Path dir;
 
@@ -70,7 +73,7 @@ class TimelineMediaUiTest {
         };
     }
 
-    private static Consumer<Message> file(MessageType type, String url, String mime, String name, long size, ObjectNode info) {
+    private static Consumer<Message> file(MessageType type, String url, String mime, String name, long size, @Nullable ObjectNode info) {
         return m -> {
             m.setType(type);
             m.setMediaUrl(url);
@@ -250,8 +253,7 @@ class TimelineMediaUiTest {
     @Test
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aShortVideoThatPlaysInTheChat() throws Exception {
-        Path ffmpeg = Ffmpeg.find();
-        assumeTrue(ffmpeg != null, "no ffmpeg to make a video");
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "no ffmpeg to make a video");
         Path gif = Path.of(java.net.URI.create(gif(320, 240)));
         Path mp4 = dir.resolve("corto.mp4");
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-i", gif.toString(), "-pix_fmt", "yuv420p",

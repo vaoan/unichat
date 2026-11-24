@@ -24,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class ReplyAlignUiTest {
     @TempDir Path dir;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it
     private TimelineWindow w;
 
     @BeforeAll

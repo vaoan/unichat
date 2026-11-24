@@ -110,14 +110,13 @@ class StickerSearchUiTest {
                 });
         library = new MediaLibrary(dir.resolve("lib.json"));
         library.toggleFavorite(sticker("favorito", "😂"));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             grid = new StickerGrid(svc, library, () -> chat, () -> null, t -> { });
             stage = new Stage();
             stage.setOpacity(0);
             stage.setScene(new Scene(grid, 400, 600));
             stage.show();
             grid.refresh();
-            return null;
         });
     }
 
@@ -158,9 +157,8 @@ class StickerSearchUiTest {
 
     /** Enter on a tile, as the keyboard sends one. */
     private static void send(Node tile) throws InterruptedException {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(tile, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-            return null;
         });
     }
 

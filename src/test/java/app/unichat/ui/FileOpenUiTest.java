@@ -75,10 +75,9 @@ class FileOpenUiTest {
                 ((StackPane) stage[0].getScene().getRoot()).getChildren().add(n);
                 return n;
             });
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 Event.fireEvent(chip, new MouseEvent(MouseEvent.MOUSE_CLICKED, 5, 5, 5, 5, MouseButton.PRIMARY, 1,
                         false, false, false, false, true, false, false, true, false, false, null));
-                return null;
             });
             done.await();
             assertEquals(pdf, opened[0], "the downloaded file");

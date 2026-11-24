@@ -42,6 +42,7 @@ class SyncedSettingsUiTest {
     /** A setting's value from the cloud, and what in the running app shows it took effect. */
     private record Proof(String value, Supplier<Object> effect, Object expected) {}
 
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private static VBox root;
 
     /** Each key: the value another computer chose, and where it shows here. Prefixes end with ".". */
@@ -62,7 +63,7 @@ class SyncedSettingsUiTest {
         p.put("ui.networkBadges", new Proof("false", () -> Settings.get().showNetworkBadges(), false));
         p.put("a11y.messageActions", new Proof("true", () -> Settings.get().alwaysShowMessageActions(), true));
         p.put("a11y.reduceMotion", new Proof("ON", Theme::reduceMotion, true));
-        p.put("account.alias.", new Proof("Trabajo", () -> Settings.get().getString("account.alias.x", null), "Trabajo"));
+        p.put("account.alias.", new Proof("Trabajo", () -> Settings.get().getString("account.alias.x"), "Trabajo"));
         // Read when used: what the code reads at that moment.
         p.put("app.globalShortcut", new Proof("false", () -> Settings.get().globalShortcut(), false));
         p.put("app.showInDock", new Proof("true", () -> Settings.get().showInDock(), true));
@@ -71,8 +72,8 @@ class SyncedSettingsUiTest {
         p.put("discord.mediaDays", new Proof("90", () -> Settings.get().discordMediaDays(), 90));
         p.put("compose.sendOnEnter", new Proof("false", () -> Settings.get().sendOnEnter(), false));
         p.put("privacy.typing", new Proof("false", () -> Settings.get().sendTypingNotifications(), false));
-        p.put("privacy.readReceiptsWhen", new Proof("NEVER", () -> Settings.get().getString("privacy.readReceiptsWhen", null), "NEVER"));
-        p.put("privacy.readReceipts", new Proof("false", () -> Settings.get().getString("privacy.readReceipts", null), "false"));
+        p.put("privacy.readReceiptsWhen", new Proof("NEVER", () -> Settings.get().getString("privacy.readReceiptsWhen"), "NEVER"));
+        p.put("privacy.readReceipts", new Proof("false", () -> Settings.get().getString("privacy.readReceipts"), "false"));
         p.put("privacy.linkPreviews", new Proof("false", () -> Settings.get().linkPreviews(), false));
         p.put("cache.mediaMb", new Proof("5000", () -> Settings.get().mediaCacheMb(), 5000));
         p.put("cache.stickerCount", new Proof("2000", () -> Settings.get().stickerCacheCount(), 2000));
@@ -102,10 +103,10 @@ class SyncedSettingsUiTest {
         p.put("video.gifLongestSeconds", new Proof("30", app.unichat.video.GifVideos::longestSeconds, 30));
         p.put("video.gifMaxMb", new Proof("50", app.unichat.video.GifVideos::maxMb, 50));
         p.put("video.gifLargestSide", new Proof("320", app.unichat.video.GifVideos::largestSide, 320));
-        p.put("cloak.level", new Proof("HIGH", () -> Settings.get().getString("cloak.level", null), "HIGH"));
+        p.put("cloak.level", new Proof("HIGH", () -> Settings.get().getString("cloak.level"), "HIGH"));
         p.put("whatsapp.animatedStickers", new Proof("GIF",
                 () -> app.unichat.service.StickerMode.of(app.unichat.model.Network.WHATSAPP).name(), "GIF"));
-        p.put("gif.", new Proof("true", () -> Settings.get().getString("gif.giphy.enabled", null), "true"));
+        p.put("gif.", new Proof("true", () -> Settings.get().getString("gif.giphy.enabled"), "true"));
         return p;
     }
 
@@ -178,9 +179,8 @@ class SyncedSettingsUiTest {
             Map<String, String> remote = new LinkedHashMap<>(before);
             proofs().forEach((k, proof) -> remote.put(k.endsWith(".") ? k + (k.equals("gif.") ? "giphy.enabled" : "x") : k, proof.value()));
             Settings.get().replacePortable(remote, k -> k.startsWith("panel."));
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 SyncedSettings.apply(Theme::applyAll);
-                return null;
             });
             List<String> wrong = new ArrayList<>();
             for (var e : proofs().entrySet()) {
@@ -191,12 +191,11 @@ class SyncedSettingsUiTest {
         } finally {
             Settings.get().replacePortable(before, k -> false);
             if (forced != null) System.setProperty("unichat.language", forced);
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 I18n.use(language);
                 AiReplyButton.SHOWN.set(AiSettings.enabled());
                 Theme.applyAll();
                 stage.close();
-                return null;
             });
         }
     }

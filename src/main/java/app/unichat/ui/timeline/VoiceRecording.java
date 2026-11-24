@@ -13,6 +13,7 @@ import app.unichat.voice.VoiceRecorder;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -30,10 +31,10 @@ final class VoiceRecording {
     /** What a recording needs from the message box it replaces. */
     interface Box {
         /** The open chat; null with none. */
-        String chatId();
+        @Nullable String chatId();
 
         /** The message being replied to, the note answers it; null if none. */
-        String replyId();
+        @Nullable String replyId();
 
         /** Leaves reply or edit mode, as a sent text does. */
         void cancelMode();
@@ -41,7 +42,7 @@ final class VoiceRecording {
         void focus();
 
         /** Shows {@code bar} where the text box is; null puts the text box back. */
-        void showInstead(Node bar);
+        void showInstead(@Nullable Node bar);
 
         /** Sends with {@code send} in {@code chatId}'s turn, behind texts being corrected before they go. */
         void inTurn(String chatId, Runnable send);
@@ -53,8 +54,8 @@ final class VoiceRecording {
     private final Button mic;
     /** "Preparing the voice note… 3 s": cleaning it up takes seconds, and before it's sent nothing else shows. */
     private final WorkingLine preparing = new WorkingLine();
-    private VoiceBar voiceBar;
-    private VoiceRecorder recorder;
+    private @Nullable VoiceBar voiceBar;
+    private @Nullable VoiceRecorder recorder;
     private Runnable beforeRecording = () -> { };
     private Callable<PcmSource> microphone = Microphone::open;
 
@@ -107,13 +108,14 @@ final class VoiceRecording {
     private void show(VoiceRecorder r) {
         recorder = r;
         mic.setDisable(false);
-        voiceBar = new VoiceBar(r, () -> discard(null), this::send, this::discard);
-        box.showInstead(voiceBar);
+        VoiceBar bar = new VoiceBar(r, () -> discard(null), this::send, this::discard);
+        voiceBar = bar;
+        box.showInstead(bar);
         r.start();
-        voiceBar.focusSend();
+        bar.focusSend();
     }
 
-    private VoiceRecorder end() {
+    private @Nullable VoiceRecorder end() {
         VoiceRecorder r = recorder;
         recorder = null;
         if (voiceBar != null) box.showInstead(null);
@@ -121,7 +123,7 @@ final class VoiceRecording {
         return r;
     }
 
-    private void discard(String message) {
+    private void discard(@Nullable String message) {
         VoiceRecorder r = end();
         if (r == null) return;
         Thread.ofPlatform().daemon().name("voice-discard").start(() -> {
@@ -138,7 +140,7 @@ final class VoiceRecording {
     private void send() {
         VoiceRecorder r = end();
         if (r == null) return;
-        String toChat = box.chatId();
+        String toChat = java.util.Objects.requireNonNull(box.chatId(), "a chat changed or closed discards its recording first");
         String reply = box.replyId();
         box.cancelMode();
         box.focus();

@@ -5,6 +5,7 @@ import app.unichat.assist.ReplyWriter;
 import app.unichat.assist.WritingStyle;
 import app.unichat.support.Errors;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 /**
  * ⌘O's correction of a text, for what goes without the person reviewing it (a message already sent, one waiting to
@@ -12,7 +13,7 @@ import app.unichat.support.I18n;
  */
 final class Correction {
     /** The corrected text, or why there's none (in the person's words). */
-    record Result(String text, String failure) {}
+    record Result(@Nullable String text, @Nullable String failure) {}
 
     private Correction() {}
 

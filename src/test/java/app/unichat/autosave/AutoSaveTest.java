@@ -61,6 +61,8 @@ class AutoSaveTest {
     /** Counted down when a download of {@link #ENDLESS} starts: it never ends by itself (a huge video). */
     private final CountDownLatch endlessStarted = new CountDownLatch(1);
     private AutoSave save;
+    /** Every AutoSave the test made, the one it ends with and any it started again: {@link #stop} waits for each. */
+    private final List<AutoSave> made = new ArrayList<>();
     /** Counted down when a round ends having saved something. */
     private final CountDownLatch roundFinished = new CountDownLatch(1);
 
@@ -119,6 +121,7 @@ class AutoSaveTest {
                 return null;
             }
         }, new TextLog(dir.resolve("texts"), Instant::now), java.time.Duration.ZERO);
+        made.add(a);
         a.setProgress(new AutoSave.Progress() {
             @Override public void changed(int done, int total) { told.add("progress " + done + "/" + total); }
             @Override public void finished(int saved, Chat c) {
@@ -134,7 +137,17 @@ class AutoSaveTest {
     }
 
     @AfterEach
-    void stop() {
+    void stop() throws InterruptedException {
+        // The texts thread writes into the temp folder (texts/, the chat's readable copy) after a round has ended: done
+        // before JUnit deletes the folder, or that failed now and then ("Failed to delete temp directory").
+        for (AutoSave a : made) { // a test may have started it again (closed and opened): each has its own threads
+            CountDownLatch saving = new CountDownLatch(1);
+            a.afterPending(saving::countDown); // the round may hand the texts thread more
+            saving.await();
+            CountDownLatch writing = new CountDownLatch(1);
+            a.afterTexts(writing::countDown);
+            writing.await();
+        }
         SaveFolders.setOwn(chat.id(), null);
         svc.stop();
     }

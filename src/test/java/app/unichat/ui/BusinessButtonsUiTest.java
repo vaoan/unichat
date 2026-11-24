@@ -14,6 +14,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** A WhatsApp Business message shows its buttons as chips, in words, with where to press them, and nothing of the bridge's. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class BusinessButtonsUiTest {
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it
     private TimelineWindow w;
 
     @AfterEach

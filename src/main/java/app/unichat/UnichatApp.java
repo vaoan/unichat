@@ -34,18 +34,24 @@ import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.image.Image;
 import javafx.stage.Stage;
+import org.jspecify.annotations.Nullable;
 
 import java.io.InputStream;
 
 /** Chooses login vs. main view, owns the window, tray icon and the active {@link ChatService}. */
 public final class UnichatApp extends Application {
+    @SuppressWarnings("NullAway.Init") // start() sets it first: JavaFX calls nothing of this class before start()
     private Stage stage;
+    @SuppressWarnings("NullAway.Init") // start() sets it first: JavaFX calls nothing of this class before start()
     private Scene scene;
+    @SuppressWarnings("NullAway.Init") // start() sets it first: JavaFX calls nothing of this class before start()
     private Notifier notifier;
-    private volatile ChatService service;
-    private MainView mainView;
+    /** The session's service; null on the login screen and after logging out. */
+    private volatile @Nullable ChatService service;
+    /** The main window's view; null on the login screen. */
+    private @Nullable MainView mainView;
     /** The person's own storage, kept up to date while a real session runs; null in the demo. */
-    private app.unichat.cloud.Cloud cloud;
+    private app.unichat.cloud.@Nullable Cloud cloud;
 
     public static void main(String[] args) {
         if (System.getProperty("unichat.snapshot") != null) {
@@ -128,7 +134,8 @@ public final class UnichatApp extends Application {
         }, "preferences-shutdown"));
         LogFiles.scheduleCleanup();
         if (s.localServer()) startLocalServer();
-        ChatService restored = switch (s.backend() == null ? "" : s.backend()) {
+        String backend = s.backend();
+        ChatService restored = switch (backend == null ? "" : backend) {
             case "demo" -> demoService();
             case "matrix" -> MatrixLogin.fromSettings();
             default -> null;
@@ -154,7 +161,11 @@ public final class UnichatApp extends Application {
         String startLogin = System.getProperty("unichat.startLogin");
         if (startLogin != null && mainView != null) {
             javafx.animation.PauseTransition wait = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(3));
-            wait.setOnFinished(e -> mainView.addAccount(Network.fromProtocolId(startLogin)));
+            wait.setOnFinished(e -> {
+                MainView view = mainView;
+                Network n = Network.fromProtocolId(startLogin); // an unknown id opens no login
+                if (view != null && n != null) view.addAccount(n);
+            });
             wait.play();
         }
         String snapshot = System.getProperty("unichat.snapshot");
@@ -207,7 +218,7 @@ public final class UnichatApp extends Application {
                 return local.provides(n.protocolId());
             }
 
-            @Override public String provisioningUrl(Network n) {
+            @Override public @Nullable String provisioningUrl(Network n) {
                 return local.provisioningUrl(n.protocolId());
             }
 
@@ -234,7 +245,7 @@ public final class UnichatApp extends Application {
                 notifier.downloadsDone(saved, chat);
                 if (cloud != null) { var _ = cloud.syncNow(); } // what was just saved goes up now, not at the next round
             }
-            @Override public void failed(String what, app.unichat.model.Chat chat, String messageId, String why) {
+            @Override public void failed(String what, app.unichat.model.Chat chat, @Nullable String messageId, String why) {
                 notifier.downloadFailed(what, chat, messageId, why);
             }
         });
@@ -271,7 +282,8 @@ public final class UnichatApp extends Application {
         if (mainView == null || service == null) return;
         String chat = mainView.currentChatId();
         String page = SettingsWindow.currentPage();
-        if (SettingsWindow.current() != null) SettingsWindow.current().close();
+        Stage settings = SettingsWindow.current();
+        if (settings != null) settings.close();
         mainView.dispose();
         mainView = new MainView(service, stage, notifier, this::logout, Browser::open);
         scene.setRoot(mainView);
@@ -375,7 +387,10 @@ public final class UnichatApp extends Application {
             if (mainView == null) return;
             mainView.openChatId(id);
             if (message != null) mainView.showMessage(id, message); // a notice about one message (a file not saved)
-            Platform.runLater(() -> System.err.println("Notification click: " + mainView.openOutcome(id)));
+            Platform.runLater(() -> {
+                MainView view = mainView;
+                if (view != null) System.err.println("Notification click: " + view.openOutcome(id));
+            });
         });
     }
 

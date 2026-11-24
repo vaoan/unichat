@@ -11,8 +11,10 @@ import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import javafx.event.EventHandler;
 import javafx.scene.Node;
+import javafx.scene.Scene;
 import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
+import org.jspecify.annotations.Nullable;
 
 /** The keys that work anywhere in the main window, focus cycling between its zones (F6) and the text size. */
 final class WindowShortcuts implements EventHandler<KeyEvent> {
@@ -96,7 +98,7 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
         return code == KeyCode.R || code == KeyCode.T || code == KeyCode.P || code == KeyCode.E;
     }
 
-    private static boolean inTimeline(Node n) {
+    private static boolean inTimeline(@Nullable Node n) {
         for (Node at = n; at != null; at = at.getParent()) {
             if (at instanceof javafx.scene.control.ListView<?> lv && lv.getStyleClass().contains("timeline")) return true;
         }
@@ -108,8 +110,9 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
         return text != null && !text.isEmpty() && !text.isBlank() && text.codePoints().noneMatch(Character::isISOControl);
     }
 
-    private Node focusOwner() {
-        return view.getScene() == null ? null : view.getScene().getFocusOwner();
+    private @Nullable Node focusOwner() {
+        Scene scene = view.getScene();
+        return scene == null ? null : scene.getFocusOwner();
     }
 
     @Override public void handle(KeyEvent e) {

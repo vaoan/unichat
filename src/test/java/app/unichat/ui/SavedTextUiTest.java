@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.autosave.AutoSave;
 import app.unichat.model.Message;
 import app.unichat.model.SaveKind;
@@ -23,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class SavedTextUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TimelineWindow w;
 
     @BeforeAll
@@ -88,8 +90,8 @@ class SavedTextUiTest {
         FxWait.until("it's listed", () -> w.cellOf(m) != null);
         w.svc.rewrite(CHAT, m.id(), Message::markDeleted);
         FxWait.until("shown as deleted", () -> FxWait.fx(() -> w.cellOf(m) != null
-                && w.cellOf(m).lookup(".deleted-text") != null));
-        List<String> buttons = FxWait.fx(() -> w.cellOf(m).lookupAll(".hover-actions .button").stream()
+                && Present.of(w.cellOf(m)).lookup(".deleted-text") != null));
+        List<String> buttons = FxWait.fx(() -> Present.of(w.cellOf(m)).lookupAll(".hover-actions .button").stream()
                 .map(Node::getAccessibleText).toList());
         assertEquals(List.of("Más"), buttons, "its menu (what it said), no reacting nor replying to what's gone");
     }

@@ -14,6 +14,7 @@ import javafx.scene.control.ToggleButton;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CountDownLatch;
 
@@ -88,14 +89,13 @@ class FilterUiTest {
     }
 
     private static void click(ButtonBase b) throws InterruptedException {
-        fx(() -> {
+        FxWait.onFx(() -> {
             b.fire();
-            return null;
         });
         FxWait.settled();
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

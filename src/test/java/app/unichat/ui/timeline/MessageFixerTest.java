@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import app.unichat.assist.ReplyWriter;
 import app.unichat.model.Message;
 import app.unichat.service.MockChatService;
@@ -7,6 +8,7 @@ import java.util.concurrent.ExecutionException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -24,7 +26,7 @@ class MessageFixerTest {
     private final List<String> prompts = new CopyOnWriteArrayList<>();
     /** What the AI answers for a text it's given: by default each "q" becomes "que". */
     private volatile java.util.function.UnaryOperator<String> answer = t -> t.replace(" q ", " que ");
-    private volatile ReplyWriter.Failure failure;
+    private volatile ReplyWriter.@Nullable Failure failure;
     private MessageFixer fixer;
 
     @BeforeEach
@@ -210,7 +212,7 @@ class MessageFixerTest {
     void aMessageTheNetworkNoLongerLetsEditIsntEdited() throws Exception {
         Message m = sent("creo q sí");
         answer = t -> {
-            svc.chat(CHAT).setFeatures(app.unichat.model.RoomFeatures.parse(
+            Present.of(svc.chat(CHAT)).setFeatures(app.unichat.model.RoomFeatures.parse(
                     new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().put("id", "x").put("edit", 0)));
             return t.replace(" q ", " que ");
         };

@@ -4,6 +4,7 @@ import app.unichat.settings.Settings;
 import javafx.scene.Node;
 import javafx.scene.control.ListCell;
 import javafx.scene.layout.HBox;
+import org.jspecify.annotations.Nullable;
 
 /** A message's row in the timeline, with its action buttons: visible on hover, when selected, or always if so chosen. */
 final class MessageLine extends HBox {
@@ -41,7 +42,7 @@ final class MessageLine extends HBox {
     }
 
     /** The list cell it's in: its parent, or further up when a range's markers wrap it. */
-    private ListCell<?> cell() {
+    private @Nullable ListCell<?> cell() {
         for (javafx.scene.Parent p = getParent(); p != null; p = p.getParent()) if (p instanceof ListCell<?> c) return c;
         return null;
     }

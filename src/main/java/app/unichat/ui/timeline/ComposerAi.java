@@ -17,6 +17,7 @@ import javafx.scene.Node;
 import javafx.scene.control.TextArea;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.Pane;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -34,10 +35,10 @@ final class ComposerAi {
     /** What the AI needs from the message box it writes in. */
     interface Box {
         /** The open chat; null with none. */
-        String chatId();
+        @Nullable String chatId();
 
         /** The message chosen with "Responder"; null if none. */
-        Message replyTo();
+        @Nullable Message replyTo();
 
         /** Makes {@code m} the message being replied to. */
         void reply(Message m);
@@ -57,9 +58,9 @@ final class ComposerAi {
     private volatile Supplier<StyleLearner.Program> learning = () -> StyleLearner.program(AiSettings.engine());
     private AiReplyButton ai;
     private AiReplyButton fix;
-    private String fixing;
+    private @Nullable String fixing;
     /** Holding a key repeats it, and each press after the first would cancel. */
-    private KeyCode aiKeyHeld;
+    private @Nullable KeyCode aiKeyHeld;
 
     ComposerAi(ChatService svc, TextArea input, Map<String, String> drafts, Consumer<String> onError, Box box) {
         this.svc = svc;
@@ -84,7 +85,7 @@ final class ComposerAi {
         learning = () -> {
             AiReplyButton.Writer w = writers.get();
             return new StyleLearner.Program() {
-                @Override public String write(String prompt) throws app.unichat.assist.ReplyWriter.Failure { return w.write(prompt); }
+                @Override public @Nullable String write(String prompt) throws app.unichat.assist.ReplyWriter.Failure { return w.write(prompt); }
 
                 @Override public void cancel() { w.cancel(); }
             };
@@ -111,7 +112,7 @@ final class ComposerAi {
     }
 
     /** Only what's written goes: not the chat, nor the instructions for replies. Null with nothing written. */
-    private AiReplyButton.Request fixRequest() {
+    private AiReplyButton.@Nullable Request fixRequest() {
         String chatId = box.chatId();
         if (chatId == null || input.getText().isBlank()) return null;
         fixing = input.getText();
@@ -121,15 +122,16 @@ final class ComposerAi {
 
     /** Replaces the text only if it's still what was sent: the person may have kept writing. ⌘Z brings it back. */
     private void fixed(String forChat, String result) {
-        String corrected = FixPrompt.keepWrapping(fixing, result);
+        String sent = java.util.Objects.requireNonNull(fixing, "a fix answers fixRequest(), which kept the text it sent");
+        String corrected = FixPrompt.keepWrapping(sent, result);
         if (!forChat.equals(box.chatId())) {
-            if (fixing.equals(drafts.get(forChat))) {
+            if (sent.equals(drafts.get(forChat))) {
                 drafts.put(forChat, corrected);
                 onError.accept(I18n.t("composer.fixedElsewhere"));
             }
-        } else if (!input.getText().equals(fixing)) {
+        } else if (!input.getText().equals(sent)) {
             onError.accept(I18n.t("composer.fixChanged"));
-        } else if (corrected.equals(fixing.strip())) {
+        } else if (corrected.equals(sent.strip())) {
             onError.accept(I18n.t("composer.fixNothing"));
         } else {
             input.replaceText(0, input.getLength(), corrected);
@@ -139,9 +141,10 @@ final class ComposerAi {
     }
 
     /** The chat so far, the message chosen with "Responder" if any, and what's written as the idea. Null with nothing to answer. */
-    private AiReplyButton.Request aiRequest() {
+    private AiReplyButton.@Nullable Request aiRequest() {
         String chatId = box.chatId();
-        List<Message> chat = chatId == null ? List.of() : List.copyOf(svc.messages(chatId));
+        if (chatId == null) return null;
+        List<Message> chat = List.copyOf(svc.messages(chatId));
         if (chat.isEmpty()) return null;
         Message target = box.replyTo();
         String idea = input.getText();
@@ -174,7 +177,8 @@ final class ComposerAi {
         if (chatId == null || !AiReplyButton.SHOWN.get() || !AiSettings.hearVoiceNotes()) return;
         Transcripts transcripts = Transcripts.get();
         for (Message m : ReplyPrompt.voiceNotesToHear(svc.messages(chatId), null)) {
-            transcripts.requestAhead(m.mediaUrl(), () -> svc.media(m.mediaUrl(), 0, 0));
+            String url = java.util.Objects.requireNonNull(m.mediaUrl(), "voiceNotesToHear gives only notes with an address");
+            transcripts.requestAhead(url, () -> svc.media(url, 0, 0));
         }
     }
 

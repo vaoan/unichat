@@ -21,6 +21,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class AutoScrollUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TimelineWindow w;
 
     @AfterEach
@@ -35,12 +36,11 @@ class AutoScrollUiTest {
         w.svc.sendText(CHAT, "te respondo", firstId).get();
         FxWait.until("the sent message shows", w::showsNewest);
         w.untilAtBottom();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             // The demo chat has replies of its own: this one's is the lowest on screen.
             Node quote = w.list().lookupAll(".reply-quote").stream()
                     .max(java.util.Comparator.comparingDouble(n -> n.localToScene(n.getBoundsInLocal()).getMinY())).orElseThrow();
             TimelineWindow.click(quote);
-            return null;
         });
         FxWait.until("the original is on screen", () -> w.yOf(firstId) != null);
         FxWait.settled();

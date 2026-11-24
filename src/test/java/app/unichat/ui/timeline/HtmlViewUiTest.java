@@ -16,6 +16,7 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -50,7 +51,7 @@ class HtmlViewUiTest {
         }
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
@@ -84,6 +85,7 @@ class HtmlViewUiTest {
 
     /** A stranger's message fits ten thousand nested tags; walking them one call each would overflow the UI thread's stack. */
     @Test
+    @SuppressWarnings("NullAway") // no media: text only, the view never asks for a picture
     void aDeeplyNestedMessageIsDrawnAsPlainTextPastTheLimit() throws Exception {
         for (String tag : List.of("b", "div", "blockquote")) {
             String html = ("<" + tag + ">").repeat(10_000) + "hondo";
@@ -101,10 +103,9 @@ class HtmlViewUiTest {
         svc.addLinkMedia("https://fixupx.com/a/1", new LinkMedia(LinkMedia.Kind.AUDIO, audioLink, "audio/mpeg", 10));
         svc.addLinkMedia("https://x.com/hashtag/b", new LinkMedia(LinkMedia.Kind.VIDEO, videoLink, "video/mp4", 50_000_000));
         svc.sendText(CHAT, "cuerpo", null).get();
-        fx(() -> {
+        FxWait.onFx(() -> {
             var ms = svc.messages(CHAT);
             ms.get(ms.size() - 1).setHtml(EMBED);
-            return null;
         });
         Scene scene = fx(() -> {
             Stage stage = new Stage();

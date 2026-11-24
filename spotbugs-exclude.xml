@@ -31,10 +31,6 @@
   <!-- A byte[] method returning null: null means "none" (no key, no file, not found), which callers test; an empty
        array would be a real, empty value. Nullness is NullAway's (Task 7), as PMD's ReturnEmptyCollectionRatherThanNull. -->
   <Match><Bug pattern="PZLA_PREFER_ZERO_LENGTH_ARRAYS"/></Match>
-  <!-- A @Nullable method's value dereferenced: SpotBugs takes two calls of the same getter as two values, so
-       "m.fileName() != null && m.fileName().isBlank()" fails (most of the 44 it found once JSpecify's @Nullable came in);
-       a null that can reach a dereference is NullAway's, which reads the same annotations, package by package. -->
-  <Match><Bug pattern="NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE"/></Match>
   <!-- "\n" in a format string: what is formatted are files and protocols (TOML, YAML, HTML, JavaScript, Matrix sync
        JSON in tests) that want "\n" on every system; %n would write "\r\n" on Windows. -->
   <Match><Bug pattern="VA_FORMAT_STRING_USES_NEWLINE"/></Match>

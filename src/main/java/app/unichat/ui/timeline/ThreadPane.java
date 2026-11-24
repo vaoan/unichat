@@ -40,6 +40,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.time.ZoneId;
 import java.util.List;
@@ -64,7 +65,7 @@ public final class ThreadPane extends BorderPane {
 
     SendQueue sendQueue() { return sendQueue; }
 
-    CaptureSheet captureSheet() { return captureSheet; }
+    @Nullable CaptureSheet captureSheet() { return captureSheet; }
     private final Label typing = new Label();
     private final TimelineScroll scroll;
     private final MessageRowView messageRows;
@@ -80,7 +81,7 @@ public final class ThreadPane extends BorderPane {
     private final Button archiveButton;
     private final VBox emptyState;
     private final BorderPane content = new BorderPane();
-    private Chat chat;
+    private @Nullable Chat chat;
     private boolean loadingOlder;
     private boolean reachedStart;
     /** What waits for the older messages being loaded (going to a pinned message). */
@@ -92,16 +93,16 @@ public final class ThreadPane extends BorderPane {
     private final FolderDialogs folderDialogs;
     /** Picking messages to forward several at once. */
     private final MessageSelection selection;
-    private ForwardSheet forwardSheet;
-    private DeleteSheet deleteSheet;
-    private SavedTextSheet savedTextSheet;
+    private @Nullable ForwardSheet forwardSheet;
+    private @Nullable DeleteSheet deleteSheet;
+    private @Nullable SavedTextSheet savedTextSheet;
     private final MessageFixer messageFixer;
     private final SendQueue sendQueue;
     private final SendQueueView sendQueueView;
     private final MessageSelection.Purpose forwarding;
     private final MessageSelection.Purpose deleting;
     private final MessageSelection.Purpose capturing;
-    private CaptureSheet captureSheet;
+    private @Nullable CaptureSheet captureSheet;
     private final Consumer<String> toast;
 
     public ThreadPane(ChatService svc, Consumer<String> openLink, Runnable toggleInfo, Consumer<String> toast, AudioPlayback audio,
@@ -118,9 +119,14 @@ public final class ThreadPane extends BorderPane {
         messageActions = new MessageActionsUi(svc, toast, composer, media, () -> chat, library, this::getScene, this::member,
                 this::jumpTo);
 
-        favButton = Icons.iconButton(Icons.STAR, I18n.t("thread.favorite"), () -> { var _ = svc.setFavorite(chat.id(), !chat.favorite()); });
-        archiveButton = Icons.iconButton(Icons.ARCHIVE, I18n.t("thread.archive", Shortcuts.key("E")),
-                () -> { var _ = svc.setArchived(chat.id(), !chat.archived()); });
+        favButton = Icons.iconButton(Icons.STAR, I18n.t("thread.favorite"), () -> {
+            Chat c = chat; // the header's buttons show only with a chat open
+            if (c != null) { var _ = svc.setFavorite(c.id(), !c.favorite()); }
+        });
+        archiveButton = Icons.iconButton(Icons.ARCHIVE, I18n.t("thread.archive", Shortcuts.key("E")), () -> {
+            Chat c = chat;
+            if (c != null) { var _ = svc.setArchived(c.id(), !c.archived()); }
+        });
         configureTimeline();
         selection = new MessageSelection(list, this::showSelectionBar);
         forwarding = new MessageSelection.Purpose("select.forward", "primary-button",
@@ -201,7 +207,9 @@ public final class ThreadPane extends BorderPane {
         });
     }
 
+    @SuppressWarnings("NullAway.Init") // buildHeader(), which the constructor calls, makes it
     private HBox header;
+    @SuppressWarnings("NullAway.Init") // buildHeader(), which the constructor calls, makes it
     private HBox headerButtons;
 
     private Node buildHeader() {
@@ -227,7 +235,10 @@ public final class ThreadPane extends BorderPane {
         infoButton.setOnAction(e -> toggleInfo.run());
         infoButton.setAccessibleText(I18n.t("thread.chatInfo"));
         Button more = Icons.iconButton(Icons.MORE, I18n.t("thread.moreOptions"), null);
-        more.setOnAction(e -> ChatMenus.forChat(chat, svc, folderDialogs, null).show(more, Side.BOTTOM, 0, 4));
+        more.setOnAction(e -> {
+            Chat c = chat;
+            if (c != null) ChatMenus.forChat(c, svc, folderDialogs, null).show(more, Side.BOTTOM, 0, 4);
+        });
         headerButtons = new HBox(10, scroll.following(), favButton, archiveButton, infoButton, more);
         headerButtons.setAlignment(Pos.CENTER_LEFT);
         header = new HBox(10, headerAvatar, titles, headerButtons);
@@ -303,7 +314,7 @@ public final class ThreadPane extends BorderPane {
         list.requestFocus();
     }
 
-    public Chat chat() { return chat; }
+    public @Nullable Chat chat() { return chat; }
 
     /** Where forwarding asks which chats (the window's overlay). */
     public void setForwardSheet(ForwardSheet sheet) { this.forwardSheet = sheet; }
@@ -384,9 +395,14 @@ public final class ThreadPane extends BorderPane {
         });
     }
 
+    /** The open chat's id, for the snapshot's diagnostics below: the snapshot opens a chat before it asks for one. */
+    private String shownChatId() {
+        return java.util.Objects.requireNonNull(chat, "the snapshot opens a chat before it shows this").id();
+    }
+
     /** Snapshot diagnostics: the question before deleting the newest three of mine that can be deleted for everyone. */
     public void showDeleting() {
-        List<Message> mine = svc.messages(chat.id()).stream().filter(deleting.pickable()).toList();
+        List<Message> mine = svc.messages(shownChatId()).stream().filter(deleting.pickable()).toList();
         delete(mine.subList(Math.max(0, mine.size() - 3), mine.size()));
     }
 
@@ -395,7 +411,7 @@ public final class ThreadPane extends BorderPane {
      * sheet, as phone pieces.
      */
     public void showCapture(boolean sheet) {
-        List<Message> all = svc.messages(chat.id());
+        List<Message> all = svc.messages(shownChatId());
         if (all.size() < 2) return;
         List<Message> six = all.subList(Math.max(0, all.size() - 6), all.size());
         selection.start(six.getFirst(), capturing);
@@ -413,7 +429,7 @@ public final class ThreadPane extends BorderPane {
             }
             return prompt;
         });
-        for (String t : snapshotDrafts()) sendQueue.submit(chat.id(), t, null);
+        for (String t : snapshotDrafts()) sendQueue.submit(shownChatId(), t, null);
     }
 
     /** The four texts {@link #showQueue} puts in the queue, as the person would write them, in the UI language. */
@@ -423,7 +439,7 @@ public final class ThreadPane extends BorderPane {
 
     /** Snapshot diagnostics: my newest message being corrected with AI (an answer that never comes). */
     public void showFixing() {
-        List<Message> mine = svc.messages(chat.id()).stream().filter(Message::outgoing).toList();
+        List<Message> mine = svc.messages(shownChatId()).stream().filter(Message::outgoing).toList();
         if (mine.isEmpty()) return;
         messageFixer.useWriter(() -> prompt -> {
             try {
@@ -441,19 +457,19 @@ public final class ThreadPane extends BorderPane {
      * sheet for a message there's no copy of.
      */
     public void showSavedText(boolean none) {
-        if (savedTextSheet == null || svc.messages(chat.id()).isEmpty()) return;
-        Message m = svc.messages(chat.id()).getLast();
+        if (savedTextSheet == null || svc.messages(shownChatId()).isEmpty()) return;
+        Message m = svc.messages(shownChatId()).getLast();
         Instant at = m.timestamp() == null ? Instant.now() : m.timestamp();
         List<app.unichat.autosave.SavedText> versions = none ? List.of() : List.of(
-                new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at, m.senderName(), m.senderId(), m.outgoing(), m.body().toLowerCase(Locale.ROOT), true),
-                new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at.plusSeconds(5), m.senderName(), m.senderId(), m.outgoing(), m.body() + "…", false),
-                new app.unichat.autosave.SavedText(m.id(), chat.id(), at, at.plusSeconds(90), m.senderName(), m.senderId(), m.outgoing(), m.body(), false));
+                new app.unichat.autosave.SavedText(m.id(), shownChatId(), at, at, m.senderName(), m.senderId(), m.outgoing(), m.body().toLowerCase(Locale.ROOT), true),
+                new app.unichat.autosave.SavedText(m.id(), shownChatId(), at, at.plusSeconds(5), m.senderName(), m.senderId(), m.outgoing(), m.body() + "…", false),
+                new app.unichat.autosave.SavedText(m.id(), shownChatId(), at, at.plusSeconds(90), m.senderName(), m.senderId(), m.outgoing(), m.body(), false));
         savedTextSheet.show(java.util.concurrent.CompletableFuture.completedFuture(versions));
     }
 
     /** Snapshot diagnostics: the sheet for the newest message, or ({@code several}) the newest three picked. */
     public void showForwarding(boolean several) {
-        List<Message> last = svc.messages(chat.id()).stream().filter(m -> messageActions.allows(m, MessageActions.Action.FORWARD)).toList();
+        List<Message> last = svc.messages(shownChatId()).stream().filter(m -> messageActions.allows(m, MessageActions.Action.FORWARD)).toList();
         if (last.isEmpty()) return;
         if (!several) {
             forward(List.of(last.getLast()));
@@ -473,7 +489,7 @@ public final class ThreadPane extends BorderPane {
 
     public void setInfoSelected(boolean selected) { infoButton.setSelected(selected); }
 
-    public void open(Chat c) {
+    public void open(@Nullable Chat c) {
         selection.end();
         chat = c;
         reachedStart = false;
@@ -577,7 +593,7 @@ public final class ThreadPane extends BorderPane {
         }));
     }
 
-    private Member member(String userId) {
+    private @Nullable Member member(String userId) {
         if (chat == null) return null;
         for (Member m : chat.members()) if (m.id().equals(userId)) return m;
         return null;
@@ -587,7 +603,7 @@ public final class ThreadPane extends BorderPane {
 
     private final class RowCell extends ListCell<ThreadRows.Row> implements MessageSelection.Shows {
         /** The message's own row, before the range's markers (if any) go around it. */
-        private Node drawn;
+        private @Nullable Node drawn;
 
         RowCell() {
             getStyleClass().add("row-cell");
@@ -647,7 +663,7 @@ public final class ThreadPane extends BorderPane {
     }
 
     /** The message selected in the timeline (the keyboard's, or one gone to), or null. */
-    public Message selectedMessage() {
+    public @Nullable Message selectedMessage() {
         return list.getSelectionModel().getSelectedItem() instanceof ThreadRows.MessageRow mr ? mr.message() : null;
     }
 
@@ -704,7 +720,7 @@ public final class ThreadPane extends BorderPane {
     }
 
     /** The reply a sticker or GIF sent now answers: {@link Composer#takeReply}. */
-    public String takeReply() {
+    public @Nullable String takeReply() {
         return composer.takeReply();
     }
 }

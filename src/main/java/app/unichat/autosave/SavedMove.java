@@ -22,7 +22,7 @@ final class SavedMove {
      * A new base folder (null: the default), taking along each chat's folder under the old one (never the base whole:
      * it can hold the person's own things). Gives how many files moved.
      */
-    static int toBase(List<Chat> chats, Path folder) throws IOException {
+    static int toBase(List<Chat> chats, @Nullable Path folder) throws IOException {
         Path before = SaveFolders.base();
         SaveFolders.setBase(folder);
         Path after = SaveFolders.base();

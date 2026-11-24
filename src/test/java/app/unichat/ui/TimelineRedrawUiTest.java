@@ -10,6 +10,7 @@ import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 class TimelineRedrawUiTest {
     private static final String CHAT = "!family:demo";
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
@@ -38,7 +39,7 @@ class TimelineRedrawUiTest {
         return true;
     }
 
-    private static Node bubble(Scene scene, String text) {
+    private static @Nullable Node bubble(Scene scene, String text) {
         return scene.getRoot().lookupAll(".bubble").stream().filter(n -> shown(n) && texts(n).contains(text)).findFirst().orElse(null);
     }
 
@@ -82,9 +83,8 @@ class TimelineRedrawUiTest {
         svc.editMessage(CHAT, first.id(), "primero cambiado").get();
         FxWait.until("the edit shows", () -> bubble(scene, "primero cambiado") != null);
         assertNotSame(before, fx(() -> bubble(scene, "primero cambiado")));
-        fx(() -> {
+        FxWait.onFx(() -> {
             scene.getWindow().hide();
-            return null;
         });
     }
 }

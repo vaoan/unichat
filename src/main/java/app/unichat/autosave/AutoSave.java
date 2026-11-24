@@ -158,7 +158,7 @@ public final class AutoSave implements ChatService.Listener {
      * it can hold the person's own things); on the saving thread, so nothing is written meanwhile. Gives how many files
      * moved.
      */
-    public java.util.concurrent.CompletableFuture<Integer> setBase(Path folder) {
+    public java.util.concurrent.CompletableFuture<Integer> setBase(@Nullable Path folder) {
         return onWorker(() -> SavedMove.toBase(chats.chats(), folder));
     }
 
@@ -342,6 +342,11 @@ public final class AutoSave implements ChatService.Listener {
     /** For tests: runs {@code then} once everything asked so far is done. */
     void afterPending(Runnable then) {
         worker.execute(then);
+    }
+
+    /** For tests: runs {@code then} once the texts thread has written what it was given so far, and what that set off. */
+    void afterTexts(Runnable then) {
+        texts.afterPending(then);
     }
 
     static Saver downloading(MediaSource media) {

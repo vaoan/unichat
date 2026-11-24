@@ -3,6 +3,7 @@ package app.unichat.ui.timeline;
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
 import app.unichat.settings.Settings;
+import org.jspecify.annotations.Nullable;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -27,7 +28,7 @@ record ForwardNote(boolean who, boolean where, boolean when) {
     boolean saysAnything() { return who || where || when; }
 
     /** The line for {@code m} of {@code from}, or null when nothing is chosen. */
-    String of(Message m, Chat from, ZoneId zone) {
+    @Nullable String of(Message m, Chat from, ZoneId zone) {
         if (!saysAnything()) return null;
         List<String> parts = new ArrayList<>();
         parts.add(who ? "Forwarded from " + shown(m.senderName()) : "Forwarded");

@@ -18,6 +18,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -37,7 +38,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class VoiceUiTest {
     private static final String CHAT = "!family:demo";
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it
     private Composer composer;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it
     private Stage stage;
     private final List<String> toasts = new ArrayList<>();
     private volatile short amplitude = 8_000;
@@ -103,7 +106,7 @@ class VoiceUiTest {
     void open() throws Exception {
         app.unichat.voice.VoiceEnhancer.setEnabled(false); // its own test covers it; nothing to download here
         svc = new MockChatService();
-        fx(() -> {
+        FxWait.onFx(() -> {
             composer = new Composer(svc, toasts::add);
             composer.setMicrophone(Mic::new);
             stage = new Stage();
@@ -113,7 +116,6 @@ class VoiceUiTest {
             stage.show();
             composer.setChat(CHAT);
             composer.refreshVoice();
-            return null;
         });
     }
 
@@ -123,7 +125,7 @@ class VoiceUiTest {
         svc.stop();
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
@@ -139,7 +141,7 @@ class VoiceUiTest {
     }
 
     private List<Message> voiceNotes() {
-        return svc.messages(CHAT).stream().filter(m -> m.type() == MessageType.AUDIO && m.fileName() != null && m.fileName().startsWith("voice-")).toList();
+        return svc.messages(CHAT).stream().filter(m -> m.type() == MessageType.AUDIO && String.valueOf(m.fileName()).startsWith("voice-")).toList();
     }
 
     @Test
@@ -155,11 +157,10 @@ class VoiceUiTest {
     void recordingAndSendingLeavesAVoiceNoteWithItsLength() throws Exception {
         startRecording();
         speak(1200);
-        fx(() -> {
+        FxWait.onFx(() -> {
             javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(stage.getScene().snapshot(null), null), "png",
                     Path.of(System.getProperty("java.io.tmpdir"), "unichat-voice-bar.png").toFile());
             ((Button) composer.lookup(".voice-bar .send-button")).fire();
-            return null;
         });
         await(() -> voiceNotes().size() == 1, "sent");
         assertTrue(voiceNotes().get(0).durationMs() >= 800, "lasts " + voiceNotes().get(0).durationMs());
@@ -244,10 +245,9 @@ class VoiceUiTest {
 
     @Test
     void noMicSaysSo() throws Exception {
-        fx(() -> {
+        FxWait.onFx(() -> {
             composer.setMicrophone(() -> { throw new IOException("No se encontró un micrófono disponible"); });
             ((Button) mic()).fire();
-            return null;
         });
         await(() -> toasts.contains("No se encontró un micrófono disponible"), "says so");
         assertFalse(fx(() -> mic().isDisabled()));

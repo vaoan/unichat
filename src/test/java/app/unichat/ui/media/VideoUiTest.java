@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
 import app.unichat.Present;
+import org.jspecify.annotations.Nullable;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -47,7 +48,7 @@ class VideoUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
@@ -94,10 +95,9 @@ class VideoUiTest {
         StackPane root = fx(StackPane::new);
         Stage stage = window(root);
         InlineVideo[] video = new InlineVideo[1];
-        fx(() -> {
+        FxWait.onFx(() -> {
             video[0] = new InlineVideo(source, "mxc://s/1", 160, 120, () -> new StackPane());
             root.getChildren().add(video[0]);
-            return null;
         });
         await(() -> playing(video[0]), "plays");
         MediaPlayer player = Present.of(video[0].player());
@@ -118,10 +118,9 @@ class VideoUiTest {
         StackPane root = fx(StackPane::new);
         Stage stage = window(root);
         InlineVideo[] video = new InlineVideo[1];
-        fx(() -> {
+        FxWait.onFx(() -> {
             video[0] = new InlineVideo(source, "mxc://s/1", 160, 120, () -> new StackPane());
             root.getChildren().add(video[0]);
-            return null;
         });
         await(() -> playing(video[0]), "plays");
         try {
@@ -143,10 +142,9 @@ class VideoUiTest {
         Stage stage = window(root);
         Node fallback = fx(StackPane::new);
         InlineVideo[] video = new InlineVideo[1];
-        fx(() -> {
+        FxWait.onFx(() -> {
             video[0] = new InlineVideo(source, "mxc://s/1", 160, 120, () -> fallback);
             root.getChildren().add(video[0]);
-            return null;
         });
         await(() -> video[0].getChildren().contains(fallback), "fallback shown");
         assertNull(fx(video[0]::player));
@@ -163,10 +161,9 @@ class VideoUiTest {
         MediaPlayer player = Present.of((MediaPlayer) viewer.getProperties().get(VideoViewer.PLAYER));
         await(() -> player.getCurrentTime().greaterThan(javafx.util.Duration.ZERO), "a frame on screen");
         FxWait.settled();
-        fx(() -> {
+        FxWait.onFx(() -> {
             javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(viewer.getScene().snapshot(null), null), "png",
                     Path.of(System.getProperty("java.io.tmpdir"), "unichat-video-viewer.png").toFile());
-            return null;
         });
         FxWait.onFx(() -> {
             viewer.close();
@@ -254,11 +251,10 @@ class VideoUiTest {
         Stage viewer = fx(() -> VideoViewer.show(owner, CompletableFuture.completedFuture(clip), "clip", () -> { }, p -> { }));
         await(() -> viewer.getProperties().get(VideoViewer.PLAYER) instanceof MediaPlayer p && p.getStatus() == MediaPlayer.Status.PLAYING, "viewer plays");
         MediaPlayer player = Present.of((MediaPlayer) viewer.getProperties().get(VideoViewer.PLAYER));
-        fx(() -> {
+        FxWait.onFx(() -> {
             viewer.getScene().getRoot().lookupAll(".icon-button").stream()
                     .filter(n -> n.getAccessibleText() != null && n.getAccessibleText().startsWith("Repetir"))
                     .findFirst().map(n -> (javafx.scene.control.Button) n).orElseThrow().fire();
-            return null;
         });
         key(viewer, javafx.scene.input.KeyCode.PERIOD, ">");
         key(viewer, javafx.scene.input.KeyCode.PERIOD, ">");
@@ -292,11 +288,10 @@ class VideoUiTest {
     }
 
     private static void key(Stage stage,javafx.scene.input.KeyCode code, String text) throws InterruptedException {
-        fx(() -> {
+        FxWait.onFx(() -> {
             Node target = stage.getScene().getFocusOwner() != null ? stage.getScene().getFocusOwner() : stage.getScene().getRoot();
             javafx.event.Event.fireEvent(target, new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED,
                     "", text, code, false, false, false, false));
-            return null;
         });
     }
 

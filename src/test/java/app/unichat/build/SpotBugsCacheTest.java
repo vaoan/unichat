@@ -3,6 +3,7 @@ package app.unichat.build;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -63,7 +64,7 @@ class SpotBugsCacheTest {
     }
 
     /** A run that went on to the mark whatever SpotBugs did: what it wrote, if anything, then the mark. */
-    private void buildGoingOn(String report) throws IOException {
+    private void buildGoingOn(@Nullable String report) throws IOException {
         assertFalse(check(classpath));
         if (report != null) report(report);
         SpotBugsCache.passed(project, cache, "run" + run);

@@ -8,6 +8,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.lang.ref.WeakReference;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -22,26 +24,27 @@ class ThemeSceneUiTest {
     void aClosedWindowsSceneIsLetGoAndOneShownAgainIsStyledAgain() throws Exception {
         TimelineWindow.toolkit();
         int before = FxWait.fx(Theme::registered);
-        Stage[] stage = new Stage[1];
+        List<Stage> stage = new ArrayList<>(); // emptied at the end, so nothing of the test holds the window
         WeakReference<Scene> scene = FxWait.fx(() -> {
-            stage[0] = new Stage();
-            stage[0].setOpacity(0);
+            Stage shown = new Stage();
+            stage.add(shown);
+            shown.setOpacity(0);
             Scene sc = new Scene(new StackPane(), 200, 100);
             Theme.register(sc); // before the window, as the app does
-            stage[0].setScene(sc);
-            stage[0].show();
+            shown.setScene(sc);
+            shown.show();
             return new WeakReference<>(sc);
         });
         assertEquals(before + 1, FxWait.fx(Theme::registered), "followed while it shows");
 
-        FxWait.onFx(stage[0]::hide);
+        FxWait.onFx(stage.getFirst()::hide);
         assertEquals(before, FxWait.fx(Theme::registered), "let go when hidden");
-        FxWait.onFx(stage[0]::show);
+        FxWait.onFx(stage.getFirst()::show);
         assertEquals(before + 1, FxWait.fx(Theme::registered), "shown again (from the tray): followed again");
 
         FxWait.onFx(() -> {
-            stage[0].close();
-            stage[0] = null;
+            stage.getFirst().close();
+            stage.clear();
         });
         FxWait.settled();
         FxWait.until("the closed window's scene is collected", () -> {

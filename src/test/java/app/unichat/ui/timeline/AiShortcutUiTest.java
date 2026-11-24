@@ -15,6 +15,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CountDownLatch;
 
@@ -24,15 +25,14 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** ⌘I writes a draft from anywhere in the window and leaves the focus in the text box; the info panel has ⌘⇧I. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class AiShortcutUiTest {
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 
     private static void press(Node target, boolean shift) throws InterruptedException {
-        fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.I, shift, true, false, true));
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_RELEASED, "", "", KeyCode.I, shift, true, false, true));
-            return null;
         });
     }
 

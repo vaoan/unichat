@@ -62,6 +62,8 @@ class I18nTest {
             I18n.use("en");
             assertEquals("English", I18n.t("language.name"));
             assertEquals("no.such.key", I18n.t("no.such.key"));
+            // A value that isn't there (a chat without a name) shows "null", in a count as in a text.
+            assertEquals("1 file from null", I18n.n("notifier.downloadsSaved", 1, (Object) null));
             I18n.use("es");
             assertEquals("Español", I18n.t("language.name"));
         } finally {

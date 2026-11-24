@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import app.unichat.service.MockChatService;
@@ -28,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -48,7 +50,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class CaptureUiTest {
     private static final String CHAT = "!family:demo";
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private Stage stage;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private MainView view;
     private ThreadPane thread;
     @TempDir
@@ -77,22 +81,21 @@ class CaptureUiTest {
             stage.setScene(new Scene(view, 900, 700));
             stage.show();
             view.openChatId(CHAT);
-            return find(view);
+            return Present.of(find(view));
         });
     }
 
     @AfterEach
     void close() throws Exception {
         svc.stop();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             view.dispose();
             stage.close();
             stage.getScene().setRoot(new javafx.scene.layout.Pane());
-            return null;
         });
     }
 
-    private static ThreadPane find(Node n) {
+    private static @Nullable ThreadPane find(Node n) {
         if (n instanceof ThreadPane t) return t;
         if (n instanceof Parent p) for (Node c : p.getChildrenUnmodifiable()) {
             ThreadPane t = find(c);
@@ -113,12 +116,11 @@ class CaptureUiTest {
     /** Space on {@code m}, as a click on it while picking. */
     private void press(Message m) throws InterruptedException {
         ListView<ThreadRows.Row> l = list();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             for (int i = 0; i < l.getItems().size(); i++) {
                 if (l.getItems().get(i) instanceof ThreadRows.MessageRow mr && mr.message().id().equals(m.id())) l.getSelectionModel().select(i);
             }
             l.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, " ", " ", KeyCode.SPACE, false, false, false, false));
-            return null;
         });
     }
 
@@ -222,14 +224,13 @@ class CaptureUiTest {
                 .filter(b -> "Enviar a un chat…".equals(b.getText())).findFirst().orElseThrow());
         FxWait.onFx(send::fire);
         int before = svc.messages("!mom:demo").size();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             ListView<?> chats = (ListView<?>) sheet().lookup(".forward-chats");
             for (int i = 0; i < chats.getItems().size(); i++) {
                 if (((app.unichat.model.Chat) chats.getItems().get(i)).id().equals("!mom:demo")) chats.getSelectionModel().select(i);
             }
             chats.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, " ", " ", KeyCode.SPACE, false, false, false, false));
             ((Button) sheet().lookupAll(".button").stream().filter(b -> "Enviar".equals(((Button) b).getText())).findFirst().orElseThrow()).fire();
-            return null;
         });
         FxWait.until("the picture went", () -> svc.messages("!mom:demo").size() == before + 1);
         Message sent = svc.messages("!mom:demo").getLast();
@@ -244,7 +245,7 @@ class CaptureUiTest {
 
     private void savesToAFolder() throws InterruptedException {
         captureLast(3);
-        FxWait.onFx(() -> thread.captureSheet().useFolderChooser(w -> dir.toFile()));
+        FxWait.onFx(() -> Present.of(thread.captureSheet()).useFolderChooser(w -> dir.toFile()));
         Button save = FxWait.fx(() -> sheet().lookupAll(".button").stream().map(n -> (Button) n)
                 .filter(b -> "Guardar…".equals(b.getText())).findFirst().orElseThrow());
         FxWait.onFx(save::fire);
@@ -291,14 +292,13 @@ class CaptureUiTest {
         press(all.getLast());
         FxWait.settled();
         Button x = FxWait.fx(() -> (Button) thread.lookup(".range-marker-end .button"));
-        FxWait.fx(() -> { // a real click, through the list's own handling while picking
+        FxWait.onFx(() -> { // a real click, through the list's own handling while picking
             javafx.geometry.Bounds b = x.localToScene(x.getBoundsInLocal());
             for (var type : List.of(javafx.scene.input.MouseEvent.MOUSE_PRESSED, javafx.scene.input.MouseEvent.MOUSE_RELEASED,
                     javafx.scene.input.MouseEvent.MOUSE_CLICKED)) {
                 Event.fireEvent(x, new javafx.scene.input.MouseEvent(type, 2, 2, b.getCenterX(), b.getCenterY(),
                         javafx.scene.input.MouseButton.PRIMARY, 1, false, false, false, false, true, false, false, true, false, false, null));
             }
-            return null;
         });
         assertEquals("Capturando 1 mensaje", count(), "only its start is left");
     }
@@ -343,7 +343,7 @@ class CaptureUiTest {
         captureLast(3);
         Path sending = app.unichat.settings.Settings.dataDir().resolve("cache").resolve("sending");
         java.util.Set<String> before = names(sending);
-        FxWait.onFx(() -> thread.captureSheet().useFolderChooser(w -> dir.toFile()));
+        FxWait.onFx(() -> Present.of(thread.captureSheet()).useFolderChooser(w -> dir.toFile()));
         Button save = FxWait.fx(() -> sheet().lookupAll(".button").stream().map(n -> (Button) n)
                 .filter(b -> "Guardar…".equals(b.getText())).findFirst().orElseThrow());
         FxWait.onFx(save::fire);
@@ -360,7 +360,7 @@ class CaptureUiTest {
 
     @Test
     void aChatsVeryLongNameStillMakesAFile() throws Exception {
-        FxWait.onFx(() -> svc.chat(CHAT).setTitle("😀".repeat(120)));
+        FxWait.onFx(() -> Present.of(svc.chat(CHAT)).setTitle("😀".repeat(120)));
         savesToAFolder();
     }
 
@@ -395,17 +395,16 @@ class CaptureUiTest {
         FxWait.settled();
         Node line = FxWait.fx(() -> thread.lookup(".range-marker-end").getParent().getChildrenUnmodifiable().stream()
                 .filter(n -> n instanceof MessageLine).findFirst().orElseThrow());
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(line, new javafx.scene.input.MouseEvent(javafx.scene.input.MouseEvent.MOUSE_ENTERED, 1, 1, 1, 1,
                     javafx.scene.input.MouseButton.NONE, 0, false, false, false, false, false, false, false, false, false, false, null));
-            return null;
         });
         assertTrue(FxWait.fx(() -> line.lookupAll(".hover-actions").stream().noneMatch(Node::isVisible)), "picking: a click only picks");
     }
 
     @Test
     void itsHeaderNamesTheNetworkAndHowManyNeverTheAccount() throws Exception {
-        app.unichat.model.Chat c = FxWait.fx(() -> svc.chat(CHAT));
+        app.unichat.model.Chat c = Present.of(FxWait.fx(() -> svc.chat(CHAT)));
         String onScreen = FxWait.fx(() -> ((Label) thread.lookup(".thread-header .thread-subtitle")).getText());
         assertTrue(onScreen.contains("+57"), "the window's header shows the account it's on: " + onScreen);
         String captured = FxWait.fx(() -> ((Label) thread.captureHeader(c).lookup(".thread-subtitle")).getText());

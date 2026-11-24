@@ -1,5 +1,6 @@
 package app.unichat.ui.chats;
 
+import app.unichat.Present;
 import app.unichat.ui.FxWait;
 import app.unichat.ui.MainView;
 import app.unichat.ui.Theme;
@@ -69,9 +70,8 @@ class GroupsUiTest {
 
     /** Presses {@code code} on {@code target}, then waits until the window has done what it set off. */
     private static void key(Node target, KeyCode code) throws InterruptedException {
-        fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false));
-            return null;
         });
         FxWait.settled();
     }
@@ -144,7 +144,7 @@ class GroupsUiTest {
 
         var spaces = fx(() -> spaceList(scene));
         enter(spaces, "!srv-general:demo");
-        assertEquals("!srv-general:demo", fx(() -> thread(scene).chat().id()), "a channel opens like a chat");
+        assertEquals("!srv-general:demo", fx(() -> Present.of(thread(scene).chat()).id()), "a channel opens like a chat");
         assertTrue(fx(() -> spaceOpen(scene)), "and the server stays open");
 
         key(spaces, KeyCode.ESCAPE);
@@ -169,9 +169,9 @@ class GroupsUiTest {
         Scene scene = open(Network.DISCORD);
         enter(fx(() -> chatList(scene)), "!server:demo");
         enter(fx(() -> spaceList(scene)), MockChatService.UNJOINED_CHANNEL_ID);
-        FxWait.until("the joined channel opens", () -> MockChatService.UNJOINED_CHANNEL_ID.equals(thread(scene).chat().id()));
+        FxWait.until("the joined channel opens", () -> MockChatService.UNJOINED_CHANNEL_ID.equals(Present.of(thread(scene).chat()).id()));
         assertNotNull(svc.chat(MockChatService.UNJOINED_CHANNEL_ID), "Enter joined the channel");
-        assertEquals(MockChatService.UNJOINED_CHANNEL_ID, fx(() -> thread(scene).chat().id()), "and opened it");
+        assertEquals(MockChatService.UNJOINED_CHANNEL_ID, fx(() -> Present.of(thread(scene).chat()).id()), "and opened it");
         svc.stop();
     }
 
@@ -208,7 +208,7 @@ class GroupsUiTest {
             letTheRoomIn.run();
             arrived.get(); // the room came in after all, and every listener heard of it
             FxWait.settled(); // and what they asked the window to do has run
-            assertEquals("!family:demo", fx(() -> thread(scene).chat().id()), "no surprise jump minutes later");
+            assertEquals("!family:demo", fx(() -> Present.of(thread(scene).chat()).id()), "no surprise jump minutes later");
             assertTrue(toastText(scene).contains("aparecerá"), toastText(scene));
         } finally {
             Spaces.joinWaitMs = 30_000;
@@ -221,7 +221,7 @@ class GroupsUiTest {
         Scene scene = open(null);
         svc.setFavorite("!server:demo", true).get();
         FxWait.until("the server's favourite tile", () -> favouriteTile(scene) != null);
-        Node tile = fx(() -> favouriteTile(scene));
+        Node tile = Present.of(fx(() -> favouriteTile(scene)));
         key(tile, KeyCode.ENTER);
         FxWait.until("the server's channels", () -> spaceTexts(scene).stream().anyMatch(t -> t.startsWith("#anuncios")));
         assertTrue(fx(() -> spaceTexts(scene)).stream().anyMatch(t -> t.startsWith("#anuncios")), fx(() -> spaceTexts(scene)).toString());
@@ -283,7 +283,7 @@ class GroupsUiTest {
         return (ThreadPane) s.getRoot().lookupAll("*").stream().filter(n -> n instanceof ThreadPane).findFirst().orElseThrow();
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 

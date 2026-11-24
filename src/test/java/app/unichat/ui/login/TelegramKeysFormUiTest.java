@@ -44,20 +44,18 @@ class TelegramKeysFormUiTest {
             stage.show();
             return f;
         });
-        fx(() -> {
+        app.unichat.ui.FxWait.onFx(() -> {
             ((TextField) form.lookup(".telegram-api-id")).setText("no es número");
             form.save.fire();
-            return null;
         });
         assertFalse(saved[0]);
         assertFalse(TelegramKeys.saved());
         assertEquals(TelegramKeys.problem("no es número", ""), fx(() -> ((Label) form.lookup(".login-error")).getText()));
 
-        fx(() -> {
+        app.unichat.ui.FxWait.onFx(() -> {
             ((TextField) form.lookup(".telegram-api-id")).setText(" 1234567 ");
             ((TextField) form.lookup(".telegram-api-hash")).setText("0123456789abcdef0123456789abcdef");
             form.save.fire();
-            return null;
         });
         assertTrue(saved[0]);
         assertTrue(TelegramKeys.saved());

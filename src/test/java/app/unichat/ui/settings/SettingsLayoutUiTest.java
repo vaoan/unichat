@@ -1,5 +1,6 @@
 package app.unichat.ui.settings;
 
+import app.unichat.Present;
 import app.unichat.ui.FxWait;
 import app.unichat.ui.Theme;
 import app.unichat.service.MockChatService;
@@ -39,7 +40,7 @@ class SettingsLayoutUiTest {
         }
         Platform.setImplicitExit(false);
         MockChatService svc = new MockChatService();
-        String scale = Settings.get().getString("ui.fontScale", null);
+        String scale = Settings.get().getString("ui.fontScale");
         List<String> bad = new ArrayList<>();
         // Something learned, so Escribir con IA shows its last change filled in (dates, traits, pending corrections).
         app.unichat.assist.WritingStyle style = app.unichat.assist.WritingStyle.get();
@@ -62,10 +63,10 @@ class SettingsLayoutUiTest {
                 for (String page : PAGES) {
                     FxWait.onFx(() -> SettingsWindow.select(page));
                     FxWait.settled();
-                    bad.addAll(FxWait.fx(() -> squeezed(SettingsWindow.current().getScene().getRoot(), page + " @" + fontScale)));
+                    bad.addAll(FxWait.fx(() -> squeezed(Present.of(SettingsWindow.current()).getScene().getRoot(), page + " @" + fontScale)));
                 }
                 FxWait.onFx(() -> {
-                    SettingsWindow.current().close();
+                    Present.of(SettingsWindow.current()).close();
                     owner.close();
                 });
             }

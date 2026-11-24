@@ -15,6 +15,7 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.VBox;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.io.IOException;
@@ -32,15 +33,15 @@ import static app.unichat.ui.settings.SettingsForm.stacked;
  */
 final class RecoveryCodeSheet extends VBox {
     /** Where "Guardar como .txt" writes: the file the system's save dialog gives (null: cancelled). Tests give one. */
-    static Function<Window, File> saveTo = RecoveryCodeSheet::chooseFile; // NOPMD: MutableStaticState, a seam tests swap
+    static Function<@Nullable Window, @Nullable File> saveTo = RecoveryCodeSheet::chooseFile; // NOPMD: MutableStaticState, a seam tests swap
     /** "Imprimir": through the system's print dialog; whether it was printed. Tests replace it. */
-    static BiPredicate<Window, String> printer = RecoveryCodeSheet::print; // NOPMD: MutableStaticState, a seam tests swap
+    static BiPredicate<@Nullable Window, String> printer = RecoveryCodeSheet::print; // NOPMD: MutableStaticState, a seam tests swap
     /** The system's clipboard as "Copiar" uses it: the code put there, and emptied after while it still holds it. */
     interface Clip {
         void put(String text);
 
         /** What it holds as text now; null for none. */
-        String now();
+        @Nullable String now();
 
         void clear();
     }
@@ -114,7 +115,7 @@ final class RecoveryCodeSheet extends VBox {
         });
         Button save = secondary(I18n.t("settings.vault.code.save"), this::save);
         Button print = secondary(I18n.t("settings.vault.code.print"), () ->
-            say(I18n.t(printer.test(getScene() == null ? null : getScene().getWindow(), text()) ? "settings.vault.code.printed" : "settings.vault.code.notPrinted")));
+            say(I18n.t(printer.test(Nodes.window(this), text()) ? "settings.vault.code.printed" : "settings.vault.code.notPrinted")));
         Button done = new Button(I18n.t("settings.vault.code.keptIt"));
         done.getStyleClass().add("primary-button");
         done.setOnAction(e -> askBack());
@@ -179,7 +180,7 @@ final class RecoveryCodeSheet extends VBox {
     }
 
     private void save() {
-        File file = saveTo.apply(getScene() == null ? null : getScene().getWindow());
+        File file = saveTo.apply(Nodes.window(this));
         if (file == null) return;
         try {
             SafeFile.replace(file.toPath(), text().getBytes(StandardCharsets.UTF_8), true); // the code: nobody else reads it
@@ -189,7 +190,7 @@ final class RecoveryCodeSheet extends VBox {
         }
     }
 
-    private static File chooseFile(Window owner) {
+    private static @Nullable File chooseFile(@Nullable Window owner) {
         FileChooser chooser = new FileChooser();
         chooser.setTitle(I18n.t("settings.vault.code.save"));
         chooser.setInitialFileName(I18n.t("settings.vault.code.fileName"));
@@ -197,7 +198,7 @@ final class RecoveryCodeSheet extends VBox {
         return chooser.showSaveDialog(owner);
     }
 
-    private static boolean print(Window owner, String text) {
+    private static boolean print(@Nullable Window owner, String text) {
         javafx.print.PrinterJob job = javafx.print.PrinterJob.createPrinterJob();
         if (job == null) return false;
         if (!job.showPrintDialog(owner)) {

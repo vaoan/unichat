@@ -13,6 +13,7 @@ import javafx.stage.Window;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,6 +27,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class MediaLoadingUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TimelineWindow w;
 
     @AfterEach
@@ -47,10 +49,10 @@ class MediaLoadingUiTest {
         return (Button) in.lookup(".media-retry");
     }
 
-    /** The newest message's bubble. */
+    /** The newest message's bubble; it fails (a wait goes on) while there's none drawn. */
     private Node newestBubble() {
         javafx.scene.control.IndexedCell<?> last = w.flow().getLastVisibleCell();
-        return last == null ? null : last.getGraphic();
+        return Present.of(last == null ? null : last.getGraphic());
     }
 
     /** {@code -Dunichat.loadingShot=<prefix>} saves what {@code n} looks like (a load is too short for a snapshot run). */
@@ -104,11 +106,10 @@ class MediaLoadingUiTest {
         FxWait.until("a way to try again", () -> retry(newestBubble()) != null && ring(newestBubble()) == null);
         shot(FxWait.fx(this::newestBubble), "retry");
         int windows = FxWait.fx(() -> Window.getWindows().size());
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             retry(newestBubble()).fireEvent(new javafx.scene.input.MouseEvent(javafx.scene.input.MouseEvent.MOUSE_CLICKED,
                     0, 0, 0, 0, javafx.scene.input.MouseButton.PRIMARY, 1, false, false, false, false, true, false, false, true,
                     false, true, null));
-            return null;
         });
         FxWait.settled();
         assertEquals(windows, FxWait.fx(() -> Window.getWindows().size()), "a click on it opens nothing else (the viewer)");

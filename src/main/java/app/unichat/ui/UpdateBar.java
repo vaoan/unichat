@@ -13,6 +13,7 @@ import javafx.scene.control.Label;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Objects;
 import java.util.function.Consumer;
@@ -25,8 +26,8 @@ final class UpdateBar extends VBox {
     private final UpdateChecker checker;
     private final Consumer<String> openLink;
     @SuppressWarnings("UnnecessaryLambda") // one instance: removeListener takes away what addListener added
-    private final Consumer<Release> listener = r -> Platform.runLater(() -> show(r));
-    private Release shown;
+    private final Consumer<@Nullable Release> listener = r -> Platform.runLater(() -> show(r));
+    private @Nullable Release shown;
 
     UpdateBar(UpdateChecker checker, Consumer<String> openLink) {
         this.checker = checker;
@@ -43,7 +44,7 @@ final class UpdateBar extends VBox {
         checker.removeListener(listener);
     }
 
-    private void show(Release r) {
+    private void show(@Nullable Release r) {
         if (Objects.equals(r, shown)) return;
         shown = r;
         getChildren().clear();

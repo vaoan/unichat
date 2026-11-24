@@ -56,11 +56,10 @@ class ProfileMediaUiTest {
         java.util.concurrent.atomic.AtomicReference<app.unichat.model.Message> jumped = new java.util.concurrent.atomic.AtomicReference<>();
         FxWait.onFx(() -> pane.setOnJump(jumped::set));
         javafx.scene.Node photoTile = FxWait.fx(() -> pane.lookup(".media-thumb-tile"));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             var p = photoTile.localToScreen(5, 5);
             javafx.event.Event.fireEvent(photoTile, new javafx.scene.input.ContextMenuEvent(javafx.scene.input.ContextMenuEvent.CONTEXT_MENU_REQUESTED,
                     5, 5, p.getX(), p.getY(), false, null));
-            return null;
         });
         javafx.scene.control.ContextMenu menu = FxWait.fx(() -> javafx.stage.Window.getWindows().stream()
                 // This tile's menu: on Linux another test's menu was still showing, and the first one found was that one.
@@ -134,17 +133,15 @@ class ProfileMediaUiTest {
         javafx.scene.Node tile = FxWait.fx(() -> pane.lookupAll(".media-thumb-tile").stream()
                 .filter(n -> app.unichat.support.I18n.t("media.videoOpen").equals(n.getAccessibleText())).findFirst().orElseThrow());
         List<javafx.stage.Window> before = FxWait.fx(() -> List.copyOf(javafx.stage.Window.getWindows()));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             javafx.event.Event.fireEvent(tile, new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED, "", "",
                     javafx.scene.input.KeyCode.ENTER, false, false, false, false));
-            return null;
         });
         FxWait.until("the voice note pauses for the video", () -> audio.state() == AudioPlayback.State.PAUSED);
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             audio.stop();
             List.copyOf(javafx.stage.Window.getWindows()).stream().filter(w -> !before.contains(w)).forEach(javafx.stage.Window::hide);
             pane.getScene().getWindow().hide();
-            return null;
         });
         svc.stop();
     }

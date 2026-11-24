@@ -33,6 +33,7 @@ import javafx.stage.FileChooser;
 import app.unichat.service.SendAs;
 import app.unichat.service.UploadQueue;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.util.HashMap;
@@ -83,11 +84,11 @@ public final class Composer extends VBox {
     @FunctionalInterface
     interface Sending {
         /** True when it took {@code text} (to send it later, corrected); false: it goes now. */
-        boolean before(String chatId, String text, String replyToId);
+        boolean before(String chatId, String text, @Nullable String replyToId);
     }
-    private String chatId;
-    private Message replyTo;
-    private Message editing;
+    private @Nullable String chatId;
+    private @Nullable Message replyTo;
+    private @Nullable Message editing;
     private boolean typingSent;
     private final HBox row;
     /** The rounded box: one line (row), or the text above the buttons when they would leave it too little room. */
@@ -150,22 +151,22 @@ public final class Composer extends VBox {
 
         this.send = button;
         voice = new VoiceRecording(svc, onError, new VoiceRecording.Box() {
-            @Override public String chatId() { return chatId; }
+            @Override public @Nullable String chatId() { return chatId; }
 
-            @Override public String replyId() { return replyTo == null ? null : replyTo.id(); }
+            @Override public @Nullable String replyId() { return replyTo == null ? null : replyTo.id(); }
 
             @Override public void cancelMode() { Composer.this.cancelMode(); }
 
             @Override public void focus() { Composer.this.focus(); }
 
-            @Override public void showInstead(Node bar) { Composer.this.showInstead(bar); }
+            @Override public void showInstead(@Nullable Node bar) { Composer.this.showInstead(bar); }
 
             @Override public void inTurn(String chat, Runnable go) { inTurn.send(chat, go); }
         });
         ai = new ComposerAi(svc, input, drafts, onError, new ComposerAi.Box() {
-            @Override public String chatId() { return chatId; }
+            @Override public @Nullable String chatId() { return chatId; }
 
-            @Override public Message replyTo() { return replyTo; }
+            @Override public @Nullable Message replyTo() { return replyTo; }
 
             @Override public void reply(Message m) { Composer.this.reply(m); }
 
@@ -209,13 +210,13 @@ public final class Composer extends VBox {
     }
 
     /** {@code bar} where the rounded box is (recording a voice note); null puts the box back. */
-    private void showInstead(Node bar) {
+    private void showInstead(@Nullable Node bar) {
         Node now = bar == null ? frame : bar;
         getChildren().set(getChildren().indexOf(boxShown), now);
         boxShown = now;
     }
 
-    public void setChat(String newChatId) {
+    public void setChat(@Nullable String newChatId) {
         if (chatId != null) {
             stopTyping();
             drafts.put(chatId, editing == null ? input.getText() : "");
@@ -309,7 +310,7 @@ public final class Composer extends VBox {
     }
 
     /** What a sticker or GIF sent now answers, and the composer leaves reply mode as a sent text would; null if none. */
-    String takeReply() {
+    @Nullable String takeReply() {
         if (replyTo == null) return null;
         String id = replyTo.id();
         cancelMode();
@@ -325,8 +326,8 @@ public final class Composer extends VBox {
         focus();
     }
 
-    private Consumer<SidePanel.Tab> onPanel;
-    private Runnable onProtect;
+    private @Nullable Consumer<SidePanel.Tab> onPanel;
+    private @Nullable Runnable onProtect;
 
     /** "Foto protegida contra IA" in the clip's menu: the window asks how hard ({@link CloakSend}). */
     public void setOnProtect(Runnable onProtect) {
@@ -438,7 +439,7 @@ public final class Composer extends VBox {
     public void aiKeyReleased(KeyCode key) { ai.keyReleased(key); }
 
     /** What the open chat's network supports; null with no chat. */
-    private app.unichat.model.RoomFeatures features() {
+    private app.unichat.model.@Nullable RoomFeatures features() {
         Chat c = chatId == null ? null : svc.chat(chatId);
         return c == null ? null : c.features();
     }
@@ -461,7 +462,7 @@ public final class Composer extends VBox {
             e.consume();
             cancelMode();
         } else if (e.getCode() == KeyCode.UP && input.getText().isEmpty() && chatId != null) {
-            editLastSent(e);
+            editLastSent(e, chatId);
         }
     }
 
@@ -479,8 +480,8 @@ public final class Composer extends VBox {
     }
 
     /** ↑ in an empty box: the last text I sent, to edit. */
-    private void editLastSent(KeyEvent e) {
-        List<Message> msgs = svc.messages(chatId);
+    private void editLastSent(KeyEvent e, String open) {
+        List<Message> msgs = svc.messages(open);
         for (int i = msgs.size() - 1; i >= 0; i--) {
             Message m = msgs.get(i);
             if (m.outgoing() && !m.deleted() && !m.isMedia()) {
@@ -605,7 +606,7 @@ public final class Composer extends VBox {
     }
 
     /** The text the box draws, found after its first layout. */
-    private Text drawn;
+    private @Nullable Text drawn;
 
     /** Most of the window the box may take; past it, it scrolls. */
     private static final double MAX_SHARE = 0.4;

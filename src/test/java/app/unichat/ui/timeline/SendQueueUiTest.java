@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import app.unichat.assist.AiSettings;
 import app.unichat.model.Message;
 import app.unichat.service.MockChatService;
@@ -21,6 +22,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -39,7 +41,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SendQueueUiTest {
     private static final String CHAT = "!family:demo";
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private Stage stage;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private MainView view;
     private ThreadPane thread;
     /** Each text's correction waits for its own gate. */
@@ -70,7 +74,7 @@ class SendQueueUiTest {
             stage.setScene(new Scene(view, 900, 700));
             stage.show();
             view.openChatId(CHAT);
-            return find(view);
+            return Present.of(find(view));
         });
         thread.sendQueue().useWriter(() -> prompt -> {
             String text = prompt.substring(prompt.indexOf(">\n") + 2, prompt.indexOf("\n</"));
@@ -89,15 +93,14 @@ class SendQueueUiTest {
         AiSettings.setFixMode(AiSettings.FixMode.OFF);
         AiReplyButton.SHOWN.set(false);
         svc.stop();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             view.dispose();
             stage.close();
             stage.getScene().setRoot(new javafx.scene.layout.Pane());
-            return null;
         });
     }
 
-    private static ThreadPane find(Node n) {
+    private static @Nullable ThreadPane find(Node n) {
         if (n instanceof ThreadPane t) return t;
         if (n instanceof Parent p) for (Node c : p.getChildrenUnmodifiable()) {
             ThreadPane t = find(c);
@@ -108,10 +111,9 @@ class SendQueueUiTest {
 
     private void send(String text) throws InterruptedException {
         TextArea box = FxWait.fx(() -> (TextArea) thread.lookup(".composer .text-area"));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             box.setText(text);
             box.fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-            return null;
         });
     }
 
@@ -272,15 +274,14 @@ class SendQueueUiTest {
             return v;
         });
         try {
-            assertTrue(FxWait.fx(() -> find(second).sendQueue() == thread.sendQueue()), "one per service: still controllable");
-            FxWait.until("its row shows there too", () -> FxWait.fx(() -> find(second).lookupAll(".send-queue-text").stream()
+            assertTrue(FxWait.fx(() -> Present.of(find(second)).sendQueue() == thread.sendQueue()), "one per service: still controllable");
+            FxWait.until("its row shows there too", () -> FxWait.fx(() -> Present.of(find(second)).lookupAll(".send-queue-text").stream()
                     .anyMatch(n -> ((Label) n).getText().contains("uno q sí"))));
         } finally {
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 second.dispose();
                 other.close();
                 other.getScene().setRoot(new javafx.scene.layout.Pane());
-                return null;
             });
         }
     }

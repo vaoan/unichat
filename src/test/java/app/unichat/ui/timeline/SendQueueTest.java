@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import app.unichat.assist.ReplyWriter;
 import app.unichat.model.Message;
 import app.unichat.service.ScriptedChatService;
@@ -7,6 +8,7 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -31,19 +33,19 @@ class SendQueueTest {
     private final AtomicInteger cancelled = new AtomicInteger();
     /** How many corrections were asked for: each one's number, from 0. */
     private final AtomicInteger asked = new AtomicInteger();
-    private volatile ReplyWriter.Failure failure;
+    private volatile ReplyWriter.@Nullable Failure failure;
     private volatile String added = "";
     /** What the AI answers instead of a correction (null: as when it was cancelled); unset: it corrects. */
     private volatile boolean answersNothing;
     private volatile boolean sendFails;
-    private volatile java.util.concurrent.CountDownLatch sendGate;
+    private volatile java.util.concurrent.@Nullable CountDownLatch sendGate;
     private SendQueue queue;
 
     @BeforeEach
     void start() {
         svc = new ScriptedChatService() {
             @Override
-            public java.util.concurrent.CompletableFuture<Void> sendText(String chatId, String text, String replyToId) {
+            public java.util.concurrent.CompletableFuture<Void> sendText(String chatId, String text, @Nullable String replyToId) {
                 if (sendGate != null) {
                     try {
                         sendGate.await(); // a slow network
@@ -56,7 +58,7 @@ class SendQueueTest {
             }
         };
         queue = new SendQueue(svc, () -> new AiReplyButton.Writer() {
-            @Override public String write(String prompt) throws ReplyWriter.Failure {
+            @Override public @Nullable String write(String prompt) throws ReplyWriter.Failure {
                 if (failure != null) throw failure;
                 if (answersNothing) return null;
                 return prompt.substring(prompt.indexOf(">\n") + 2, prompt.indexOf("\n</")).replace(" q ", " que ") + added;
@@ -77,7 +79,7 @@ class SendQueueTest {
     }
 
     private void answer(int which) {
-        running.remove("#" + which).run();
+        Present.of(running.remove("#" + which)).run();
     }
 
     @Test
@@ -214,7 +216,7 @@ class SendQueueTest {
     @Test
     void aNetworkWithoutRepliesGetsNone() {
         svc.receive(CHAT, "¿vienes mañana?");
-        svc.chat(CHAT).setFeatures(app.unichat.model.RoomFeatures.parse(
+        Present.of(svc.chat(CHAT)).setFeatures(app.unichat.model.RoomFeatures.parse(
                 new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().put("id", "x").put("reply", 0)));
         queue.submit(CHAT, "creo q sí", null);
         svc.receive(CHAT, "¿y a qué hora?");

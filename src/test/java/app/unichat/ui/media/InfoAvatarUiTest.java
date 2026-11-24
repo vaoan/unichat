@@ -45,11 +45,10 @@ class InfoAvatarUiTest {
 
     @AfterEach
     void close() throws Exception {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Window.getWindows().stream().filter(w -> w.getScene() != null
                     && w.getScene().getRoot().getStyleClass().contains("media-viewer")).toList().forEach(Window::hide);
             if (stage != null) stage.close();
-            return null;
         });
     }
 
@@ -81,9 +80,8 @@ class InfoAvatarUiTest {
         mama.setAvatarUrl("mxc://demo/mama.png");
         InfoPane info = panel(svc, mama);
         Node avatar = FxWait.fx(() -> info.lookup(".avatar-enlargeable"));
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(avatar, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-            return null;
         });
         var file = svc.media("mxc://demo/mama.png", 0, 0);
         FxWait.until("the photo viewer shows the photo", () -> {

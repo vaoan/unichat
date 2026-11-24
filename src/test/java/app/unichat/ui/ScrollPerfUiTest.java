@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
@@ -40,6 +41,7 @@ import javafx.stage.Stage;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Not a check but a measurement, for before and after a change: a giant chat of stickers, GIFs, videos, photos and embeds
@@ -226,7 +228,7 @@ class ScrollPerfUiTest {
      * Scrolls one step per frame for {@code seconds} worth of frames (at 60 a second) and, with {@code live}, brings a
      * message every 6 frames: the load is counted in frames, not in time, so a slower machine does the same work.
      */
-    private static void run(String name, Node target, double delta, int seconds, Thread ui, Runnable live) throws InterruptedException, ExecutionException {
+    private static void run(String name, Node target, double delta, int seconds, Thread ui, @Nullable Runnable live) throws InterruptedException, ExecutionException {
         List<Long> gaps = Collections.synchronizedList(new ArrayList<>());
         long[] last = {0};
         int[] direction = {-1};
@@ -249,9 +251,8 @@ class ScrollPerfUiTest {
         };
         long gcBefore = gcMillis();
         try (Sampler sampler = new Sampler(ui)) {
-            fx(() -> {
+            FxWait.onFx(() -> {
                 timer.start();
-                return null;
             });
             if (live == null) {
                 over.await();
@@ -261,9 +262,8 @@ class ScrollPerfUiTest {
                     live.run();
                 }
             }
-            fx(() -> {
+            FxWait.onFx(() -> {
                 timer.stop();
-                return null;
             });
             List<Long> s = new ArrayList<>(gaps);
             s.sort(java.util.Comparator.naturalOrder());
@@ -300,7 +300,7 @@ class ScrollPerfUiTest {
         MockChatService svc = new MockChatService();
         Field field = MockChatService.class.getDeclaredField("messages");
         field.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
-        @SuppressWarnings("unchecked") List<Message> list = ((Map<String, List<Message>>) field.get(svc)).get(CHAT); // the field is that map
+        @SuppressWarnings("unchecked") List<Message> list = Present.of(((Map<String, List<Message>>) field.get(svc)).get(CHAT)); // the field is that map
         Method fire = MockChatService.class.getDeclaredMethod("fireMessages", String.class);
         fire.setAccessible(true); // NOPMD: AvoidAccessibilityAlteration, the test reaches a private part to check it
         Instant start = Instant.now().minusSeconds(MESSAGES * 30L);
@@ -310,20 +310,18 @@ class ScrollPerfUiTest {
         Scene[] scene = new Scene[1];
         MainView[] view = new MainView[1];
         Thread ui = fx(Thread::currentThread);
-        fx(() -> {
+        FxWait.onFx(() -> {
             Stage stage = new Stage();
             view[0] = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, u -> { });
             scene[0] = new Scene(view[0], 1280, 860);
             Theme.register(scene[0]);
             stage.setScene(scene[0]);
             stage.show();
-            return null;
         });
         FxWait.settled();
         long opening = System.nanoTime();
-        fx(() -> {
+        FxWait.onFx(() -> {
             view[0].openChatId(CHAT);
-            return null;
         });
         fx(() -> null);
         System.out.printf("PERF open the giant chat: %.0f ms%n", (System.nanoTime() - opening) / 1e6);
@@ -353,17 +351,15 @@ class ScrollPerfUiTest {
         run("chat list scroll", fx(() -> chats.lookup(".virtual-flow")), 60, 8, ui, null);
         for (String id : List.of("!mom:demo", CHAT, "!mom:demo", CHAT)) {
             long at = System.nanoTime();
-            fx(() -> {
+            FxWait.onFx(() -> {
                 view[0].openChatId(id);
-                return null;
             });
             fx(() -> null);
             System.out.printf("PERF switch to %s: %.0f ms%n", id.equals(CHAT) ? "giant" : "small", (System.nanoTime() - at) / 1e6);
             FxWait.settled();
         }
-        fx(() -> {
+        FxWait.onFx(() -> {
             scene[0].getWindow().hide();
-            return null;
         });
     }
 }

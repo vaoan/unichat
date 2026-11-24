@@ -12,6 +12,7 @@ import javafx.stage.Stage;
 import javafx.stage.Window;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CountDownLatch;
 
@@ -49,12 +50,11 @@ class MediaClickUiTest {
         FxWait.until("the photo renders", () -> scene.getRoot().lookup(".media-box") != null);
         // Count only viewer windows: the demo's simulated incoming messages open notification cards too.
         int before = fx(MediaClickUiTest::viewers);
-        fx(() -> {
+        FxWait.onFx(() -> {
             Node media = scene.getRoot().lookup(".media-box");
             assertNotNull(media, "the demo chat has a photo");
             Event.fireEvent(media, mouse(MouseEvent.MOUSE_PRESSED, true));
             Event.fireEvent(media, mouse(MouseEvent.MOUSE_RELEASED, true));
-            return null;
         });
         FxWait.until("a viewer opens", () -> viewers() > before);
         FxWait.settled(); // and only one
@@ -62,10 +62,9 @@ class MediaClickUiTest {
         boolean viewer = fx(() -> Window.getWindows().stream().anyMatch(w -> w.getScene() != null
                 && w.getScene().getRoot().getStyleClass().contains("media-viewer")));
         assertTrue(viewer);
-        fx(() -> {
+        FxWait.onFx(() -> {
             Window.getWindows().stream().filter(w -> w.getScene() != null && w.getScene().getRoot().getStyleClass().contains("media-viewer"))
                     .toList().forEach(Window::hide);
-            return null;
         });
     }
 
@@ -79,7 +78,7 @@ class MediaClickUiTest {
                 true, false, false, true, false, still, null);
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

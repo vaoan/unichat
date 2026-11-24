@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.service.ScriptedChatService;
 import app.unichat.ui.desktop.Notifier;
@@ -18,6 +19,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.ScrollEvent;
 import javafx.stage.Stage;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -110,7 +112,7 @@ final class TimelineWindow {
     }
 
     /** The row drawing {@code m}, or null when it isn't drawn. */
-    javafx.scene.control.ListCell<?> cellOf(Message m) {
+    javafx.scene.control.@Nullable ListCell<?> cellOf(Message m) {
         for (Node n : list().lookupAll(".row-cell")) {
             if (n instanceof javafx.scene.control.ListCell<?> c && c.getItem() instanceof ThreadRows.MessageRow mr && mr.message().id().equals(m.id())) return c;
         }
@@ -120,7 +122,7 @@ final class TimelineWindow {
     /** The item {@code text} of {@code m}'s menu, opened from the keys as a person would (Enter on it). */
     javafx.scene.control.MenuItem menuItem(Message m, String text) throws InterruptedException {
         return FxWait.fx(() -> {
-            javafx.scene.control.ListCell<?> cell = cellOf(m);
+            javafx.scene.control.ListCell<?> cell = Present.of(cellOf(m));
             list().getSelectionModel().select(cell.getIndex());
             list().fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
             javafx.scene.control.ContextMenu menu = javafx.stage.Window.getWindows().stream().filter(x -> x instanceof javafx.scene.control.ContextMenu cm && cm.isShowing()
@@ -133,9 +135,8 @@ final class TimelineWindow {
 
     /** Runs a menu item as a click on it would. */
     static void fire(javafx.scene.control.MenuItem item) throws InterruptedException {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             item.fire();
-            return null;
         });
     }
 
@@ -168,7 +169,7 @@ final class TimelineWindow {
     }
 
     /** How far the newest row's bottom is below the viewport's (px; negative is space under it), or null when it isn't drawn. */
-    Double newestGap() {
+    @Nullable Double newestGap() {
         VirtualFlow<?> flow = flow();
         IndexedCell<?> last = flow.getLastVisibleCell();
         if (last == null || last.getIndex() != list().getItems().size() - 1) return null;
@@ -198,7 +199,7 @@ final class TimelineWindow {
     }
 
     /** Where the row of message {@code id} is drawn (its top, in the scene), or null when it isn't on screen. */
-    Double yOf(String id) {
+    @Nullable Double yOf(String id) {
         VirtualFlow<?> flow = flow();
         for (int i = flow.getFirstVisibleCell().getIndex(); i <= flow.getLastVisibleCell().getIndex(); i++) {
             IndexedCell<?> c = flow.getVisibleCell(i);
@@ -242,16 +243,15 @@ final class TimelineWindow {
             Double gap = newestGap();
             return gap != null && gap <= 1 && gap > -6;
         });
-        return FxWait.fx(this::newestGap);
+        return Present.of(FxWait.<@Nullable Double, RuntimeException>fx(this::newestGap));
     }
 
     /** One turn of the wheel or trackpad: {@code dy} up (positive) or down (negative), as a person would. */
     void wheel(double dy) throws InterruptedException {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(flow(), new ScrollEvent(ScrollEvent.SCROLL, 200, 200, 200, 200, false, false, false, false,
                     false, false, 0, dy, 0, dy, ScrollEvent.HorizontalTextScrollUnits.NONE, 0,
                     ScrollEvent.VerticalTextScrollUnits.NONE, 0, 0, null));
-            return null;
         });
         FxWait.pulses(1); // the list lays out each turn
     }
@@ -266,10 +266,9 @@ final class TimelineWindow {
 
     /** A key pressed in the message box. */
     void key(KeyCode code, boolean shift) throws InterruptedException {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             input().requestFocus();
             input().fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, shift, false, false, false));
-            return null;
         });
     }
 
@@ -292,26 +291,24 @@ final class TimelineWindow {
 
     /** ⌘+ / ⌘- / ⌘0 on the window: the text bigger, smaller or back to 100 % (Ctrl on Linux: both are pressed). */
     void zoom(KeyCode code) throws InterruptedException {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             scene.getRoot().fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, true, false, true));
-            return null;
         });
         FxWait.settled();
     }
 
     /** A key pressed on the message list itself (it has the focus, as after F6 or a click on a message). */
     void listKey(KeyCode code) throws InterruptedException {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             list().requestFocus();
             list().fireEvent(new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, false, false, false, false));
-            return null;
         });
         FxWait.settled();
     }
 
     /** The scrollbar's thumb pressed, moved to {@code fraction} of the way down (0 top, 1 bottom), and let go. */
     void dragScrollbar(double fraction) throws InterruptedException {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             javafx.scene.control.ScrollBar bar = list().lookupAll(".scroll-bar").stream()
                     .filter(n -> n instanceof javafx.scene.control.ScrollBar sb
                             && sb.getOrientation() == javafx.geometry.Orientation.VERTICAL)
@@ -319,7 +316,6 @@ final class TimelineWindow {
             bar.fireEvent(mouse(javafx.scene.input.MouseEvent.MOUSE_PRESSED));
             bar.setValue(bar.getMin() + fraction * (bar.getMax() - bar.getMin()));
             bar.fireEvent(mouse(javafx.scene.input.MouseEvent.MOUSE_RELEASED));
-            return null;
         });
         FxWait.settled();
     }
@@ -336,11 +332,10 @@ final class TimelineWindow {
      */
     void close() throws InterruptedException {
         svc.stop();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             view.dispose();
             stage.close();
             scene.setRoot(new javafx.scene.layout.Pane());
-            return null;
         });
     }
 
@@ -359,7 +354,7 @@ final class TimelineWindow {
         @FunctionalInterface
         interface Probe {
             /** Null when the frame is right, else what's wrong with it. */
-            String check() throws Exception; // NOPMD: SignatureDeclareThrowsException, a callback: each test's probe looks as it needs
+            @Nullable String check() throws Exception; // NOPMD: SignatureDeclareThrowsException, a callback: each test's probe looks as it needs
         }
 
         private final Probe probe;
@@ -412,7 +407,7 @@ final class TimelineWindow {
     Frames readingOlder() throws InterruptedException {
         scrollUp();
         String read = FxWait.fx(this::readMessage);
-        return watch(stays(read, FxWait.fx(() -> yOf(read))));
+        return watch(stays(read, Present.of(FxWait.fx(() -> yOf(read)))));
     }
 
     /** Where the list is scrolled to, 0 (its start) to 1 (its end). */

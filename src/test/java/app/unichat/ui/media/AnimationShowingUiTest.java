@@ -76,14 +76,13 @@ class AnimationShowingUiTest {
         AnimatedImage.Frames frames = frames();
         long before = FxWait.fx(AnimationBudget.SHARED::used);
         Stage[] stage = new Stage[1];
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             ImageView view = new ImageView();
             stage[0] = new Stage();
             stage[0].setOpacity(0);
             stage[0].setScene(new Scene(new StackPane(view), 100, 100));
             stage[0].show();
             AnimatedImage.play(view, frames);
-            return null;
         });
         assertEquals(before + frames.bytes(), FxWait.fx(AnimationBudget.SHARED::used), "playing while it shows");
 

@@ -53,11 +53,12 @@ public final class CloakBar extends TaskBar {
             }
             default -> Nodes.show(this, true);
         }
-        String level = I18n.t("cloak.level." + s.level().name());
+        String level = I18n.t("cloak.level." + java.util.Objects.requireNonNull(s.level(), "a job under way or failed has its level").name());
         boolean failed = s.phase() == CloakJob.Phase.FAILED;
         what.setText(I18n.t(failed ? "cloak.bar.failed" : "cloak.bar.protecting", s.file(), level));
         stage.setText(failed ? s.error()
-                : s.phase() == CloakJob.Phase.INSTALLING ? I18n.t(s.stepKey()) : I18n.t("cloak.bar.working"));
+                : s.phase() == CloakJob.Phase.INSTALLING ? I18n.t(java.util.Objects.requireNonNull(s.stepKey(), "installing says its step"))
+                : I18n.t("cloak.bar.working"));
         bar.setProgress(failed ? 0 : s.fraction() < 0 ? ProgressBar.INDETERMINATE_PROGRESS : s.fraction());
         Nodes.show(bar, !failed);
         big.setText(s.fraction() >= 0 && !failed ? percent(s.fraction()) : "");

@@ -18,6 +18,7 @@ import javafx.scene.control.Button;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
@@ -43,8 +44,8 @@ public final class UploadBar extends TaskBar {
     private final FxCoalescer redraw = new FxCoalescer(this::refresh);
     private final Runnable listener = redraw::request;
     private final PauseTransition hideLater = new PauseTransition(DONE_SHOWN);
-    private Path shownFile;
-    private String chatId;
+    private @Nullable Path shownFile;
+    private @Nullable String chatId;
 
     public UploadBar(UploadQueue queue, ChatReader chats, Consumer<String> openChat) {
         super("upload-bar");
@@ -93,7 +94,8 @@ public final class UploadBar extends TaskBar {
             if (s.failed() > 0) text += " · " + I18n.n("uploadBar.failed", s.failed());
             what.setText(text);
             // Why a file couldn't go as asked (a video too long to be a moving picture): it wasn't tried again.
-            String why = s.refused() == null ? "" : s.refused();
+            String refused = s.refused();
+            String why = refused == null ? "" : refused;
             bar.setAccessibleText(why.isEmpty() ? text : text + ". " + why);
             detail.setText(why);
             where.setText("");
@@ -107,7 +109,7 @@ public final class UploadBar extends TaskBar {
             return;
         }
         hideLater.stop();
-        UploadQueue.Upload u = s.current();
+        UploadQueue.Upload u = java.util.Objects.requireNonNull(s.current(), "a batch neither idle nor finished has a file going");
         StringBuilder text = new StringBuilder(I18n.t("uploadBar.sending", s.position(), s.total()));
         if (s.sent() > 0) text.append(" · ").append(I18n.n("uploadBar.sentSoFar", s.sent()));
         if (s.failed() > 0) text.append(" · ").append(I18n.n("uploadBar.failed", s.failed()));

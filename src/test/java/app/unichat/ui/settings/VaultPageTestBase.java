@@ -21,6 +21,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.io.TempDir;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.nio.file.Path;
@@ -40,12 +41,13 @@ abstract class VaultPageTestBase { // NOPMD: AbstractClassWithoutAbstractMethod,
     @TempDir
     Path dir;
     protected VaultFixture account;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it
     protected Stage stage;
-    protected Function<javafx.stage.Window, File> saveWas;
-    protected BiPredicate<javafx.stage.Window, String> printWas;
+    protected Function<javafx.stage.@Nullable Window, @Nullable File> saveWas;
+    protected BiPredicate<javafx.stage.@Nullable Window, String> printWas;
     protected RecoveryCodeSheet.Clip clipboardWas;
     /** What the system's clipboard holds now, as the sheet put it there or the person copied over it. */
-    protected String clip;
+    protected @Nullable String clip;
     protected final List<String> copied = new ArrayList<>();
     protected final List<String> printed = new ArrayList<>();
 
@@ -75,7 +77,7 @@ abstract class VaultPageTestBase { // NOPMD: AbstractClassWithoutAbstractMethod,
                 clip = text;
             }
 
-            @Override public String now() {
+            @Override public @Nullable String now() {
                 return clip;
             }
 

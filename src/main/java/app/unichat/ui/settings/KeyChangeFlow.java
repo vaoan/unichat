@@ -12,6 +12,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -33,7 +34,7 @@ final class KeyChangeFlow {
     private KeyChangeFlow() {}
 
     /** Asks before changing the key; {@code removing} is the computer taken out with it, or null. */
-    static Node confirm(Cloud cloud, VaultView view, VaultView.Computer removing, Consumer<Cloud.KeyChanged> done, Runnable cancel) {
+    static Node confirm(Cloud cloud, VaultView view, VaultView.@Nullable Computer removing, Consumer<Cloud.KeyChanged> done, Runnable cancel) {
         java.util.Set<String> confirmed = new java.util.HashSet<>(); // those listed here as getting it: no other is offered it
         VBox who = new VBox(6);
         who.getChildren().add(Labels.help(I18n.t("settings.vault.change.receive")));

@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -39,7 +41,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class StickerSuggestionsUiTest {
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it
     private Stage stage;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it
     private MainView view;
     private String chat;
 
@@ -64,14 +68,13 @@ class StickerSuggestionsUiTest {
         svc = service;
         svc.noAutoReplies();
         chat = svc.chats().stream().filter(c -> c.features().accepts(RoomFeatures.STICKER)).findFirst().orElseThrow().id();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             stage = new Stage();
             stage.setOpacity(0);
             view = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
             stage.setScene(new Scene(view, 900, 700));
             stage.show();
             view.openChatId(chat);
-            return null;
         });
         FxWait.until("the message box", () -> FxWait.fx(() -> view.lookup(".composer-input") != null));
     }
@@ -80,11 +83,10 @@ class StickerSuggestionsUiTest {
     void close() throws Exception {
         Settings.get().setSuggestStickers(true);
         svc.stop();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             view.dispose();
             stage.close();
             stage.getScene().setRoot(new javafx.scene.layout.Pane());
-            return null;
         });
     }
 
@@ -117,12 +119,11 @@ class StickerSuggestionsUiTest {
         FxWait.until("the set's 😂 offered", () -> offered().size() == 1);
         assertEquals("Stickers de 😂", FxWait.fx(() -> suggestions().getAccessibleText()));
         Node jaja = offered().getFirst();
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(jaja, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-            return null;
         });
         FxWait.until("the sticker sent", () -> stickersSent().size() == 1);
-        assertTrue(stickersSent().getFirst().mediaUrl().endsWith("sticker-jaja"), stickersSent().getFirst().mediaUrl());
+        assertTrue(Present.of(stickersSent().getFirst().mediaUrl()).endsWith("sticker-jaja"), stickersSent().getFirst().mediaUrl());
         FxWait.until("the emoji gone from the box", () -> FxWait.fx(() -> box().getText().isEmpty()));
         FxWait.settled();
         assertTrue(offered().isEmpty(), "and the line with it");
@@ -177,7 +178,7 @@ class StickerSuggestionsUiTest {
         FxWait.until("offered", () -> offered().size() == 1);
         svc.sendText(chat, "😂", null).get();
         Message mine = svc.messages(chat).getLast();
-        FxWait.onFx(() -> find(view).composer().edit(mine));  // the box already holds "😂": no text changes
+        FxWait.onFx(() -> Present.of(find(view)).composer().edit(mine));  // the box already holds "😂": no text changes
         FxWait.settled();
         assertTrue(offered().isEmpty(), "an edit stays a text: no sticker can take its place");
     }
@@ -188,7 +189,7 @@ class StickerSuggestionsUiTest {
         CompletableFuture<Void> going = new CompletableFuture<>();
         openWith(new MockChatService() {
             @Override
-            public CompletableFuture<Void> sendSticker(String chatId, app.unichat.model.MediaLibrary.Item item, String replyToId) {
+            public CompletableFuture<Void> sendSticker(String chatId, app.unichat.model.MediaLibrary.Item item, @Nullable String replyToId) {
                 return going.thenCompose(v -> super.sendSticker(chatId, item, replyToId)); // a slow bridge
             }
         });
@@ -216,11 +217,10 @@ class StickerSuggestionsUiTest {
     @Test
     void aChatThatRefusesStickersHasItsTilesSayItThoughTheTextIsTheSame() throws Exception {
         String refusing = svc.chats().stream().map(Chat::id).filter(id -> !id.equals(chat)).findFirst().orElseThrow();
-        FxWait.fx(() -> {
-            svc.chat(refusing).setFeatures(RoomFeatures.parse(new com.fasterxml.jackson.databind.ObjectMapper()
+        FxWait.onFx(() -> {
+            Present.of(svc.chat(refusing)).setFeatures(RoomFeatures.parse(new com.fasterxml.jackson.databind.ObjectMapper()
                     .readTree("{\"id\":\"gm\",\"file\":{\"m.image\":{\"mime_types\":{\"image/*\":2}}}}")));
             view.openChatId(refusing);
-            return null;
         });
         type("😂");
         FxWait.onFx(() -> view.openChatId(chat));
@@ -242,11 +242,10 @@ class StickerSuggestionsUiTest {
         FxWait.onFx(() -> box().requestFocus());
         List<Node> passed = new java.util.ArrayList<>();
         for (int i = 0; i < 4 && FxWait.fx(() -> view.getScene().getFocusOwner()) != tile; i++) { // the box's buttons, then it
-            FxWait.fx(() -> {
+            FxWait.onFx(() -> {
                 Node at = view.getScene().getFocusOwner();
                 passed.add(at);
                 Event.fireEvent(at, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.TAB, true, false, false, false));
-                return null;
             });
             FxWait.settled();
         }
@@ -254,13 +253,12 @@ class StickerSuggestionsUiTest {
     }
 
     private static void press(Node tile) throws InterruptedException {
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(tile, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-            return null;
         });
     }
 
-    private static app.unichat.ui.timeline.ThreadPane find(Node n) {
+    private static app.unichat.ui.timeline.@Nullable ThreadPane find(Node n) {
         if (n instanceof app.unichat.ui.timeline.ThreadPane t) return t;
         if (n instanceof javafx.scene.Parent p) for (Node c : p.getChildrenUnmodifiable()) {
             app.unichat.ui.timeline.ThreadPane t = find(c);

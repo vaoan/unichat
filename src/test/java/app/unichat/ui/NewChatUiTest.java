@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.ui.timeline.ThreadPane;
 import app.unichat.service.ChatService;
@@ -17,6 +18,7 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -60,7 +62,7 @@ class NewChatUiTest {
         type(scene, "Mamá");
         FxWait.until("the search for Mamá", () -> names(scene).equals(List.of("Mamá")));
         enter(scene);
-        assertEquals("!mom:demo", fx(() -> thread(scene).chat().id()), "an existing chat just opens");
+        assertEquals("!mom:demo", fx(() -> Present.of(thread(scene).chat()).id()), "an existing chat just opens");
         assertNull(fx(() -> pane(scene)), "and the pane closes");
 
         shortcutN(scene);
@@ -68,8 +70,8 @@ class NewChatUiTest {
         type(scene, "Carlos");
         FxWait.until("the search for Carlos", () -> names(scene).equals(List.of("Carlos Peña")));
         enter(scene);
-        FxWait.until("Carlos's new chat opens", () -> thread(scene).chat().id().equals("!dm-c-carlos:demo"));
-        assertEquals("!dm-c-carlos:demo", fx(() -> thread(scene).chat().id()), "a chat is created and opened");
+        FxWait.until("Carlos's new chat opens", () -> Present.of(thread(scene).chat()).id().equals("!dm-c-carlos:demo"));
+        assertEquals("!dm-c-carlos:demo", fx(() -> Present.of(thread(scene).chat()).id()), "a chat is created and opened");
 
         shortcutN(scene);
         chooseNetwork(scene, "WhatsApp");
@@ -84,9 +86,8 @@ class NewChatUiTest {
         assertTrue(help.contains("Grupos"), help);
 
         for (int i = 0; i < 2; i++) { // the first Esc empties the search box, the second closes (SearchFields)
-            fx(() -> {
+            FxWait.onFx(() -> {
                 Event.fireEvent(search(scene), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false));
-                return null;
             });
             FxWait.settled();
             if (i == 0) assertEquals("", fx(() -> search(scene).getText()), "the first Esc empties the search");
@@ -138,21 +139,19 @@ class NewChatUiTest {
         Runnable chatArrives = svc.holdBridge(); // the scenario: the new chat arrives after the pane was closed
         enter(scene); // the bridge creates the chat: it arrives later
         CompletableFuture<Void> arrived = arrival(svc, "!dm-c-pedro:demo");
-        fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(search(scene), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ESCAPE, false, false, false, false));
-            return null;
         });
-        fx(() -> {
+        FxWait.onFx(() -> {
             boolean mac = MainView.MAC;
             Event.fireEvent(scene.getRoot(), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.K, false, !mac, false, mac));
-            return null;
         });
         chatArrives.run(); // the pane is closed and the command bar open: now the chat comes in
         arrived.get(); // every listener has heard of Pedro's new chat
         FxWait.settled(); // and what they asked the window to do has run
         assertTrue(fx(() -> scene.getRoot().lookup(".command-bar") != null && scene.getRoot().lookup(".command-bar").getScene() != null),
                 "the command bar opened afterwards stays open");
-        assertEquals("!family:demo", fx(() -> thread(scene).chat().id()), "no jump to the chat you gave up on");
+        assertEquals("!family:demo", fx(() -> Present.of(thread(scene).chat()).id()), "no jump to the chat you gave up on");
         svc.stop();
     }
 
@@ -177,7 +176,7 @@ class NewChatUiTest {
         return t != null && !t.isBlank();
     }
 
-    private static Node pane(Scene s) {
+    private static @Nullable Node pane(Scene s) {
         Node n = s.getRoot().lookup(".new-chat-pane");
         return n != null && n.isVisible() && n.getScene() != null ? n : null;
     }
@@ -222,35 +221,31 @@ class NewChatUiTest {
         // The pane is built on the next pulse after ⌘N: wait for its network chips.
         FxWait.until("the " + name + " chip", () -> s.getRoot().lookupAll(".new-chat-network").stream()
                 .anyMatch(n -> name.equals(((ToggleButton) n).getText())));
-        fx(() -> {
+        FxWait.onFx(() -> {
             s.getRoot().lookupAll(".new-chat-network").stream().map(n -> (ToggleButton) n)
                     .filter(b -> name.equals(b.getText())).findFirst().orElseThrow().fire();
-            return null;
         });
     }
 
     private static void type(Scene s, String text) throws InterruptedException {
         FxWait.until("the search field", () -> search(s) != null);
-        fx(() -> {
+        FxWait.onFx(() -> {
             search(s).setText(text);
-            return null;
         });
     }
 
     /** Enter in the search field, then what it set off on the FX thread (opening a chat that exists) has run. */
     private static void enter(Scene s) throws InterruptedException {
-        fx(() -> {
+        FxWait.onFx(() -> {
             Event.fireEvent(search(s), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.ENTER, false, false, false, false));
-            return null;
         });
         FxWait.settled();
     }
 
     private static void shortcutN(Scene s) throws InterruptedException {
-        fx(() -> {
+        FxWait.onFx(() -> {
             boolean mac = MainView.MAC;
             Event.fireEvent(s.getRoot(), new KeyEvent(KeyEvent.KEY_PRESSED, "", "", KeyCode.N, false, !mac, false, mac));
-            return null;
         });
         FxWait.settled();
     }
@@ -259,7 +254,7 @@ class NewChatUiTest {
         return (ThreadPane) s.getRoot().lookupAll("*").stream().filter(n -> n instanceof ThreadPane).findFirst().orElseThrow();
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

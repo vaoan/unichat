@@ -2,6 +2,7 @@ package app.unichat.ui.timeline;
 
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -44,7 +45,8 @@ public final class ThreadRows {
             Message prev = i > 0 ? messages.get(i - 1) : null;
             Message next = i + 1 < messages.size() ? messages.get(i + 1) : null;
             // A reply shows a piece of the message it answers.
-            Message replied = m.replyToId() == null ? null : byId.get(m.replyToId());
+            String replyToId = m.replyToId();
+            Message replied = replyToId == null ? null : byId.get(replyToId);
             int revision = 31 * m.revision() + (replied == null ? 0 : replied.revision());
             rows.add(new MessageRow(m, !sameGroup(prev, m, zone), !sameGroup(m, next, zone), revision));
         }
@@ -75,7 +77,7 @@ public final class ThreadRows {
         if (newEnd > from) current.addAll(from, next.subList(from, newEnd));
     }
 
-    static boolean sameGroup(Message a, Message b, ZoneId zone) {
+    static boolean sameGroup(@Nullable Message a, @Nullable Message b, ZoneId zone) {
         if (a == null || b == null) return false;
         if (a.type() == MessageType.SYSTEM || b.type() == MessageType.SYSTEM) return false;
         if (!a.senderId().equals(b.senderId())) return false;

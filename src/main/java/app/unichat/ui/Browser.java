@@ -1,6 +1,7 @@
 package app.unichat.ui;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 /** The person's web browser, and the system's file manager. */
 public final class Browser {
@@ -13,7 +14,7 @@ public final class Browser {
      * other schemes to whatever claims them ({@code file:} runs a program, {@code smb:} sends the Windows password's hash,
      * {@code ms-msdt:} was a remote-code hole), so nothing else ever leaves Unichat.
      */
-    static java.util.Optional<java.net.URI> web(String url) {
+    static java.util.Optional<java.net.URI> web(@Nullable String url) {
         if (url == null) return java.util.Optional.empty();
         try {
             java.net.URI uri = new java.net.URI(url.strip());

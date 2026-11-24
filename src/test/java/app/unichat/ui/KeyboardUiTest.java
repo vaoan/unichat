@@ -1,5 +1,6 @@
 package app.unichat.ui;
 
+import app.unichat.Present;
 import app.unichat.ui.chats.ChatListPane;
 import app.unichat.ui.chats.Rail;
 import app.unichat.ui.desktop.Notifier;
@@ -18,6 +19,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Locale;
@@ -119,7 +121,7 @@ class KeyboardUiTest {
             // another UI test started the toolkit
         }
         MockChatService svc = new MockChatService();
-        svc.chat("!family:demo").setFeatures(app.unichat.model.RoomFeatures.parse(
+        Present.of(svc.chat("!family:demo")).setFeatures(app.unichat.model.RoomFeatures.parse(
                 new com.fasterxml.jackson.databind.ObjectMapper().readTree("{\"reply\":0,\"edit\":0,\"reaction\":0}")));
         Scene scene = fx(() -> {
             Stage stage = new Stage();
@@ -157,24 +159,22 @@ class KeyboardUiTest {
     private static void typeLetter(Scene scene, String letter) throws InterruptedException {
         KeyCode code = KeyCode.getKeyCode(letter.toUpperCase(Locale.ROOT));
         for (var type : List.of(KeyEvent.KEY_PRESSED, KeyEvent.KEY_TYPED)) {
-            fx(() -> {
+            FxWait.onFx(() -> {
                 Node target = scene.getFocusOwner() != null ? scene.getFocusOwner() : scene.getRoot();
                 boolean typed = type == KeyEvent.KEY_TYPED;
                 Event.fireEvent(target, new KeyEvent(type, typed ? letter : "", typed ? "" : letter,
                         typed ? KeyCode.UNDEFINED : code, false, false, false, false));
-                return null;
             });
         }
         FxWait.settled(); // what the key started (focus moves, redraws) has run
     }
 
     private static void press(Scene scene, KeyCode code, boolean shift, boolean shortcut) throws InterruptedException {
-        fx(() -> {
+        FxWait.onFx(() -> {
             Node target = scene.getFocusOwner() != null ? scene.getFocusOwner() : scene.getRoot();
             boolean mac = MainView.MAC;
             Event.fireEvent(target, new KeyEvent(KeyEvent.KEY_PRESSED, "", "", code, shift,
                     shortcut && !mac, false, shortcut && mac));
-            return null;
         });
         FxWait.settled(); // what the key started (focus moves, redraws) has run
     }
@@ -186,7 +186,7 @@ class KeyboardUiTest {
         FxWait.settled();
     }
 
-    private static <T, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
+    private static <T extends @Nullable Object, E extends Exception> T fx(FxWait.FxCall<T, E> c) throws E, InterruptedException {
         return FxWait.fx(c);
     }
 }

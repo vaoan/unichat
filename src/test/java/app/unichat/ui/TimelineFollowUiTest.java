@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class TimelineFollowUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private TimelineWindow w;
 
     @AfterEach
@@ -170,10 +171,9 @@ class TimelineFollowUiTest {
     void theNewestMessageGrowsAfterItShows() throws Exception {
         TimelineWindow.Frames frames = atBottom(20);
         // Like a photo finishing its download: the bubble gets taller after it was drawn.
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             Region r = (Region) w.flow().getLastVisibleCell().getGraphic();
             r.setMinHeight(r.getHeight() + 220);
-            return null;
         });
         frames.stop("the newest bubble growing");
     }

@@ -1,5 +1,6 @@
 package app.unichat.ui.timeline;
 
+import app.unichat.Present;
 import app.unichat.service.MockChatService;
 import app.unichat.ui.FxWait;
 import javafx.application.Platform;
@@ -23,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 /** The footer changed twice: an older capture finishing last never replaces the newer one. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class CaptureRetakeUiTest {
+    @SuppressWarnings("NullAway.Init") // each test sets it before use
     private javafx.stage.Stage stage;
 
     @BeforeAll
@@ -54,17 +56,16 @@ class CaptureRetakeUiTest {
         StackPane overlay = new StackPane();
         List<CompletableFuture<ConversationShot.Shot>> takes = new CopyOnWriteArrayList<>();
         CaptureSheet sheet = new CaptureSheet(svc, n -> overlay.getChildren().setAll(n), () -> overlay.getChildren().clear(), t -> { });
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             stage = new javafx.stage.Stage();
             stage.setOpacity(0);
             stage.setScene(new javafx.scene.Scene(overlay, 600, 700));
             stage.show();
-            sheet.open(3, svc.chat("!family:demo"), footer -> {
+            sheet.open(3, Present.of(svc.chat("!family:demo")), footer -> {
                 CompletableFuture<ConversationShot.Shot> f = new CompletableFuture<>();
                 takes.add(f);
                 return f;
             });
-            return null;
         });
         FxWait.until("the sheet is drawn", () -> FxWait.fx(() -> overlay.lookup(".check-box") != null)); // a scroll pane's content comes with its skin
         CheckBox footer = FxWait.fx(() -> (CheckBox) overlay.lookup(".check-box"));
@@ -86,13 +87,12 @@ class CaptureRetakeUiTest {
         MockChatService svc = new MockChatService();
         StackPane overlay = new StackPane();
         CaptureSheet sheet = new CaptureSheet(svc, n -> overlay.getChildren().setAll(n), () -> overlay.getChildren().clear(), t -> { });
-        FxWait.fx(() -> {
+        FxWait.onFx(() -> {
             stage = new javafx.stage.Stage();
             stage.setOpacity(0);
             stage.setScene(new javafx.scene.Scene(overlay, 600, 700));
             stage.show();
-            sheet.open(500, svc.chat("!family:demo"), footer -> CompletableFuture.failedFuture(new ConversationShot.TooLong()));
-            return null;
+            sheet.open(500, Present.of(svc.chat("!family:demo")), footer -> CompletableFuture.failedFuture(new ConversationShot.TooLong()));
         });
         FxWait.until("the sheet is drawn", () -> FxWait.fx(() -> overlay.lookup(".check-box") != null));
         FxWait.settled();
