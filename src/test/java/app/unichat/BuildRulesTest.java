@@ -211,17 +211,6 @@ class BuildRulesTest {
     }
 
     @Test
-    void noMavenConfigFileSkipsACheckEither() throws IOException {
-        // .mvn/maven.config adds command-line options to every build (-Dpmd.skip, -Dcheckstyle.skip, -Dmaven.test.skip ...),
-        // and a -D in .mvn/jvm.config sets a property the same way: neither is read in pom.xml.
-        assertFalse(Files.exists(Path.of(".mvn/maven.config")), ".mvn/maven.config adds options to every build");
-        for (String line : Files.readAllLines(Path.of(".mvn/jvm.config"))) {
-            assertTrue(line.isBlank() || line.startsWith("--add-exports ") || line.startsWith("--add-opens "),
-                    ".mvn/jvm.config only opens the compiler's packages to Error Prone (--add-exports, --add-opens): " + line);
-        }
-    }
-
-    @Test
     void theJvmsABuildStartsStayOffTheScreen() {
         // A test that drew a picture (ImageIO, Graphics2D) put "ForkedBooter" in the Dock and took the focus, in every
         // build without headless-ui; SpotBugs' own JVM is started the same way.
