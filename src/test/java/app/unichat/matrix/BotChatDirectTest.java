@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class BotChatDirectTest {
     private static final String ME = "@me:example.org";
     private final List<String> calls = Collections.synchronizedList(new ArrayList<>());
+    @SuppressWarnings("NullAway.Init") // bots() sets it, and every test calls it first
     private HttpServer server;
 
     private BotChat bots(int getStatus, String getBody) throws IOException {
@@ -39,7 +40,7 @@ class BotChatDirectTest {
         server.start();
         MatrixClient client = new MatrixClient("http://127.0.0.1:" + server.getAddress().getPort(), "tok");
         MatrixCore core = new MatrixCore(client, new SyncProcessor(ME), ME, "example.org", "tok");
-        return new BotChat(core, new MessageSender(core, null));
+        return new BotChat(core, new MessageSender(core, new MediaDownloader(core.client, core.io)));
     }
 
     @AfterEach

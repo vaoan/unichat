@@ -21,6 +21,7 @@ import app.unichat.service.QuietRule;
 import app.unichat.settings.Settings;
 import app.unichat.support.Hashes;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InterruptedIOException;
@@ -61,9 +62,9 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor(Threads.daemon("matrix-timer"));
     private final Map<String, CompletableFuture<Boolean>> historyInFlight = new ConcurrentHashMap<>();
     private volatile ConnectionState state = ConnectionState.CONNECTING;
-    private volatile String nextBatch;
+    private volatile @Nullable String nextBatch;
     /** Set under the lock in start(); wake() and dropLongPoll() read it without it. */
-    private volatile Thread syncThread;
+    private volatile @Nullable Thread syncThread;
     /** The computer just woke: the open long poll is dropped and the next sync answers at once ({@link #wake}). */
     private volatile boolean woke;
     /** From starting or waking until the first answer: a refused connection then is the server still starting, not "offline". */
@@ -95,7 +96,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                 Settings.get().dir().resolve("server-seen.json")), Settings.get().deviceId());
     }
 
-    MatrixChatService(String homeserver, String userId, String accessToken, PreferencesFile prefs, String deviceId) {
+    MatrixChatService(String homeserver, String userId, String accessToken, PreferencesFile prefs, @Nullable String deviceId) {
         this.serverIdentity = serverIdentity(homeserver, deviceId, userId);
         this.prefs = prefs;
         this.client = new MatrixClient(homeserver, accessToken);
@@ -267,7 +268,8 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         boolean quick = false;
         while (core.running) {
             try {
-                boolean initial = nextBatch == null;
+                String since = nextBatch;
+                boolean initial = since == null;
                 if (initial) setState(ConnectionState.SYNCING);
                 int timeout = pollTimeout(initial, catchUp, quick);
                 synchronized (pollLock) {
@@ -276,7 +278,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
                 String filterParam = syncFilter.forRequest(initial);
                 JsonNode resp;
                 try {
-                    resp = poll(filterParam, timeout, initial, catchUp);
+                    resp = poll(filterParam, timeout, since, catchUp);
                 } catch (MatrixException e) {
                     Refusal what = refused(e, filterParam, catchUp);
                     if (what == Refusal.FAIL) throw e;
@@ -317,10 +319,10 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     }
 
     /** One /sync request: the first or a catch-up may take minutes to answer. */
-    private JsonNode poll(String filterParam, int timeout, boolean initial, boolean catchUp) throws IOException {
+    private JsonNode poll(String filterParam, int timeout, @Nullable String since, boolean catchUp) throws IOException {
         String path = CLIENT + "/sync?filter=" + enc(filterParam) + "&timeout=" + timeout
-                + (initial ? "" : "&since=" + enc(nextBatch));
-        return client.request("GET", path, null, Duration.ofSeconds(initial || catchUp ? 180 : 75));
+                + (since == null ? "" : "&since=" + enc(since));
+        return client.request("GET", path, null, Duration.ofSeconds(since == null || catchUp ? 180 : 75));
     }
 
     /** How long this round's request may wait for news: 0 to come back at once. */
@@ -444,7 +446,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
      * Which server's answers these are, for {@link PreferencesFile#useServer}. The URL alone isn't enough: the local
      * server is always at the same one, wiped or not. A new login has a new device, and forgetting then is the safe side.
      */
-    static String serverIdentity(String homeserver, String deviceId, String userId) {
+    static String serverIdentity(String homeserver, @Nullable String deviceId, String userId) {
         return homeserver + "|" + (deviceId == null || deviceId.isBlank() ? userId : deviceId);
     }
 
@@ -557,7 +559,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
 
     /** Asked once per message (the answer is kept: a reply shows on every redraw). */
     @Override
-    public CompletableFuture<Message> message(String chatId, String messageId) { return fetched.message(chatId, messageId); }
+    public CompletableFuture<@Nullable Message> message(String chatId, String messageId) { return fetched.message(chatId, messageId); }
 
     @Override
     public CompletableFuture<Boolean> loadOlder(String chatId) {
@@ -603,11 +605,11 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     ChatActions actions() { return chatActions; }
     MessageSender sender() { return sender; }
 
-    public static void setBridgeProvisioner(BridgeProvisioner p) { BridgeAccounts.provisioner = p; }
+    public static void setBridgeProvisioner(@Nullable BridgeProvisioner p) { BridgeAccounts.provisioner = p; }
 
     @Override public void addListener(Listener listener) { core.listeners.add(listener); }
     @Override public void removeListener(Listener listener) { core.listeners.remove(listener); }
-    @Override public Chat chat(String chatId) { return core.chat(chatId); }
+    @Override public @Nullable Chat chat(String chatId) { return core.chat(chatId); }
     @Override public void keepCached(java.util.Collection<String> urls) { media.keep(urls); }
     @Override public void keepSaved(java.util.Collection<String> urls) { media.save(urls); }
     @Override public CompletableFuture<Path> media(String url, int width, int height) { return media.media(url, width, height); }
@@ -621,15 +623,15 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     @Override public CompletableFuture<java.util.Optional<app.unichat.model.LinkMedia>> linkMedia(String url) { return media.linkMedia(url); }
     @Override public CompletableFuture<java.util.Optional<app.unichat.model.LinkPreview>> linkPreview(String url) { return media.linkPreview(url); }
 
-    @Override public CompletableFuture<Void> sendText(String chatId, String text, String replyToId) { return sender.sendText(chatId, text, replyToId); }
-    @Override public CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, String replyToId) { return sender.sendSticker(chatId, item, replyToId); }
+    @Override public CompletableFuture<Void> sendText(String chatId, String text, @Nullable String replyToId) { return sender.sendText(chatId, text, replyToId); }
+    @Override public CompletableFuture<Void> sendSticker(String chatId, MediaLibrary.Item item, @Nullable String replyToId) { return sender.sendSticker(chatId, item, replyToId); }
     @Override public CompletableFuture<Void> forward(String chatId, Message message, boolean gifs) { return sender.forward(chatId, message, gifs); }
-    @Override public CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, String replyToId) { return sender.sendVoice(chatId, note, replyToId); }
-    @Override public CompletableFuture<Void> sendFile(String chatId, Path file, String replyToId, app.unichat.service.SendAs as,
+    @Override public CompletableFuture<Void> sendVoice(String chatId, VoiceNote note, @Nullable String replyToId) { return sender.sendVoice(chatId, note, replyToId); }
+    @Override public CompletableFuture<Void> sendFile(String chatId, Path file, @Nullable String replyToId, app.unichat.service.SendAs as,
                                                       java.util.function.DoubleConsumer progress) {
         return sender.sendFile(chatId, file, replyToId, as, progress);
     }
-    @Override public CompletableFuture<Void> sendGif(String chatId, Path file, String mime, int width, int height, String replyToId) { return sender.sendGif(chatId, file, mime, width, height, replyToId); }
+    @Override public CompletableFuture<Void> sendGif(String chatId, Path file, String mime, int width, int height, @Nullable String replyToId) { return sender.sendGif(chatId, file, mime, width, height, replyToId); }
     @Override public CompletableFuture<Void> editMessage(String chatId, String messageId, String newText) { return sender.editMessage(chatId, messageId, newText); }
     @Override public CompletableFuture<Void> deleteMessage(String chatId, String messageId) { return sender.deleteMessage(chatId, messageId); }
     @Override public CompletableFuture<Void> toggleReaction(String chatId, String messageId, String emoji) { return sender.toggleReaction(chatId, messageId, emoji); }
@@ -658,18 +660,18 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     @Override public void setArchiveOpen(boolean open) { var _ = rest.setArchiveOpen(open); }
     @Override public void archivedChatOpened(String chatId) { var _ = rest.archivedChatOpened(chatId); }
     @Override public void setOpenChat(String chatId) { var _ = rest.setOpenChat(chatId); }
-    @Override public Waking waking() { return rest.waking(); }
+    @Override public @Nullable Waking waking() { return rest.waking(); }
     @Override public void addWakingListener(Runnable l) { rest.addListener(l); }
     @Override public void removeWakingListener(Runnable l) { rest.removeListener(l); }
     @Override public CompletableFuture<Void> setPinned(String chatId, boolean pinned) { return chatActions.setPinned(chatId, pinned); }
     @Override public CompletableFuture<Void> setMuted(String chatId, boolean muted) { return chatActions.setMuted(chatId, muted); }
-    @Override public CompletableFuture<Void> setReminder(String chatId, Instant at) { return chatActions.setReminder(chatId, at); }
+    @Override public CompletableFuture<Void> setReminder(String chatId, @Nullable Instant at) { return chatActions.setReminder(chatId, at); }
     @Override public CompletableFuture<Void> joinChat(String roomId) { return chatActions.joinChat(roomId); }
     @Override public CompletableFuture<Map<String, String>> spaceNames(String spaceId) { return chatActions.spaceNames(spaceId); }
     @Override public CompletableFuture<Void> leaveChat(String chatId) { return chatActions.leaveChat(chatId); }
     @Override public List<Network> availableNetworks() { return bridges.availableNetworks(); }
     @Override public List<Account> accounts() { return bridges.accounts(); }
-    @Override public BridgeLogin bridgeLogin(Network n) { return bridges.bridgeLogin(n); }
+    @Override public @Nullable BridgeLogin bridgeLogin(Network n) { return bridges.bridgeLogin(n); }
     @Override public void prepareBridge(Network n) throws Exception { bridges.prepareBridge(n); }
     @Override public void loginFinished(Network n) { bridges.loginFinished(n); }
     @Override public CompletableFuture<String> connectNetwork(Network network) { return bridges.connectNetwork(network); }
@@ -680,7 +682,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     @Override public CompletableFuture<ContactSupport> contactSupport(Account a) { return contacts.contactSupport(a); }
     @Override public CompletableFuture<List<Contact>> contacts(Account a) { return contacts.contacts(a); }
     @Override public CompletableFuture<List<Contact>> searchContacts(Account a, String query) { return contacts.searchContacts(a, query); }
-    @Override public CompletableFuture<Contact> resolveContact(Account a, String identifier) { return contacts.resolveContact(a, identifier); }
+    @Override public CompletableFuture<@Nullable Contact> resolveContact(Account a, String identifier) { return contacts.resolveContact(a, identifier); }
     @Override public CompletableFuture<String> openDm(Account a, Contact contact) { return contacts.openDm(a, contact); }
     @Override public CompletableFuture<List<app.unichat.model.StickerPack.Ref>> stickerPacks() { return stickerPacks.packs(); }
     @Override public CompletableFuture<app.unichat.model.StickerPack> stickerPack(String url) { return stickerPacks.pack(url); }

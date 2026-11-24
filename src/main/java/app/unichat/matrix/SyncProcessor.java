@@ -9,6 +9,7 @@ import app.unichat.service.PreferencesFile;
 import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -76,8 +77,8 @@ final class SyncProcessor {
     void refresh(MatrixRoom room) { fields.refresh(room); }
 
     Collection<MatrixRoom> rooms() { return rooms.values(); }
-    MatrixRoom room(String id) { return id == null ? null : rooms.get(id); }
-    MatrixRoom removeRoom(String id) { return rooms.remove(id); }
+    @Nullable MatrixRoom room(@Nullable String id) { return id == null ? null : rooms.get(id); }
+    @Nullable MatrixRoom removeRoom(String id) { return rooms.remove(id); }
     ObjectNode directContentCopy() { return directContent.deepCopy(); }
 
     // ---------------------------------------------------------------- preferences
@@ -143,12 +144,8 @@ final class SyncProcessor {
     }
 
     private void processJoined(String roomId, JsonNode j, boolean live, Result r) {
-        MatrixRoom room = rooms.get(roomId);
-        boolean isNew = room == null;
-        if (isNew) {
-            room = new MatrixRoom(roomId);
-            rooms.put(roomId, room);
-        }
+        boolean isNew = !rooms.containsKey(roomId);
+        MatrixRoom room = rooms.computeIfAbsent(roomId, MatrixRoom::new);
         room.invite = false;
         r.chatsChanged = true;
 
@@ -285,12 +282,13 @@ final class SyncProcessor {
     }
 
     /** Fills in a profile fetched separately (lazy-loaded members); returns the rooms whose chat changed. */
-    List<String> applyProfile(String userId, String name, String avatar) {
+    List<String> applyProfile(String userId, @Nullable String name, @Nullable String avatar) {
         List<String> changed = new ArrayList<>();
         for (MatrixRoom room : rooms.values()) {
             if (!room.membership.containsKey(userId) && !room.heroes.contains(userId)) continue;
             Member old = room.members.get(userId);
-            if (old != null && old.name() != null && !old.name().isBlank()) continue;
+            String oldName = old == null ? null : old.name();
+            if (oldName != null && !oldName.isBlank()) continue;
             room.members.put(userId, new Member(userId, cleanName(name), avatar != null ? avatar : old == null ? null : old.avatarUrl()));
             fields.refresh(room);
             changed.add(room.id);
@@ -305,7 +303,8 @@ final class SyncProcessor {
             if (room.invite) continue;
             for (String u : fields.otherUsers(room)) {
                 Member m = room.members.get(u);
-                if ((m == null || m.name() == null || m.name().isBlank()) && !isBot(u)) out.add(u);
+                String name = m == null ? null : m.name();
+                if ((name == null || name.isBlank()) && !isBot(u)) out.add(u);
             }
         }
         return out;
@@ -324,7 +323,7 @@ final class SyncProcessor {
     // ---------------------------------------------------------------- timeline
 
     /** {@code older} is null for live/sync events (appended), or the batch being prepended. */
-    private void processEvent(MatrixRoom room, JsonNode ev, List<Message> older, boolean live, Result r) {
+    private void processEvent(MatrixRoom room, JsonNode ev, @Nullable List<Message> older, boolean live, Result r) {
         String type = text(ev, "type");
         String id = text(ev, "event_id");
         String sender = text(ev, "sender");
@@ -349,7 +348,7 @@ final class SyncProcessor {
                     applyEdit(room, ev, r);
                     return;
                 }
-                Message m = newMessage(room, ev);
+                Message m = newMessage(room, ev, id, sender);
                 if (redacted || content.isEmpty()) {
                     m.setDeleted(true);
                 } else {
@@ -365,7 +364,7 @@ final class SyncProcessor {
                 addMessage(room, m, ev, older, live, r);
             }
             case "m.room.encrypted" -> {
-                Message m = newMessage(room, ev);
+                Message m = newMessage(room, ev, id, sender);
                 m.setType(MessageType.SYSTEM);
                 m.setBody(encryptedText());
                 if (redacted) m.setDeleted(true);
@@ -380,7 +379,7 @@ final class SyncProcessor {
                 if (!ev.has("state_key") || redacted) return;
                 String text = systemMessages.of(room, ev);
                 if (text == null) return;
-                Message m = newMessage(room, ev);
+                Message m = newMessage(room, ev, id, sender);
                 m.setType(MessageType.SYSTEM);
                 m.setBody(text);
                 addMessage(room, m, ev, older, live, r);
@@ -392,11 +391,14 @@ final class SyncProcessor {
      * A message fetched on its own (a reply's original, older than what's loaded), read like one in the timeline but
      * not added to it. Null when the room is unknown or the event isn't a message.
      */
-    Message standalone(String roomId, JsonNode ev) {
+    @Nullable Message standalone(String roomId, JsonNode ev) {
         MatrixRoom room = rooms.get(roomId);
         String type = text(ev, "type");
-        if (room == null || text(ev, "event_id") == null || !("m.room.message".equals(type) || "m.sticker".equals(type))) return null;
-        Message m = newMessage(room, ev);
+        String id = text(ev, "event_id");
+        if (room == null || id == null || type == null || !("m.room.message".equals(type) || "m.sticker".equals(type))) return null;
+        // A server always says who sent it; without that it's still the message, by nobody known.
+        String sender = text(ev, "sender");
+        Message m = newMessage(room, ev, id, sender != null ? sender : "");
         JsonNode content = ev.path("content");
         if (ev.path("unsigned").has("redacted_because") || content.isEmpty()) {
             m.setDeleted(true);
@@ -408,14 +410,13 @@ final class SyncProcessor {
         return m;
     }
 
-    private Message newMessage(MatrixRoom room, JsonNode ev) {
-        String sender = text(ev, "sender");
+    private Message newMessage(MatrixRoom room, JsonNode ev, String id, String sender) {
         long ts = ev.path("origin_server_ts").asLong(0);
-        return new Message(text(ev, "event_id"), room.id, sender, fields.nameOf(room, sender), me.equals(sender),
+        return new Message(id, room.id, sender, fields.nameOf(room, sender), me.equals(sender),
                 Instant.ofEpochMilli(ts));
     }
 
-    private void addMessage(MatrixRoom room, Message m, JsonNode ev, List<Message> older, boolean live, Result r) {
+    private void addMessage(MatrixRoom room, Message m, JsonNode ev, @Nullable List<Message> older, boolean live, Result r) {
         r.messagesChanged.add(room.id);
         String txn = text(ev.path("unsigned"), "transaction_id");
         if (older == null && txn != null) {
@@ -479,7 +480,7 @@ final class SyncProcessor {
      * Whether a bridge's refusal only means it wasn't connected yet: a message sent as Unichat restarted its bridges got
      * "user is not logged in" from Discord's and failed for good, three seconds before it was connected again.
      */
-    static boolean bridgeNotReady(String error) {
+    static boolean bridgeNotReady(@Nullable String error) {
         return error != null && error.toLowerCase(java.util.Locale.ROOT).contains("not logged in");
     }
 
@@ -539,7 +540,8 @@ final class SyncProcessor {
         String key = text(rel, "key");
         String sender = text(ev, "sender");
         String id = text(ev, "event_id");
-        if (target == null || key == null || !"m.annotation".equals(text(rel, "rel_type"))) return;
+        // id and sender: processEvent lets through, and keeps pending, only events with both.
+        if (target == null || key == null || id == null || sender == null || !"m.annotation".equals(text(rel, "rel_type"))) return;
         room.reactionEvents.put(id, new MatrixRoom.Reaction(target, key, sender));
         Message t = room.byId.get(target);
         if (t == null) {
@@ -697,7 +699,7 @@ final class SyncProcessor {
     }
 
     /** The server accepted a local echo: swap it for a message with the real event id (unless sync already did). */
-    void confirmLocalEcho(String roomId, String txnId, String eventId) {
+    void confirmLocalEcho(String roomId, String txnId, @Nullable String eventId) {
         MatrixRoom room = rooms.get(roomId);
         if (room == null) return;
         Message local = room.byId.remove(LOCAL_PREFIX + txnId);
@@ -754,7 +756,7 @@ final class SyncProcessor {
     }
 
     /** Records a reaction we just sent so the sync echo is deduplicated and it can be removed later. */
-    void registerOwnReaction(String roomId, String eventId, String targetId, String key) {
+    void registerOwnReaction(String roomId, @Nullable String eventId, String targetId, String key) {
         MatrixRoom room = rooms.get(roomId);
         if (room == null || eventId == null) return;
         room.reactionEvents.put(eventId, new MatrixRoom.Reaction(targetId, key, me));
@@ -763,7 +765,7 @@ final class SyncProcessor {
     }
 
     /** Event id of my reaction {@code key} on {@code targetId}, or null. */
-    String ownReactionEvent(String roomId, String targetId, String key) {
+    @Nullable String ownReactionEvent(String roomId, String targetId, String key) {
         MatrixRoom room = rooms.get(roomId);
         if (room == null) return null;
         MatrixRoom.Reaction wanted = new MatrixRoom.Reaction(targetId, key, me);
@@ -774,7 +776,7 @@ final class SyncProcessor {
     }
 
     /** Newest server-side event id in the loaded timeline. */
-    String lastEventId(String roomId) {
+    @Nullable String lastEventId(String roomId) {
         MatrixRoom room = rooms.get(roomId);
         if (room == null) return null;
         for (int i = room.timeline.size() - 1; i >= 0; i--) {
@@ -785,7 +787,7 @@ final class SyncProcessor {
     }
 
     /** The newest message someone else sent in the room that the server has; null if there's none loaded. */
-    String lastIncomingEventId(String roomId) {
+    @Nullable String lastIncomingEventId(String roomId) {
         MatrixRoom room = rooms.get(roomId);
         if (room == null) return null;
         for (int i = room.timeline.size() - 1; i >= 0; i--) {

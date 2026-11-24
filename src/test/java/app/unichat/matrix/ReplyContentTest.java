@@ -3,6 +3,7 @@ package app.unichat.matrix;
 import app.unichat.service.Changes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,7 +25,7 @@ class ReplyContentTest {
                "content":{"msgtype":"m.text","body":"la pregunta"}}]}}}}}""";
 
     private HttpServer server;
-    private volatile String sendBody;
+    private volatile @Nullable String sendBody;
 
     @BeforeEach
     void fakeHomeserver() throws Exception {

@@ -60,7 +60,7 @@ class DiscordPauseRetryTest {
         server.start();
         MatrixClient client = new MatrixClient("http://127.0.0.1:" + server.getAddress().getPort(), "tok");
         MatrixCore core = new MatrixCore(client, proc, ME, "example.org", "tok");
-        discord = new DiscordServers(core, new BotChat(core, new MessageSender(core, null)), List::of);
+        discord = new DiscordServers(core, new BotChat(core, new MessageSender(core, new MediaDownloader(core.client, core.io))), List::of);
     }
 
     @AfterEach

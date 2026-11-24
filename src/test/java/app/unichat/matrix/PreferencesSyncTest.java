@@ -1,11 +1,13 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import app.unichat.model.Chat;
 import app.unichat.service.ChatService;
 import app.unichat.service.PreferencesFile;
 import app.unichat.service.PreferencesFile.Flag;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -109,7 +111,7 @@ class PreferencesSyncTest {
         return json("{\"account_data\":{\"events\":[{\"type\":\"m.push_rules\",\"content\":{\"global\":{\"room\":[" + in + "]}}}]}}");
     }
 
-    private Chat chat(String id) { return proc.room(id).chat; }
+    private Chat chat(String id) { return Present.of(proc.room(id)).chat; }
 
     // ---- the brief's cases
 
@@ -117,7 +119,7 @@ class PreferencesSyncTest {
     void tagsOnlyEnterThroughTheFile() {
         proc.process(room(ROOM, "", tags("m.favourite")), true);
         assertTrue(chat(ROOM).favorite());
-        prefs.choose(chat(ROOM).prefKey(), Flag.FAVORITE, false);
+        prefs.choose(Present.of(chat(ROOM).prefKey()), Flag.FAVORITE, false);
         proc.process(room(ROOM, "", tags("m.favourite")), true);
         assertFalse(chat(ROOM).favorite());
     }
@@ -135,7 +137,7 @@ class PreferencesSyncTest {
         prefs.choose(TELEGRAM_7, Flag.ARCHIVED, true);
         SyncProcessor other = processor(prefs);
         other.process(room("!other:y", bridge("telegram", "7"), ""), true);
-        assertTrue(other.room("!other:y").chat.archived());
+        assertTrue(Present.of(other.room("!other:y")).chat.archived());
     }
 
     @Test
@@ -196,7 +198,7 @@ class PreferencesSyncTest {
     void anUnmuteChosenHereIsAppliedToTheServer() {
         proc.process(room(ROOM, "", ""), true);
         proc.process(rules(ROOM), true);
-        prefs.choose(chat(ROOM).prefKey(), Flag.MUTED, false);
+        prefs.choose(Present.of(chat(ROOM).prefKey()), Flag.MUTED, false);
         proc.process(rules(ROOM), true);
         assertFalse(chat(ROOM).muted());
         assertEquals(Map.of(ROOM, false), proc.mutesToApply());
@@ -261,7 +263,7 @@ class PreferencesSyncTest {
     void aServerReminderOnlyEntersWhenTheFileHasNone() {
         proc.process(room(ROOM, "", reminder(T)), true);
         assertEquals(T, chat(ROOM).reminderAt());
-        prefs.chooseReminder(chat(ROOM).prefKey(), null);
+        prefs.chooseReminder(Present.of(chat(ROOM).prefKey()), null);
         proc.process(room(ROOM, "", reminder(T)), true);
         assertNull(chat(ROOM).reminderAt());
     }
@@ -342,8 +344,8 @@ class PreferencesSyncTest {
         MatrixChatService svc = service();
         svc.processor().replay(cachedSync(ROOM, tags("u.archived")));
         svc.setFavorite(ROOM, true).get();
-        assertTrue(svc.chat(ROOM).archived(), "the chat must not flash into the inbox");
-        assertTrue(svc.chat(ROOM).favorite());
+        assertTrue(Present.of(svc.chat(ROOM)).archived(), "the chat must not flash into the inbox");
+        assertTrue(Present.of(svc.chat(ROOM)).favorite());
     }
 
     @Test
@@ -354,11 +356,11 @@ class PreferencesSyncTest {
         PreferencesFile restarted = open();
         SyncProcessor next = processor(restarted);
         next.replay(room(ROOM, "", tags()));
-        assertTrue(next.room(ROOM).chat.archived());
+        assertTrue(Present.of(next.room(ROOM)).chat.archived());
         assertTrue(restarted.current("matrix:" + ROOM).archived());
 
         next.process(room(ROOM, "", tags("u.archived")), true);
-        assertTrue(next.room(ROOM).chat.archived(), "the catch-up has the tag that came after the cache");
+        assertTrue(Present.of(next.room(ROOM)).chat.archived(), "the catch-up has the tag that came after the cache");
     }
 
     @Test
@@ -384,7 +386,7 @@ class PreferencesSyncTest {
 
     // ---- through the service: what's chosen and what goes to the server
 
-    private HttpServer server;
+    private @Nullable HttpServer server;
     private final List<String> calls = new CopyOnWriteArrayList<>();
     private volatile int ruleStatus = 200;
 
@@ -407,7 +409,7 @@ class PreferencesSyncTest {
         return new MatrixChatService(url(), ME, "t", file, deviceId);
     }
 
-    private String url() { return "http://127.0.0.1:" + server.getAddress().getPort(); }
+    private String url() { return "http://127.0.0.1:" + Present.of(server).getAddress().getPort(); }
 
     @AfterEach
     void stopServer() {
@@ -422,7 +424,7 @@ class PreferencesSyncTest {
     void choicesGoToTheFileAndNotToTheServer() throws Exception {
         MatrixChatService svc = service();
         svc.processor().process(room(ROOM, "", ""), true);
-        Chat c = svc.chat(ROOM);
+        Chat c = Present.of(svc.chat(ROOM));
         svc.setFavorite(ROOM, true).get();
         svc.setLowPriority(ROOM, true).get();
         svc.setPinned(ROOM, true).get();
@@ -443,13 +445,13 @@ class PreferencesSyncTest {
         AtomicInteger fired = new AtomicInteger();
         svc.addListener(changes(fired));
         svc.setArchived(ROOM, true).get();
-        assertTrue(svc.chat(ROOM).archived() && svc.chat(ROOM).muted());
+        assertTrue(Present.of(svc.chat(ROOM)).archived() && Present.of(svc.chat(ROOM)).muted());
         assertTrue(fired.get() > 0);
         assertEquals(List.of("PUT /_matrix/client/v3/pushrules/global/room/!a:x"), writes());
 
         calls.clear();
         svc.setMuted(ROOM, false).get();
-        assertFalse(svc.chat(ROOM).archived() || svc.chat(ROOM).muted());
+        assertFalse(Present.of(svc.chat(ROOM)).archived() || Present.of(svc.chat(ROOM)).muted());
         assertEquals(List.of("DELETE /_matrix/client/v3/pushrules/global/room/!a:x",
                 "DELETE /_matrix/client/v3/pushrules/global/override/!a:x"), writes());
     }
@@ -476,7 +478,7 @@ class PreferencesSyncTest {
         svc.processor().process(room(ROOM, "", ""), true);
         svc.processor().process(rules(), true);
         svc.setMuted(ROOM, true).get();
-        assertTrue(svc.chat(ROOM).muted(), "not reverted");
+        assertTrue(Present.of(svc.chat(ROOM)).muted(), "not reverted");
         assertTrue(prefs.current("matrix:" + ROOM).muted());
         assertEquals(Map.of(), svc.processor().mutesToApply());
         assertEquals(Map.of(ROOM, true), svc.processor().mutesToApply(Instant.now().plus(Duration.ofHours(2))));
@@ -490,13 +492,13 @@ class PreferencesSyncTest {
         AtomicInteger fired = new AtomicInteger();
         svc.addListener(changes(fired));
         svc.applyQuietRules();
-        assertTrue(svc.chat(ROOM).archived());
+        assertTrue(Present.of(svc.chat(ROOM)).archived());
         assertEquals(1, fired.get());
         assertEquals(List.of(), writes());
         assertFalse(prefs.current("matrix:" + ROOM).muteChosenHere());
 
         svc.processor().process(room(ROOM, "", tags()), true);
-        assertTrue(svc.chat(ROOM).archived(), "no server said it was: nothing erases it");
+        assertTrue(Present.of(svc.chat(ROOM)).archived(), "no server said it was: nothing erases it");
     }
 
     @Test
@@ -506,7 +508,7 @@ class PreferencesSyncTest {
         svc.processor().process(room(ROOM, "", ""), true);
         svc.processor().process(rules(ROOM), true);
         svc.applyQuietRules();
-        assertFalse(svc.chat(ROOM).archived());
+        assertFalse(Present.of(svc.chat(ROOM)).archived());
     }
 
     @Test
@@ -519,7 +521,7 @@ class PreferencesSyncTest {
         svc.applyQuietRules();
         svc.processor().process(room("!c:x", "", ""), true);
         svc.applyQuietRules();
-        assertTrue(svc.chat("!c:x").archived() && svc.chat("!c:x").muted());
+        assertTrue(Present.of(svc.chat("!c:x")).archived() && Present.of(svc.chat("!c:x")).muted());
     }
 
     private static final String ARCHIVED_SERVER = "{\"type\":\"m.room.create\",\"state_key\":\"\",\"sender\":\"" + ME
@@ -539,7 +541,7 @@ class PreferencesSyncTest {
         restarted.processor().process(rules("!s:x"), true);
         restarted.applyQuietRules();
 
-        assertFalse(restarted.chat("!c:x").archived() || restarted.chat("!c:x").muted());
+        assertFalse(Present.of(restarted.chat("!c:x")).archived() || Present.of(restarted.chat("!c:x")).muted());
         var saved = open().current("matrix:!c:x");
         assertFalse(saved.archived() || saved.muted());
         assertTrue(saved.muteChosenHere(), "still the person's choice");
@@ -558,14 +560,14 @@ class PreferencesSyncTest {
         svc.processor().process(rules("!s:x"), true);
         svc.applyQuietRules();
 
-        assertTrue(svc.chat("!c:x").archived() && svc.chat("!c:x").muted());
+        assertTrue(Present.of(svc.chat("!c:x")).archived() && Present.of(svc.chat("!c:x")).muted());
         assertFalse(prefs.current("matrix:!c:x").muteChosenHere(), "a rule, not a choice");
         svc.actions().muteWritesDone().get();
         assertEquals(List.of("PUT /_matrix/client/v3/pushrules/global/room/!c:x"), writes());
 
         svc.processor().process(rules("!s:x", "!c:x"), true);
         svc.processor().process(rules("!s:x"), true);
-        assertFalse(svc.chat("!c:x").muted(), "the phone can still change it");
+        assertFalse(Present.of(svc.chat("!c:x")).muted(), "the phone can still change it");
     }
 
     private void startAndStop(MatrixChatService svc) {
@@ -586,7 +588,7 @@ class PreferencesSyncTest {
         startAndStop(before);
         feed(before, room(ROOM, "", ""));
         feed(before, rules(ROOM));
-        assertTrue(before.chat(ROOM).muted());
+        assertTrue(Present.of(before.chat(ROOM)).muted());
 
         // The local server wiped, same URL and data dir, logged in again: a new device's empty rules erase nothing.
         PreferencesFile file = open();
@@ -594,7 +596,7 @@ class PreferencesSyncTest {
         startAndStop(after);
         feed(after, room(ROOM, "", ""));
         feed(after, rules());
-        assertTrue(after.chat(ROOM).muted());
+        assertTrue(Present.of(after.chat(ROOM)).muted());
         assertTrue(file.current("matrix:" + ROOM).muted());
     }
 
@@ -609,7 +611,7 @@ class PreferencesSyncTest {
         startAndStop(after);
         feed(after, room(ROOM, "", ""));
         feed(after, rules());
-        assertFalse(after.chat(ROOM).muted(), "unmuted on the phone while closed: followed");
+        assertFalse(Present.of(after.chat(ROOM)).muted(), "unmuted on the phone while closed: followed");
     }
 
     @Test
@@ -640,7 +642,7 @@ class PreferencesSyncTest {
         });
         svc.actions().checkReminders();
         assertEquals(1, due.get());
-        assertNull(svc.chat(ROOM).reminderAt());
+        assertNull(Present.of(svc.chat(ROOM)).reminderAt());
         assertEquals(List.of(), writes());
         assertTrue(saved().contains("\"reminderAt\" : null"));
 

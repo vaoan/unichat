@@ -2,6 +2,7 @@ package app.unichat.server;
 
 import app.unichat.support.Redactor;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -40,7 +41,7 @@ final class LogPump {
     private final Path log;
     private final LongSupplier clockMs;
     private final ToLongFunction<Path> sizeOf;
-    private OutputStream out;
+    private @Nullable OutputStream out;
     private long bytes;
     private long lastFlush;
 
@@ -141,7 +142,7 @@ final class LogPump {
         return false;
     }
 
-    private static OutputStream closeQuietly(OutputStream out) {
+    private static @Nullable OutputStream closeQuietly(@Nullable OutputStream out) {
         if (out != null) {
             try {
                 out.close();

@@ -5,6 +5,7 @@ import app.unichat.service.ChatKeys;
 import app.unichat.service.PreferencesFile;
 import app.unichat.service.PreferencesFile.Effective;
 import app.unichat.service.PreferencesFile.ServerValues;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.Collection;
@@ -97,7 +98,7 @@ final class RoomPreferences {
                 room.serverReminder, room.reminderKnown);
     }
 
-    private static Boolean tag(MatrixRoom room, String name) {
+    private static @Nullable Boolean tag(MatrixRoom room, String name) {
         return room.serverTags == null ? null : room.serverTags.contains(name);
     }
 

@@ -18,6 +18,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
  */
 class LocalFileUrlTest {
     @Test
+    @SuppressWarnings("NullAway") // no homeserver: what this checks never reaches it
     void aFileAddressFromAMessageIsRefusedAndOnlyWhatWeSentIsOurs(@TempDir Path dir) throws Exception {
         Path secret = Files.writeString(dir.resolve("id_rsa"), "secret");
         Path sent = Files.writeString(dir.resolve("photo.jpg"), "jpeg");

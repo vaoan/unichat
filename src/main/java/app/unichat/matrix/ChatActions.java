@@ -10,6 +10,7 @@ import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.time.Instant;
@@ -269,7 +270,7 @@ final class ChatActions {
         }
     }
 
-    CompletableFuture<Void> setReminder(String chatId, Instant at) {
+    CompletableFuture<Void> setReminder(String chatId, @Nullable Instant at) {
         return change(chatId, key -> prefs.chooseReminder(key, at));
     }
 

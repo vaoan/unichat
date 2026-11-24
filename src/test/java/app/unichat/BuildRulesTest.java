@@ -120,13 +120,6 @@ class BuildRulesTest {
     private static final Set<String> NULLAWAY_OPTIONS = Set.of("-XepOpt:NullAway:OnlyNullMarked=true",
             "-XepOpt:NullAway:JSpecifyMode=true", "-XepOpt:NullAway:HandleTestAssertionLibraries=true");
 
-    /**
-     * The packages NullAway checks so far, each with its subpackages: a package joins with its {@code package-info.java}
-     * marked {@code @NullMarked}, and its name goes here. Once every package has, this is {@code app.unichat} alone.
-     */
-    private static final List<String> NULL_MARKED = List.of("app.unichat.support", "app.unichat.model", "app.unichat.settings",
-            "app.unichat.service", "app.unichat.cloud");
-
     @Test
     void nullAwayFailsTheBuildOnTheMarkedPackages() {
         List<String> flags = errorProneFlags();
@@ -142,32 +135,6 @@ class BuildRulesTest {
                 .findFirst().orElseThrow(() -> new AssertionError("JSpecify's annotations are a dependency"));
         assertTrue(text(jspecify, "version").matches("\\d+\\.\\d+\\.\\d+"), "pinned: " + text(jspecify, "version"));
         assertNull(text(jspecify, "scope"), "main code is marked with them, so they're no test-only dependency");
-    }
-
-    @Test
-    void everyPackageDoneIsNullMarked() throws IOException {
-        Set<String> marked = new TreeSet<>();
-        for (String pkg : mainPackages()) {
-            Path info = Path.of("src/main/java", pkg.split("\\.")).resolve("package-info.java");
-            String text = Files.exists(info) ? Files.readString(info) : "";
-            boolean isMarked = text.contains("\n@NullMarked\n") && text.contains("import org.jspecify.annotations.NullMarked;");
-            if (isMarked) marked.add(pkg);
-            boolean done = NULL_MARKED.stream().anyMatch(d -> pkg.equals(d) || pkg.startsWith(d + "."));
-            assertEquals(done, isMarked, pkg + (done ? " is done, so its package-info.java is @NullMarked (each subpackage has"
-                    + " its own)" : " is marked: add it to NULL_MARKED"));
-        }
-        assertFalse(marked.isEmpty(), "the packages done so far are marked");
-    }
-
-    @Test
-    void noClassLeavesNullAwayOut() throws IOException {
-        try (Stream<Path> files = Files.walk(Path.of("src"))) {
-            for (Path f : files.filter(p -> p.toString().endsWith(".java")).toList()) {
-                String text = Files.readString(f);
-                assertFalse(text.contains("Null" + "Unmarked"), f + " leaves code out of NullAway: a finding is fixed, or"
-                        + " suppressed on one member with its reason");
-            }
-        }
     }
 
     @Test
@@ -391,7 +358,7 @@ class BuildRulesTest {
     }
 
     /** The packages with a class under src/main/java. */
-    private static Set<String> mainPackages() {
+    static Set<String> mainPackages() {
         Path root = Path.of("src/main/java");
         try (Stream<Path> files = Files.walk(root)) {
             return files.filter(f -> f.toString().endsWith(".java")).map(f -> root.relativize(f.getParent()).toString()

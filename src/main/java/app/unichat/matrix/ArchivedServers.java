@@ -1,6 +1,7 @@
 package app.unichat.matrix;
 
 import app.unichat.support.Threads;
+import org.jspecify.annotations.Nullable;
 
 import java.util.HashMap;
 import java.util.HashSet;
@@ -24,14 +25,14 @@ final class ArchivedServers {
     private final SyncProcessor proc;
     private final DiscordServers discord;
     /** Told the name of a server as it's brought back, and null once it has. */
-    private final Consumer<String> resuming;
+    private final Consumer<@Nullable String> resuming;
     private final ExecutorService bridge = Executors.newSingleThreadExecutor(Threads.daemon("discord-servers"));
     /** Guild ids brought back while Archivados is open; guarded by this. */
     private final Set<String> resumed = new HashSet<>();
     /** The next run asked for, shared by everyone who asks before it starts; guarded by this. */
-    private CompletableFuture<Void> next;
+    private @Nullable CompletableFuture<Void> next;
 
-    ArchivedServers(MatrixCore core, DiscordServers discord, Consumer<String> resuming) {
+    ArchivedServers(MatrixCore core, DiscordServers discord, Consumer<@Nullable String> resuming) {
         this.proc = core.proc;
         this.discord = discord;
         this.resuming = resuming;
@@ -75,7 +76,7 @@ final class ArchivedServers {
         CompletableFuture<Void> done;
         Set<String> back;
         synchronized (this) {
-            done = next;
+            done = java.util.Objects.requireNonNull(next, "a run is queued only with the next one set, and only it clears it");
             next = null;
             back = Set.copyOf(resumed);
         }

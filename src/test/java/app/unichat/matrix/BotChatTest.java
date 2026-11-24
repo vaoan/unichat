@@ -1,7 +1,9 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import app.unichat.model.Network;
 import com.sun.net.httpserver.HttpServer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -56,7 +58,7 @@ class BotChatTest {
         server.start();
         MatrixClient client = new MatrixClient("http://127.0.0.1:" + server.getAddress().getPort(), "tok");
         MatrixCore core = new MatrixCore(client, proc, ME, "example.org", "tok");
-        bots = new BotChat(core, new MessageSender(core, null));
+        bots = new BotChat(core, new MessageSender(core, new MediaDownloader(core.client, core.io)));
     }
 
     @AfterEach
@@ -85,7 +87,7 @@ class BotChatTest {
 
     @Test
     void returnsTheBotsNextReply() throws Exception {
-        assertTrue(bots.ask(Network.WHATSAPP, "list-logins").endsWith("list-logins ok"));
+        assertTrue(Present.of(bots.ask(Network.WHATSAPP, "list-logins")).endsWith("list-logins ok"));
     }
 
     @Test
@@ -116,7 +118,7 @@ class BotChatTest {
                 && log.get(2).startsWith("sent") && log.get(3).startsWith("reply"), log.toString());
     }
 
-    private String ask(String command) {
+    private @Nullable String ask(String command) {
         try {
             return bots.ask(Network.WHATSAPP, command);
         } catch (Exception e) {

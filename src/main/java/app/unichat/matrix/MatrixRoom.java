@@ -4,6 +4,7 @@ import app.unichat.model.Chat;
 import app.unichat.model.Member;
 import app.unichat.model.Message;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -32,19 +33,19 @@ final class MatrixRoom {
     /** Timestamp of the newest edit applied per message, so out-of-order edits don't win. */
     final Map<String, Long> editTs = new HashMap<>();
 
-    String name;
-    String avatar;
-    String topic;
-    String canonicalAlias;
-    String bridgeProtocol;
+    @Nullable String name;
+    @Nullable String avatar;
+    @Nullable String topic;
+    @Nullable String canonicalAlias;
+    @Nullable String bridgeProtocol;
     /** Content of com.beeper.room_features (what the network supports), or null. */
-    JsonNode roomFeatures;
+    @Nullable JsonNode roomFeatures;
     /** {@code com.beeper.room_type} from bridgev2 bridge info: dm, group or space. */
-    String bridgeRoomType;
+    @Nullable String bridgeRoomType;
     /** {@code m.room.create} type m.space. */
     boolean space;
     /** {@code channel.id} of m.bridge ("__personal…" marks the bridge's folder space). */
-    String bridgeChannelId;
+    @Nullable String bridgeChannelId;
     /** m.room.create was sent by a bridge bot. */
     boolean createdByBridge;
     /** m.space.child state: child room id → its order ("" when none), in arrival order. */
@@ -56,13 +57,13 @@ final class MatrixRoom {
     boolean directInvite;
     boolean invite;
     boolean markedUnreadStable;
-    Instant invitedAt;
-    String inviter;
-    String prevBatch;
+    @Nullable Instant invitedAt;
+    @Nullable String inviter;
+    @Nullable String prevBatch;
     /** Names in the last m.tag; null until one is heard. Only input for the preferences file (see {@link RoomPreferences}). */
-    java.util.Set<String> serverTags;
+    java.util.@Nullable Set<String> serverTags;
     /** Last reminder account data; {@link #reminderKnown} once heard, null when it's empty. */
-    Instant serverReminder;
+    @Nullable Instant serverReminder;
     boolean reminderKnown;
 
     MatrixRoom(String id) {

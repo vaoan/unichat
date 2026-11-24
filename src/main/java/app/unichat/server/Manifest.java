@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,7 +31,7 @@ public final class Manifest {
             return assetPrefix + "-" + p.os() + "-" + p.arch();
         }
 
-        public String releaseUrl() {
+        public @Nullable String releaseUrl() {
             return url(repo + "@" + tag);
         }
     }
@@ -87,9 +88,12 @@ public final class Manifest {
     }
 
     /** Null when the bridge isn't in the manifest. */
-    public Component bridge(String name) { return bridges.get(name); }
+    public @Nullable Component bridge(String name) { return bridges.get(name); }
     public Map<String, Component> bridges() { return bridges; }
-    public String tuwunelVersion() { return settings.get("TUWUNEL_VERSION"); }
+    /** Never null: versions.env pins the homeserver, as every manifest a test makes does. */
+    public String tuwunelVersion() {
+        return Objects.requireNonNull(settings.get("TUWUNEL_VERSION"), "versions.env pins the homeserver");
+    }
 
     /** The homeserver as a download: Unichat's own build, in the natives release (tuwunel has none for Mac or Windows). */
     public Component tuwunel() {
@@ -97,17 +101,17 @@ public final class Manifest {
     }
 
     /** Where {@code c}'s files for {@code p} are: the bridge's own release, or Unichat's where it has none. */
-    public String releaseUrl(Component c, Platform p) {
+    public @Nullable String releaseUrl(Component c, Platform p) {
         return url(release(c, p));
     }
 
     /** Unichat's release with what it builds itself: the homeserver, and the bridges for Windows. */
-    public String nativesUrl() {
+    public @Nullable String nativesUrl() {
         return url(settings.get("NATIVES"));
     }
 
     /** The release {@code c}'s files for {@code p} come from, as {@code <owner/repo>@<tag>}. */
-    private String release(Component c, Platform p) {
+    private @Nullable String release(Component c, Platform p) {
         return official(c, p) ? c.repo() + "@" + c.tag() : settings.get("NATIVES");
     }
 
@@ -125,15 +129,16 @@ public final class Manifest {
         return official(c, p) || "tuwunel".equals(c.name()) || natives == null ? c.tag() : c.tag() + "+" + natives;
     }
 
-    private static String url(String release) {
+    private static @Nullable String url(@Nullable String release) {
         String tag = tagOf(release);
-        return tag == null ? null
+        return tag == null || release == null ? null
                 : "https://github.com/" + release.substring(0, release.indexOf('@')) + "/releases/download/" + tag;
     }
 
     /** The tag of a release written {@code <owner/repo>@<tag>}, or null when it isn't written so. */
-    private static String tagOf(String release) {
-        int at = release == null ? -1 : release.indexOf('@');
+    private static @Nullable String tagOf(@Nullable String release) {
+        if (release == null) return null;
+        int at = release.indexOf('@');
         return at < 1 || at == release.length() - 1 ? null : release.substring(at + 1);
     }
 
@@ -146,7 +151,7 @@ public final class Manifest {
     }
 
     /** The SHA-256 the app expects for {@code c}'s file for {@code p}, or null when it isn't pinned (never installed). */
-    public String sha256(Component c, Platform p) {
+    public @Nullable String sha256(Component c, Platform p) {
         return pinned.get(pinKey(c, p));
     }
 

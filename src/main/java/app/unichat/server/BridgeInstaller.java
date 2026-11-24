@@ -7,12 +7,14 @@ import app.unichat.support.Processes;
 import app.unichat.support.Redactor;
 import app.unichat.support.SafeFile;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -46,7 +48,7 @@ final class BridgeInstaller {
     }
 
     /** {@code telegram} may be null for any other bridge, and without it Telegram can't be prepared. Blocking. */
-    void prepare(String b, String doublePuppetToken, String statusUrl, TelegramApi telegram, Consumer<String> progress)
+    void prepare(String b, @Nullable String doublePuppetToken, String statusUrl, @Nullable TelegramApi telegram, Consumer<String> progress)
             throws IOException, InterruptedException {
         Manifest.Component c = manifest.bridge(b);
         if (c == null) throw new IOException(I18n.t("bridge.noPinnedVersion", b));
@@ -60,9 +62,11 @@ final class BridgeInstaller {
         if (!Files.exists(config)) generateConfig(b, bd, config);
         boolean isTelegram = b.equals("telegram");
         if (isTelegram && telegram == null) throw new IOException(I18n.t("bridge.telegramKeys"));
-        BridgeConfig.rewrite(config, new BridgeConfig.Settings(b, BridgePorts.BRIDGE_PORTS.get(b), LocalServer.DOMAIN,
+        TelegramApi keys = isTelegram ? telegram : null;
+        int port = Objects.requireNonNull(BridgePorts.BRIDGE_PORTS.get(b), "every bridge the manifest pins has its port");
+        BridgeConfig.rewrite(config, new BridgeConfig.Settings(b, port, LocalServer.DOMAIN,
                 "@" + LocalServer.USER + ":" + LocalServer.DOMAIN, LocalServer.URL, bd, doublePuppetToken,
-                isTelegram ? telegram.id() : null, isTelegram ? telegram.hash() : null, statusUrl));
+                keys == null ? null : keys.id(), keys == null ? null : keys.hash(), statusUrl));
         Path reg = bd.resolve("registration.yaml");
         if (!Files.exists(reg)) run(bd, command(b, "-g", "-c", "config.yaml", "-r", "registration.yaml"));
         // The bridge writes these with the default mode (and -g puts the tokens in config.yaml): only the person's.

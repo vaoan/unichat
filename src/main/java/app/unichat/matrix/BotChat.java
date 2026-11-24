@@ -7,6 +7,7 @@ import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -87,11 +88,11 @@ final class BotChat {
     }
 
     /** Sends a command through the existing bot chat and returns its next reply; null with no chat, or no reply in 10 s. */
-    String ask(Network n, String command) throws IOException, InterruptedException {
+    @Nullable String ask(Network n, String command) throws IOException, InterruptedException {
         return ask(n, command, Duration.ofSeconds(10));
     }
 
-    String ask(Network n, String command, Duration patience) throws IOException, InterruptedException {
+    @Nullable String ask(Network n, String command, Duration patience) throws IOException, InterruptedException {
         synchronized (botLocks.computeIfAbsent(n, k -> new Object())) {
             String roomId = find(n);
             if (roomId == null) return null;
@@ -105,7 +106,7 @@ final class BotChat {
      * The bot's next message in {@code roomId} (after {@code before} of its messages), as soon as a sync brings it
      * ({@link SyncProcessor#process} wakes this); null if none comes within {@code patience}.
      */
-    private String awaitReply(String roomId, int before, Duration patience) throws InterruptedException {
+    private @Nullable String awaitReply(String roomId, int before, Duration patience) throws InterruptedException {
         long deadline = System.nanoTime() + patience.toNanos();
         synchronized (proc) {
             String reply = replyAfter(roomId, before);
@@ -137,7 +138,7 @@ final class BotChat {
         throw new MatrixException(0, null, I18n.t("bot.noReply", n.displayName()));
     }
 
-    String find(Network n) {
+    @Nullable String find(Network n) {
         Set<String> broken = Settings.get().getSet("matrix.brokenRooms");
         synchronized (proc) {
             for (MatrixRoom r : proc.rooms()) {
@@ -154,7 +155,7 @@ final class BotChat {
         }
     }
 
-    String replyAfter(String roomId, int before) {
+    @Nullable String replyAfter(String roomId, int before) {
         synchronized (proc) {
             MatrixRoom r = proc.room(roomId);
             if (r == null) return null;
@@ -182,7 +183,7 @@ final class BotChat {
             cached = proc.directContentCopy();
         }
         String path = CLIENT + "/user/" + enc(userId) + "/account_data/m.direct";
-        JsonNode server = null;
+        @Nullable JsonNode server = null;
         try {
             server = client.get(path);
         } catch (MatrixException e) {

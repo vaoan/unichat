@@ -3,6 +3,7 @@ package app.unichat.server;
 import java.io.IOException;
 import java.sql.SQLException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -26,7 +27,7 @@ class BridgeCapabilitiesTest {
     @TempDir Path dir;
 
     @SuppressFBWarnings(value = {"SQL_INJECTION_JDBC", "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"}, justification = "builds or reads a fixture database with the test's own SQL")
-    private Path db(String bridge, String value) throws IOException, SQLException {
+    private Path db(String bridge, @Nullable String value) throws IOException, SQLException {
         Path d = dir.resolve(bridge);
         Files.createDirectories(d);
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + d.resolve(bridge + ".db")); Statement s = c.createStatement()) {
@@ -38,7 +39,7 @@ class BridgeCapabilitiesTest {
     }
 
     @SuppressFBWarnings(value = {"SQL_INJECTION_JDBC", "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"}, justification = "builds or reads a fixture database with the test's own SQL")
-    private static String value(Path bridgeDir, String bridge, String key) throws SQLException {
+    private static @Nullable String value(Path bridgeDir, String bridge, String key) throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + bridgeDir.resolve(bridge + ".db"));
              Statement s = c.createStatement(); ResultSet r = s.executeQuery("SELECT value FROM kv_store WHERE key = '" + key + "'")) {
             return r.next() ? r.getString(1) : null;

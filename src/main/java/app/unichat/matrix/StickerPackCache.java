@@ -4,6 +4,7 @@ import app.unichat.model.StickerPack;
 import app.unichat.support.SafeFile;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -27,7 +28,7 @@ final class StickerPackCache {
     }
 
     /** The copy kept, if it's recent enough not to ask again. */
-    JsonNode fresh(String url) {
+    @Nullable JsonNode fresh(String url) {
         Path f = file(url);
         try {
             if (f == null || !Files.isRegularFile(f)) return null;
@@ -39,7 +40,7 @@ final class StickerPackCache {
     }
 
     /** The copy kept, however old; null when none or unreadable. */
-    JsonNode any(String url) {
+    @Nullable JsonNode any(String url) {
         Path f = file(url);
         try {
             return f == null || !Files.isRegularFile(f) ? null : JSON.readTree(f.toFile());
@@ -61,7 +62,7 @@ final class StickerPackCache {
     }
 
     /** The set's short name names its file: {@link StickerPack#isLink} lets only letters, digits and underscores through. */
-    private Path file(String url) {
+    private @Nullable Path file(String url) {
         return StickerPack.isLink(url) ? dir.resolve(url.substring(url.lastIndexOf('/') + 1) + ".json") : null;
     }
 }

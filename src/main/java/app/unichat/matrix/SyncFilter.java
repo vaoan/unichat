@@ -5,6 +5,7 @@ import app.unichat.support.Hashes;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -94,7 +95,7 @@ final class SyncFilter {
     }
 
     /** The id kept for {@code hash} on this computer, or null. */
-    private static String kept(String hash) {
+    private static @Nullable String kept(String hash) {
         for (String e : Settings.get().getSet(KEPT_KEY)) if (e.startsWith(hash + "=")) return e.substring(hash.length() + 1);
         return null;
     }

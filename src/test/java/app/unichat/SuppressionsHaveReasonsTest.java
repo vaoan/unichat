@@ -135,9 +135,7 @@ class SuppressionsHaveReasonsTest {
      */
     static List<String> unexplained(String name, String text) {
         String kinds = kinds(text);
-        StringBuilder blanked = new StringBuilder(text);
-        for (int k = 0; k < text.length(); k++) if (kinds.charAt(k) != CODE && text.charAt(k) != '\n') blanked.setCharAt(k, ' ');
-        String code = blanked.toString();
+        String code = code(text, kinds);
         String[] lines = text.split("\n", -1);
         List<String> out = new ArrayList<>();
         for (int i = 0; i < lines.length; i++) {
@@ -173,6 +171,17 @@ class SuppressionsHaveReasonsTest {
     private static final char TEXT = 's';
     private static final char BLOCK = 'b';
     private static final char LINE = 'l';
+
+    /** {@code text} with its comments, strings, chars and text blocks blanked (line ends kept): what the compiler reads as code. */
+    static String code(String text) {
+        return code(text, kinds(text));
+    }
+
+    private static String code(String text, String kinds) {
+        StringBuilder blanked = new StringBuilder(text);
+        for (int k = 0; k < text.length(); k++) if (kinds.charAt(k) != CODE && text.charAt(k) != '\n') blanked.setCharAt(k, ' ');
+        return blanked.toString();
+    }
 
     /** For each character of {@code text}: code, inside a string, char or text block, or in a block or line comment. */
     private static String kinds(String text) {

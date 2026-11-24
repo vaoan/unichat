@@ -5,6 +5,7 @@ import app.unichat.service.Changes;
 import app.unichat.service.ChatService;
 import com.sun.net.httpserver.HttpServer;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Waking up drops the long poll left open before sleeping and catches up at once. */
 class WakeSyncTest {
-    private HttpServer server;
+    private @Nullable HttpServer server;
+    @SuppressWarnings("NullAway.Init") // each test makes it before use; @AfterEach stops it only if made
     private MatrixChatService svc;
     private final List<String> syncs = new CopyOnWriteArrayList<>();
     private final Changes changes = new Changes();

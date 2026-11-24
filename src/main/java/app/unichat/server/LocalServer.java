@@ -10,6 +10,7 @@ import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.URI;
@@ -22,6 +23,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Properties;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -37,7 +39,7 @@ public final class LocalServer {
     static final String DOMAIN = "localhost";
     static final String USER = "yo";
 
-    private static LocalServer instance;
+    private static @Nullable LocalServer instance;
 
     private final Platform platform;
     private final Path dir;
@@ -69,7 +71,8 @@ public final class LocalServer {
         java.util.Map<String, Integer> ports = new java.util.HashMap<>(BridgePorts.BRIDGE_PORTS);
         ports.put("tuwunel", PORT);
         this.bridges = new BridgeLauncher(new BridgeProcesses(), new BridgeDemand(this::hasAccount,
-                b -> HttpProbe.answers(http, BridgePorts.BRIDGE_PORTS.get(b), Duration.ofSeconds(3), HttpProbe.Up.ALIVE),
+                b -> HttpProbe.answers(http, Objects.requireNonNull(BridgePorts.BRIDGE_PORTS.get(b),
+                        "bridges.active names only bridges this server provides, each with its port"), Duration.ofSeconds(3), HttpProbe.Up.ALIVE),
                 Duration.ofMillis(500), Duration.ofSeconds(60)), this::usableBridges);
         this.metaSessions = new MetaSessions(dir, MetaSessions::redirecting, this::restoreSession);
         this.watchdog = new Watchdog(ports, this::watched, states, (name, why) -> supervisor.kill(name), Internet::reachable,
@@ -79,7 +82,7 @@ public final class LocalServer {
     }
 
     /** Null on systems the native stack doesn't support (Intel Mac, Linux). */
-    public static synchronized LocalServer get() {
+    public static synchronized @Nullable LocalServer get() {
         if (instance == null) {
             Platform p = Platform.current();
             if (p != null) instance = new LocalServer(p);
@@ -114,12 +117,12 @@ public final class LocalServer {
 
     /** Whether {@code bridge} has an account, so it starts at launch ({@link AccountCheck}). */
     private boolean hasAccount(String bridge) {
-        return AccountCheck.hasAccount(Settings.get().getString(LoginsCache.key(bridge), null),
+        return AccountCheck.hasAccount(Settings.get().getString(LoginsCache.key(bridge)),
                 BridgeConfig.database(dir.resolve(bridge), bridge));
     }
 
     /** A bridge's as_token, from its registration (it authorizes the bridge's status reports). */
-    private String asToken(String bridge) {
+    private @Nullable String asToken(String bridge) {
         if (!BridgePorts.BRIDGE_PORTS.containsKey(bridge)) return null;
         return asTokens.computeIfAbsent(bridge, b -> {
             try {
@@ -131,7 +134,7 @@ public final class LocalServer {
     }
 
     /** The bridge's login API (bridgev2 bridges serve it on their appservice port); null for legacy bridges. */
-    public String provisioningUrl(String bridge) {
+    public @Nullable String provisioningUrl(String bridge) {
         Integer port = BridgePorts.BRIDGE_PORTS.get(bridge);
         return port == null || BridgeInstaller.LEGACY_BRIDGES.contains(bridge) ? null : "http://127.0.0.1:" + port + "/_matrix/provision";
     }

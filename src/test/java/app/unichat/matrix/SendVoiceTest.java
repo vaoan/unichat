@@ -3,6 +3,7 @@ package app.unichat.matrix;
 import app.unichat.model.VoiceNote;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,8 +25,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SendVoiceTest {
     @TempDir Path dir;
     private HttpServer server;
-    private volatile String sendBody;
-    private volatile String uploadType;
+    private volatile @Nullable String sendBody;
+    private volatile @Nullable String uploadType;
 
     @BeforeEach
     void fakeHomeserver() throws Exception {

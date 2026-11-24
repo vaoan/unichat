@@ -67,6 +67,7 @@ class DownloadLeftoversTest {
     }
 
     @Test
+    @SuppressWarnings("NullAway") // no homeserver: what this checks never reaches it
     void nobodyIsLeftWatchingAFinishedDownload() throws Exception {
         try (ExecutorService io = Executors.newSingleThreadExecutor()) {
             var media = new MediaDownloader(null, io);

@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import app.unichat.model.Chat;
 import app.unichat.model.ConnectionState;
 import app.unichat.model.Message;
@@ -11,6 +12,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
@@ -63,22 +65,22 @@ class MatrixLiveIT {
             String roomId = bobPost(bob, "/createRoom", "{\"name\":\"" + roomName + "\",\"invite\":[\"" + alice.myUserId() + "\"],\"preset\":\"private_chat\"}")
                     .get("room_id").asText();
 
-            await("invite auto-joined", () -> alice.chat(roomId) != null && alice.chat(roomId).title().equals(roomName));
-            Chat chat = alice.chat(roomId);
+            await("invite auto-joined", () -> java.util.Optional.ofNullable(alice.chat(roomId)).map(c -> c.title().equals(roomName)).orElse(false));
+            Chat chat = Present.of(alice.chat(roomId));
 
             bobSend(bob, roomId, "hola alice");
             await("incoming message", () -> body(alice, roomId, "hola alice") != null);
             await("notification", () -> notified.stream().anyMatch(m -> m.body().equals("hola alice")));
             await("unread", chat::isUnread);
-            Message incoming = body(alice, roomId, "hola alice");
+            Message incoming = Present.of(body(alice, roomId, "hola alice"));
             assertFalse(incoming.outgoing());
 
             alice.markRead(roomId);
             await("read", () -> !chat.isUnread());
 
             alice.sendText(roomId, "hola bob", incoming.id()).get();
-            await("sent", () -> body(alice, roomId, "hola bob") != null && body(alice, roomId, "hola bob").status() != MessageStatus.SENDING);
-            Message mine = body(alice, roomId, "hola bob");
+            await("sent", () -> java.util.Optional.ofNullable(body(alice, roomId, "hola bob")).filter(m -> m.status() != MessageStatus.SENDING).isPresent());
+            Message mine = Present.of(body(alice, roomId, "hola bob"));
             assertEquals(incoming.id(), mine.replyToId());
 
             alice.toggleReaction(roomId, incoming.id(), "👍").get();
@@ -111,12 +113,12 @@ class MatrixLiveIT {
             bobPut(bob, "/rooms/" + enc(roomId) + "/send/m.room.message/" + UUID.randomUUID(),
                     "{\"msgtype\":\"m.image\",\"body\":\"bob.png\",\"url\":\"" + mxc + "\",\"info\":{\"w\":40,\"h\":30,\"mimetype\":\"image/png\"}}");
             await("image received", () -> body(alice, roomId, "bob.png") != null);
-            Message img = body(alice, roomId, "bob.png");
+            Message img = Present.of(body(alice, roomId, "bob.png"));
             assertEquals(MessageType.IMAGE, img.type());
             assertEquals(mxc, img.mediaUrl());
-            Path downloaded = alice.media(img.mediaUrl(), 0, 0).get();
+            Path downloaded = alice.media(Present.of(img.mediaUrl()), 0, 0).get();
             assertTrue(Files.size(downloaded) > 0);
-            Path thumb = alice.media(img.mediaUrl(), 32, 32).get();
+            Path thumb = alice.media(Present.of(img.mediaUrl()), 32, 32).get();
             assertTrue(Files.exists(thumb));
 
             bobPut(bob, "/rooms/" + enc(roomId) + "/typing/" + enc("@bob:" + alice.myUserId().split(":", 2)[1]),
@@ -129,22 +131,22 @@ class MatrixLiveIT {
             assertNotNull(alice.messages(roomId));
 
             alice.leaveChat(roomId).get();
-            await("left", () -> alice.chat(roomId) == null || alice.chat(roomId).archived());
+            await("left", () -> java.util.Optional.ofNullable(alice.chat(roomId)).map(Chat::archived).orElse(true));
         } finally {
             alice.logout().get();
             alice.stop();
         }
     }
 
-    private static Message body(MatrixChatService svc, String roomId, String text) {
+    private static @Nullable Message body(MatrixChatService svc, String roomId, String text) {
         return svc.messages(roomId).stream().filter(m -> m.body().equals(text) || text.equals(m.fileName())).findFirst().orElse(null);
     }
 
     /** alice's changes: each wait reacts to them. */
-    private static app.unichat.service.Changes changes;
+    private static app.unichat.service.@Nullable Changes changes;
 
     private static void await(String what, BooleanSupplier cond) throws InterruptedException {
-        changes.until(what, cond);
+        Present.of(changes).until(what, cond);
     }
 
     private String bobLogin() throws JsonProcessingException, IOException, InterruptedException {
@@ -174,7 +176,7 @@ class MatrixLiveIT {
         return call("PUT", path, token, body);
     }
 
-    private JsonNode call(String method, String path, String token, String body) throws JsonProcessingException, IOException, InterruptedException {
+    private JsonNode call(String method, String path, @Nullable String token, String body) throws JsonProcessingException, IOException, InterruptedException {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(hs + "/_matrix/client/v3" + path))
                 .header("Content-Type", "application/json")
                 .method(method, HttpRequest.BodyPublishers.ofString(body));

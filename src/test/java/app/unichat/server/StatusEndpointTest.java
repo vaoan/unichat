@@ -2,6 +2,7 @@ package app.unichat.server;
 
 import app.unichat.bridge.BridgeStates;
 import java.io.IOException;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +23,7 @@ class StatusEndpointTest {
         endpoint.stop();
     }
 
-    private int post(String url, String token, String body) throws IOException, InterruptedException {
+    private int post(String url, @Nullable String token, String body) throws IOException, InterruptedException {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url)).POST(HttpRequest.BodyPublishers.ofString(body));
         if (token != null) b.header("Authorization", "Bearer " + token);
         return HttpClient.newHttpClient().send(b.build(), HttpResponse.BodyHandlers.discarding()).statusCode();

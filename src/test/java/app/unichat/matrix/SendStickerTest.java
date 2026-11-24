@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import app.unichat.model.MediaLibrary;
 import app.unichat.service.StickerMode;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -7,6 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
 import java.util.concurrent.ExecutionException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,12 +27,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** A favourite sticker goes out as m.sticker keeping its info (bridges resend the native sticker from it). */
 class SendStickerTest {
     private HttpServer server;
-    private volatile String path;
-    private volatile String body;
+    private volatile @Nullable String path;
+    private volatile @Nullable String body;
     private final java.util.List<String> puts = new java.util.concurrent.CopyOnWriteArrayList<>();
-    private volatile String uploadedType;
+    private volatile @Nullable String uploadedType;
     /** What the fake server serves as any media; null = a 16 px GIF. */
-    private volatile java.nio.file.Path served;
+    private volatile java.nio.file.@Nullable Path served;
 
     @BeforeEach
     void fakeHomeserver() throws Exception {
@@ -83,7 +85,7 @@ class SendStickerTest {
                 {"mimetype":"image/webp","w":512,"h":512,"fi.mau.bridged_sticker":{"network":"telegram","id":"123","emoji":"😂"}}""");
         svc.sendSticker("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/abc", "image/webp", 512, 512, info), null)
                 .get();
-        assertTrue(path.contains("/send/m.sticker/"), path);
+        assertTrue(Present.of(path).contains("/send/m.sticker/"), path);
         JsonNode sent = MatrixClient.JSON.readTree(body);
         assertEquals("mxc://s/abc", sent.path("url").asText());
         assertEquals("telegram", sent.path("info").path("fi.mau.bridged_sticker").path("network").asText());
@@ -126,7 +128,7 @@ class SendStickerTest {
                 "{\"id\":\"wa\",\"file\":{\"m.sticker\":{\"mime_types\":{\"image/webp\":2}},\"m.video\":{\"mime_types\":{\"video/mp4\":2}}}}"));
         svc.sender().sendStickerAs("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/gif", "image/gif", 16, 16, null), wa, mode, null)
                 .get();
-        assertTrue(path.contains("/send/m.room.message/"), path);
+        assertTrue(Present.of(path).contains("/send/m.room.message/"), path);
         assertEquals("video/mp4", uploadedType);
         return MatrixClient.JSON.readTree(body);
     }
@@ -275,7 +277,7 @@ class SendStickerTest {
         svc.sender().sendStickerEvent("!c:example.org", new MediaLibrary.Item(MediaLibrary.Kind.STICKER, "mxc://s/abc", "image/webp", 512, 512, info),
                 app.unichat.model.RoomFeatures.UNKNOWN, true, null).get();
         assertEquals("image/gif", uploadedType, "the fake server's file is a GIF: it goes as what it is, whatever the label");
-        assertTrue(path.contains("/send/m.sticker/"), path);
+        assertTrue(Present.of(path).contains("/send/m.sticker/"), path);
         JsonNode sent = MatrixClient.JSON.readTree(body);
         assertNotEquals("mxc://s/abc", sent.path("url").asText());
         assertTrue(sent.path("url").asText().startsWith("mxc://"));
@@ -296,9 +298,9 @@ class SendStickerTest {
         java.nio.file.Path media = app.unichat.settings.Settings.get().cacheDir().resolve("media");
         java.nio.file.Files.createDirectories(media);
         javax.imageio.ImageIO.write(new java.awt.image.BufferedImage(8, 8, java.awt.image.BufferedImage.TYPE_INT_RGB), "gif",
-                media.resolve(app.unichat.support.Hashes.sha256(MediaDownloader.cacheKey(m.mediaUrl(), 0, 0)) + ".gif").toFile());
+                media.resolve(app.unichat.support.Hashes.sha256(MediaDownloader.cacheKey(Present.of(m.mediaUrl()), 0, 0)) + ".gif").toFile());
         svc.forward("!c:example.org", m, true).get();
-        assertTrue(path.contains("/send/m.room.message/"), path);
+        assertTrue(Present.of(path).contains("/send/m.room.message/"), path);
         JsonNode sent = MatrixClient.JSON.readTree(body);
         assertEquals("mxc://s/converted", sent.path("url").asText(), "Discord's bridge can't read Telegram's direct media");
         assertEquals("image/gif", uploadedType);
@@ -359,6 +361,18 @@ class SendStickerTest {
         chatOn("telegram").sendGif("!c:example.org", mp4, "video/mp4", 64, 64, null).get();
         assertEquals("video/mp4", uploadedType, "Telegram shows its own as a GIF: it goes as it is");
         assertEquals("m.video", MatrixClient.JSON.readTree(body).path("msgtype").asText());
+    }
+
+    /** A stranger's sticker whose event names no type: forwarding it threw (Set.of's contains(null)) and the echo stayed sending. */
+    @Test
+    void aForwardedStickerThatSaysNoTypeGoesAsWhatItsBytesAre() throws Exception {
+        app.unichat.model.Message m = new app.unichat.model.Message("$n", "!x:example.org", "@discord_1:example.org", "Ana", false, java.time.Instant.EPOCH);
+        m.setType(app.unichat.model.MessageType.STICKER);
+        m.setMediaUrl("mxc://s/untyped");
+        m.setSize(16, 16);
+        chatOn("telegram").forward("!c:example.org", m, true).get();
+        assertTrue(Present.of(path).contains("/send/m.sticker/"), path);
+        assertEquals("image/png", uploadedType, "a still GIF goes to Telegram as the PNG its bridge encodes");
     }
 
     @Test

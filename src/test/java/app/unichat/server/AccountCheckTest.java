@@ -2,6 +2,7 @@ package app.unichat.server;
 
 import java.sql.SQLException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -43,7 +44,7 @@ class AccountCheckTest {
                 : db("CREATE TABLE \"user\" (mxid TEXT)", "CREATE TABLE user_login (id TEXT)", "INSERT INTO \"user\" VALUES ('@yo:localhost')");
     }
 
-    private Path legacyDiscord(String token) throws SQLException {
+    private Path legacyDiscord(@Nullable String token) throws SQLException {
         return db("CREATE TABLE \"user\" (mxid TEXT PRIMARY KEY, dcid TEXT, discord_token TEXT)",
                 "INSERT INTO \"user\" VALUES ('@yo:localhost', null, " + (token == null ? "null" : "'" + token + "'") + ")");
     }

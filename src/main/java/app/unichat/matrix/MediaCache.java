@@ -1,6 +1,7 @@
 package app.unichat.matrix;
 
 import app.unichat.support.PathParts;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -67,7 +68,7 @@ final class MediaCache {
     /** What a folder holds: the files that may go, and the totals (pinned ones counted); null if it can't be read. */
     private record Listing(List<Entry> entries, long total, int count, long leftovers) {}
 
-    private static Listing list(Path dir, Set<String> pinned) {
+    private static @Nullable Listing list(Path dir, Set<String> pinned) {
         if (!Files.isDirectory(dir)) return null;
         List<Entry> entries = new ArrayList<>();
         long total = 0;

@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
 import app.unichat.model.Chat;
@@ -10,6 +11,7 @@ import app.unichat.settings.Settings;
 import app.unichat.support.PathParts;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,7 +44,8 @@ class StartupBeforeSyncTest {
     private final CountDownLatch syncAnswers = new CountDownLatch(1);
     private final AtomicInteger syncsAnswered = new AtomicInteger();
     private final Changes changes = new Changes();
-    private volatile String sinceSeen;
+    private volatile @Nullable String sinceSeen;
+    @SuppressWarnings("NullAway.Init") // each test makes it before use; @AfterEach stops it only if made
     private MatrixChatService svc;
 
     @BeforeEach
@@ -133,11 +136,11 @@ class StartupBeforeSyncTest {
         assertTrue(accounts.stream().anyMatch(a -> a.network() == Network.WHATSAPP && a.id().equals("whatsapp:573001112233")), accounts.toString());
         assertTrue(accounts.stream().anyMatch(a -> a.network() == Network.TELEGRAM && a.label().equals("Juan")), accounts.toString());
 
-        Chat wa = svc.chat("!wa:localhost");
+        Chat wa = Present.of(svc.chat("!wa:localhost"));
         assertEquals(Network.WHATSAPP, wa.network());
         assertEquals("Ana", wa.title(), "bridge suffix removed");
         assertEquals("hola", wa.lastPreview());
-        assertEquals(Network.TELEGRAM, svc.chat("!tg:localhost").network());
+        assertEquals(Network.TELEGRAM, Present.of(svc.chat("!tg:localhost")).network());
 
         // The network sync resumes from the cached token instead of downloading everything again.
         changes.until(() -> "s1".equals(sinceSeen));

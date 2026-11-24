@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import org.junit.jupiter.api.Test;
 
@@ -23,7 +24,7 @@ class TimelineOrderTest {
             proc.process(MatrixClient.JSON.readTree(sync(channel("!c:x", "c")).replace("\"timeline\":{\"events\":[]}",
                     "\"timeline\":{\"events\":[" + a + "," + c + "]}")), false);
             proc.process(MatrixClient.JSON.readTree("{\"rooms\":{\"join\":{\"!c:x\":{\"timeline\":{\"events\":[" + b + "]}}}}}"), false);
-            assertEquals(List.of("$a", "$b", "$c"), proc.room("!c:x").timeline.stream().map(Message::id).toList());
+            assertEquals(List.of("$a", "$b", "$c"), Present.of(proc.room("!c:x")).timeline.stream().map(Message::id).toList());
         }
     }
 }

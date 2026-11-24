@@ -2,6 +2,7 @@ package app.unichat.matrix;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import org.jsoup.nodes.Entities;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +24,7 @@ final class BusinessMessages {
             "(?:\\s*<br\\s*/?>)*\\s*(?:&lt;[^<>]{1,80}?&gt;\\s*<br\\s*/?>\\s*)*" + Pattern.quote(NOTE) + "\\s*$");
 
     /** The message's own text, its HTML (null when none), and the buttons' labels as the bridge wrote them. */
-    record Parsed(String body, String html, List<String> buttons) {}
+    record Parsed(String body, @Nullable String html, List<String> buttons) {}
 
     private BusinessMessages() {}
 
@@ -32,7 +33,7 @@ final class BusinessMessages {
     }
 
     /** {@code body} and {@code html} without the bridge's button lines and note; {@code order} names an order's picture. */
-    static Parsed parse(String body, String html, String order) {
+    static Parsed parse(String body, @Nullable String html, String order) {
         List<String> lines = new ArrayList<>(List.of(body.split("\n", -1)));
         List<String> buttons = new ArrayList<>();
         if (!lines.isEmpty() && lines.getLast().strip().equals(NOTE)) {

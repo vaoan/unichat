@@ -6,6 +6,7 @@ import app.unichat.service.ArchiveWaking.Waking;
 import app.unichat.settings.Settings;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.time.Duration;
@@ -61,18 +62,18 @@ final class ArchiveRest {
     private final BiConsumer<SyncProcessor.Result, Collection<String>> caughtUp;
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     @SuppressWarnings("UnnecessaryLambda") // one instance: removeListener takes away what addListener added
-    private final Consumer<String> onSetting = key -> {
+    private final Consumer<@Nullable String> onSetting = key -> {
         if (key == null || key.equals(Settings.NOTIFY_ARCHIVED)) { var _ = update(); }
     };
     private volatile boolean archiveOpen;
-    private volatile String openChat;
-    private volatile Waking waking;
+    private volatile @Nullable String openChat;
+    private volatile @Nullable Waking waking;
     private volatile Runnable wakeLoop = () -> { };
     private volatile Supplier<Instant> clock = Instant::now;
     /** How long a catch-up or tags sync may take: they hold the sync thread, so not a full sync's minutes. */
     private volatile Duration sideTimeout = Duration.ofSeconds(30);
     /** Where the main sync is ({@code next_batch}): rooms that start resting have their tags asked from there. */
-    private final Supplier<String> mainSince;
+    private final Supplier<@Nullable String> mainSince;
     /** The rooms that rest but for the chat open in the window; published for {@link #setOpenChat}. */
     private volatile Set<String> restable = Set.of();
     /** Asks made, and those waiting for a round that has seen them; guarded by this. */
@@ -87,15 +88,15 @@ final class ArchiveRest {
     private final Set<String> owed = new LinkedHashSet<>();
     private int partsDone;
     private int partsTotal;
-    private Retry catchUpRetry;
-    private Retry filterRetry;
-    private Instant tagsDue;
-    private String tagsSince;
+    private @Nullable Retry catchUpRetry;
+    private @Nullable Retry filterRetry;
+    private @Nullable Instant tagsDue;
+    private @Nullable String tagsSince;
 
     private record Waiter(long ask, CompletableFuture<Void> done) {}
 
     ArchiveRest(MatrixCore core, SyncFilter filter, DiscordServers discord,
-                BiConsumer<SyncProcessor.Result, Collection<String>> caughtUp, Supplier<String> mainSince) {
+                BiConsumer<SyncProcessor.Result, Collection<String>> caughtUp, Supplier<@Nullable String> mainSince) {
         this.mainSince = mainSince;
         this.core = core;
         this.proc = core.proc;
@@ -134,7 +135,7 @@ final class ArchiveRest {
     }
 
     /** The chat shown in the window: it never rests, or its new messages wouldn't come (opened from a search, a folder). */
-    CompletableFuture<Void> setOpenChat(String chatId) {
+    CompletableFuture<Void> setOpenChat(@Nullable String chatId) {
         String before = openChat;
         openChat = chatId;
         // Only a chat that rests, or rested until now, changes anything: any other mustn't drop the long poll.
@@ -151,7 +152,7 @@ final class ArchiveRest {
     /** What's archived changed, or Discord connected: what rests, and what each server brings, follow. */
     CompletableFuture<Void> archivedChanged() { return CompletableFuture.allOf(update(), servers.update()); }
 
-    Waking waking() { return waking; }
+    @Nullable Waking waking() { return waking; }
 
     void addListener(Runnable l) { listeners.add(l); }
 
@@ -370,7 +371,7 @@ final class ArchiveRest {
     }
 
     /** A sync with filter {@code f}, posted; inlined if the server won't keep it or doesn't know its id any more. */
-    private JsonNode sync(ObjectNode f, String since) throws IOException {
+    private JsonNode sync(ObjectNode f, @Nullable String since) throws IOException {
         String tail = "&timeout=0" + (since == null ? "" : "&since=" + enc(since));
         String id;
         try {
@@ -390,15 +391,15 @@ final class ArchiveRest {
     }
 
     /** "Reactivando <server>…" while a server comes back; once back, "Al día" unless a catch-up is still going. */
-    private synchronized void resuming(String server) {
+    private synchronized void resuming(@Nullable String server) {
         if (server != null) showLocked(new Waking(Step.SERVER, 0, 0, server));
         else if (!catching) showLocked(new Waking(Step.DONE, 0, 0));
     }
 
-    private synchronized void show(Waking w) { showLocked(w); }
+    private synchronized void show(@Nullable Waking w) { showLocked(w); }
 
     /** Caller holds this: the bar's state is decided in one place at a time. */
-    private void showLocked(Waking w) {
+    private void showLocked(@Nullable Waking w) {
         waking = w;
         for (Runnable l : listeners) {
             try {

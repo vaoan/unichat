@@ -11,6 +11,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -36,7 +37,7 @@ final class BridgeProtocol {
     private static final Pattern LOGGED_IN_AS = Pattern.compile("(?i)logged in as ([^\\n.]+)");
 
     /** A bridge login as reported by {@code list-logins}. */
-    record Login(String id, String name, String state) {}
+    record Login(String id, @Nullable String name, @Nullable String state) {}
 
     /** What a bridge's bot chat says about its only account. */
     record BotChatLogin(AccountStatus status, String label) {}
@@ -102,7 +103,7 @@ final class BridgeProtocol {
     }
 
     /** The bridge login behind an account ("whatsapp:573…" → "573…"); null for a network-wide account. */
-    static String loginIdOf(Account a) {
+    static @Nullable String loginIdOf(Account a) {
         String prefix = a.network().protocolId() + ":";
         return a.id().startsWith(prefix) ? a.id().substring(prefix.length()) : null;
     }
@@ -111,7 +112,7 @@ final class BridgeProtocol {
         return n.protocolId() + ":" + loginId;
     }
 
-    static AccountStatus loginStatus(String state) {
+    static AccountStatus loginStatus(@Nullable String state) {
         if (state == null) return AccountStatus.CONNECTED;
         return switch (state) {
             case "CONNECTED", "BACKFILLING" -> AccountStatus.CONNECTED;
@@ -127,7 +128,7 @@ final class BridgeProtocol {
     }
 
     /** The legacy Discord bridge's {@code ping} answer as a login list (empty when not logged in). */
-    static List<Login> parseDiscordPing(String reply) {
+    static List<Login> parseDiscordPing(@Nullable String reply) {
         if (reply == null) return new ArrayList<>();
         Matcher m = DISCORD_LOGGED_IN.matcher(reply);
         if (m.find()) return new ArrayList<>(List.of(new Login(m.group(2), "@" + m.group(1), "CONNECTED")));
@@ -138,7 +139,7 @@ final class BridgeProtocol {
     }
 
     /** Parses a {@code list-logins} reply; empty when the bot says we're not logged in. */
-    static List<Login> parseLogins(String reply) {
+    static List<Login> parseLogins(@Nullable String reply) {
         List<Login> out = new ArrayList<>();
         if (reply == null) return out;
         Matcher m = LOGIN_LINE.matcher(reply);
@@ -147,7 +148,7 @@ final class BridgeProtocol {
     }
 
     /** Bot messages after which the list of logins may have changed. */
-    static boolean loginChanged(String body) {
+    static boolean loginChanged(@Nullable String body) {
         String b = body == null ? "" : body.toLowerCase(Locale.ROOT);
         return b.contains("successfully logged in") || b.contains("logged out") || b.contains("logged in as");
     }
@@ -198,7 +199,7 @@ final class BridgeProtocol {
     }
 
     /** Whether Telegram's chats should be listed again: never done, or done for a lower limit than now. */
-    static boolean needsChatResync(String doneForLimit, int limit) {
+    static boolean needsChatResync(@Nullable String doneForLimit, int limit) {
         return !Integer.toString(limit).equals(doneForLimit);
     }
 
@@ -206,9 +207,9 @@ final class BridgeProtocol {
      * Merges m.direct content: union of the server's and the locally cached room lists per user, then
      * appends {@code roomId} under {@code otherUser} if absent. Never drops existing entries.
      */
-    static ObjectNode mergeDirect(JsonNode serverContent, JsonNode cachedContent, String otherUser, String roomId) {
+    static ObjectNode mergeDirect(@Nullable JsonNode serverContent, @Nullable JsonNode cachedContent, String otherUser, String roomId) {
         ObjectNode out = MatrixClient.JSON.createObjectNode();
-        for (JsonNode src : new JsonNode[] {serverContent, cachedContent}) {
+        for (@Nullable JsonNode src : new @Nullable JsonNode[] {serverContent, cachedContent}) {
             if (src == null || !src.isObject()) continue;
             src.fields().forEachRemaining(e -> {
                 ArrayNode arr = out.has(e.getKey()) && out.get(e.getKey()) instanceof ArrayNode a

@@ -105,6 +105,7 @@ class SavedMediaTest {
     }
 
     @Test
+    @SuppressWarnings("NullAway") // no homeserver: what this checks never reaches it
     void theDownloaderPrefersTheCopyAndAsksNobody() throws Exception {
         String url = "mxc://media-telegram.localhost/perdido";
         Path dir = app.unichat.settings.Settings.dataDir().resolve("media-library");

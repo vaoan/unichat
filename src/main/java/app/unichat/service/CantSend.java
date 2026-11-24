@@ -1,5 +1,7 @@
 package app.unichat.service;
 
+import org.jspecify.annotations.Nullable;
+
 import java.io.IOException;
 
 /**
@@ -14,7 +16,8 @@ public final class CantSend extends IOException {
         super(why);
     }
 
-    public CantSend(String why, Throwable cause) {
+    /** {@code why} is the cause's message, which a tool's failure may lack. */
+    public CantSend(@Nullable String why, Throwable cause) {
         super(why, cause);
     }
 }

@@ -2,6 +2,7 @@ package app.unichat.server;
 
 import app.unichat.bridge.LoginsCache;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -26,15 +27,14 @@ final class AccountCheck {
      * @param cached the logins kept, null when none were ever read
      * @param db the bridge's SQLite database
      */
-    static boolean hasAccount(String cached, Path db) {
+    static boolean hasAccount(@Nullable String cached, Path db) {
         if (LoginsCache.hasLogin(cached)) return true;
         Boolean inDb = inDatabase(db);
         return inDb == null || inDb;
     }
 
     /** A login in the bridge's database: a {@code user_login} row (bridgev2) or a user with a token (legacy Discord); null when it can't tell. */
-    @SuppressFBWarnings(value = "NP_BOOLEAN_RETURN_NULL", justification = "three answers on purpose: a login, none, or can't tell (null), which its caller reads as start the bridge")
-    private static Boolean inDatabase(Path db) {
+    private static @Nullable Boolean inDatabase(Path db) {
         if (!Files.isRegularFile(db)) return null;
         org.sqlite.SQLiteConfig ro = new org.sqlite.SQLiteConfig();
         ro.setReadOnly(true);

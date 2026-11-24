@@ -71,7 +71,7 @@ class LogoutWiringTest {
             @Override public void loggedOut(Network n) { stopped.add(n); }
         };
         core = new MatrixCore(new MatrixClient(base, "tok"), proc, ME, "example.org", "tok");
-        BotChat bots = new BotChat(core, new MessageSender(core, null));
+        BotChat bots = new BotChat(core, new MessageSender(core, new MediaDownloader(core.client, core.io)));
         accounts = new BridgeAccounts(core, bots, new DiscordServers(core, bots, List::of));
     }
 

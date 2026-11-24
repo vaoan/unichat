@@ -2,6 +2,7 @@ package app.unichat.server;
 
 import app.unichat.bridge.BridgeStates;
 import app.unichat.support.Storage;
+import org.jspecify.annotations.Nullable;
 import java.net.http.HttpClient;
 import java.time.Duration;
 import java.util.HashMap;
@@ -63,7 +64,7 @@ final class Watchdog {
     record Health(int probeFailures, long troubledSince, int drops) {}
 
     /** Why to restart, or null to leave it alone. */
-    static String reason(Health h, long now) {
+    static @Nullable String reason(Health h, long now) {
         if (h.probeFailures() >= PROBE_FAILURES) return "not responding";
         if (h.drops() >= FLAPS) return h.drops() + " disconnections in 10 min";
         if (h.troubledSince() >= 0 && now - h.troubledSince() >= STUCK_MS) return "disconnected for over 10 min";
@@ -71,7 +72,7 @@ final class Watchdog {
     }
 
     /** {@link #reason(Health, long)} knowing whether there's internet: without it, only a hung process counts. */
-    static String reason(Health h, long now, boolean online) {
+    static @Nullable String reason(Health h, long now, boolean online) {
         return online || h.probeFailures() >= PROBE_FAILURES ? reason(h, now) : null;
     }
 
@@ -93,7 +94,7 @@ final class Watchdog {
     private final Map<String, Long> lastRestart = new HashMap<>();
     private final Map<String, Integer> inARow = new HashMap<>();
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
-    private ScheduledExecutorService timer;
+    private @Nullable ScheduledExecutorService timer;
 
     /**
      * @param ports   process name → port it answers HTTP on ("tuwunel" and every bridge)
@@ -146,7 +147,7 @@ final class Watchdog {
     private record Round(long now, boolean online, boolean internetBack, boolean low, boolean roomBack, Set<String> failing) {}
 
     /** Why to restart {@code name} this round: with the disk low only a hung one, as a restart can't help the rest. */
-    private static String why(String name, Health h, Round r) {
+    private static @Nullable String why(String name, Health h, Round r) {
         if (r.low()) return h.probeFailures() >= PROBE_FAILURES ? reason(h, r.now(), r.online()) : null;
         if (r.failing().contains(name)) return "it couldn't write to the disk";
         return reason(h, r.now(), r.online());

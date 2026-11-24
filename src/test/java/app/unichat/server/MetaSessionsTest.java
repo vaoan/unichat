@@ -5,6 +5,7 @@ import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
 import java.sql.SQLException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,7 @@ class MetaSessionsTest {
     private final List<String> restored = new ArrayList<>();
     private boolean redirecting;
     private MetaSessions sessions;
-    private HttpServer server;
+    private @Nullable HttpServer server;
 
     @BeforeEach
     void setUp() throws Exception {
@@ -74,7 +75,7 @@ class MetaSessionsTest {
     }
 
     @SuppressFBWarnings(value = {"SQL_INJECTION_JDBC", "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"}, justification = "builds or reads a fixture database with the test's own SQL")
-    private String metadata(String id) throws SQLException {
+    private @Nullable String metadata(String id) throws SQLException {
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db());
              Statement s = c.createStatement();
              ResultSet r = s.executeQuery("SELECT metadata FROM user_login WHERE id='" + id + "'")) {
@@ -186,7 +187,7 @@ class MetaSessionsTest {
         assertTrue(sessions.safeToRestart("telegram"));
     }
 
-    private URI serving(int status, String location) throws IOException {
+    private URI serving(int status, @Nullable String location) throws IOException {
         server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
             if (location != null) ex.getResponseHeaders().add("Location", location);

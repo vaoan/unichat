@@ -31,6 +31,7 @@ class ReadOnReplyTest {
     /** The messages each public read receipt went for, in order. */
     private final List<String> receipts = new CopyOnWriteArrayList<>();
     private Settings.ReadReceipts was;
+    @SuppressWarnings("NullAway.Init") // each test makes it before use; @AfterEach stops it only if made
     private MatrixChatService svc;
 
     @BeforeEach

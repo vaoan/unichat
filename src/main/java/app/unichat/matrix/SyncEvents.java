@@ -6,6 +6,7 @@ import app.unichat.model.MessageType;
 import app.unichat.model.Network;
 import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.jspecify.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -20,14 +21,14 @@ final class SyncEvents {
     private static final java.util.regex.Pattern NETWORK_SUFFIX = java.util.regex.Pattern.compile(
             "\\s*\\((WA|WhatsApp|Telegram|Signal|Instagram|Facebook|Messenger|Discord|Slack|Google Messages|GMessages|SMS|Twitter|X|LinkedIn)\\)$");
 
-    static String cleanName(String name) {
+    static @Nullable String cleanName(@Nullable String name) {
         if (name == null) return null;
         String n = NETWORK_SUFFIX.matcher(name).replaceFirst("");
         return n.isBlank() ? name : n;
     }
 
     /** Sets type, body, media fields from a message content (also used for m.new_content). */
-    static void applyContent(Message m, String msgtype, String body, JsonNode content) {
+    static void applyContent(Message m, @Nullable String msgtype, @Nullable String body, JsonNode content) {
         MessageType t = switch (msgtype == null ? "" : msgtype) {
             case "m.emote" -> MessageType.EMOTE;
             case "m.notice" -> MessageType.NOTICE;
@@ -55,7 +56,7 @@ final class SyncEvents {
             m.setBody(own);
             m.setHtml(html);
             m.setLinkPreviews(previews);
-            String extra = (own.equals(b) ? "" : MessageHtml.text(html))
+            String extra = (own.equals(b) || html == null ? "" : MessageHtml.text(html))
                     + previews.stream().map(p -> " " + p.title() + " " + p.description()).collect(java.util.stream.Collectors.joining());
             m.setHtmlText(extra.isBlank() ? null : extra.strip());
             return;
@@ -94,7 +95,8 @@ final class SyncEvents {
      * server's, which is what forwarding, saving and the next start use.
      */
     static boolean takesServerMedia(Message known, JsonNode content) {
-        return known.outgoing() && known.mediaUrl() != null && known.mediaUrl().startsWith("file:")
+        String url = known.mediaUrl();
+        return known.outgoing() && url != null && url.startsWith("file:")
                 && app.unichat.model.Mxc.parse(text(content, "url")) != null;
     }
 
@@ -114,7 +116,7 @@ final class SyncEvents {
     }
 
     /** Removes the "> quoted" reply fallback that precedes the real body. */
-    static String stripReplyFallback(String body) {
+    static @Nullable String stripReplyFallback(@Nullable String body) {
         if (body == null || !body.startsWith(">")) return body;
         String[] lines = body.split("\n", -1);
         int i = 0;
@@ -152,13 +154,14 @@ final class SyncEvents {
     static String fallbackName(String userId) {
         String local = localpart(userId);
         Network n = Network.fromUserId(userId);
-        if (n == null || n.puppetPrefix() == null || !local.startsWith(n.puppetPrefix())) return local;
-        String rest = local.substring(n.puppetPrefix().length());
+        String prefix = n == null ? null : n.puppetPrefix();
+        if (n == null || prefix == null || !local.startsWith(prefix)) return local;
+        String rest = local.substring(prefix.length());
         if (rest.matches("\\d{6,15}")) return "+" + rest;
         return I18n.t("sync.contactOf", n.displayName());
     }
 
-    static String localpart(String userId) {
+    static String localpart(@Nullable String userId) {
         if (userId == null) return "";
         int colon = userId.indexOf(':');
         int start = userId.startsWith("@") ? 1 : 0;
@@ -166,7 +169,7 @@ final class SyncEvents {
     }
 
     /** True if {@code userId} is a bridge bot (e.g. {@code @whatsappbot:server}). */
-    static boolean isBot(String userId) {
+    static boolean isBot(@Nullable String userId) {
         Network n = Network.fromUserId(userId);
         return n != null && Objects.equals(localpart(userId), n.botLocalpart());
     }
@@ -176,13 +179,13 @@ final class SyncEvents {
         return p.isMissingNode() ? ev.path("prev_content") : p;
     }
 
-    static String text(JsonNode node, String field) {
+    static @Nullable String text(@Nullable JsonNode node, String field) {
         if (node == null) return null;
         JsonNode v = node.get(field);
         return v != null && v.isTextual() ? v.asText() : null;
     }
 
-    static String blankToNull(String s) { return s == null || s.isBlank() ? null : s; }
+    static @Nullable String blankToNull(@Nullable String s) { return s == null || s.isBlank() ? null : s; }
 
     static List<String> strings(JsonNode arr) {
         List<String> out = new ArrayList<>();

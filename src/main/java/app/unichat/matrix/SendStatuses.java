@@ -2,6 +2,7 @@ package app.unichat.matrix;
 
 import app.unichat.support.BoundedMap;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.LinkedHashMap;
@@ -32,7 +33,7 @@ final class SendStatuses {
         if (f != null) settle(f, status);
     }
 
-    static boolean isFinal(String status) {
+    static boolean isFinal(@Nullable String status) {
         return status != null && (status.equals("SUCCESS") || status.startsWith("FAIL"));
     }
 

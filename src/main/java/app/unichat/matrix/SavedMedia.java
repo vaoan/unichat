@@ -1,6 +1,7 @@
 package app.unichat.matrix;
 
 import app.unichat.support.PathParts;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -40,7 +41,7 @@ final class SavedMedia {
     }
 
     /** The copy of {@code url}, or null. */
-    Path find(String url) {
+    @Nullable Path find(String url) {
         return MediaDownloader.findCached(dir, names.apply(url));
     }
 

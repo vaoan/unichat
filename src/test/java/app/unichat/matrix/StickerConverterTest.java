@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import app.unichat.model.Network;
 import app.unichat.model.RoomFeatures;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -109,8 +110,8 @@ class StickerConverterTest {
         assertNotNull(telegram);
         assertEquals(NetworkFormats.LOTTIE, telegram.mime());
         org.junit.jupiter.api.Assertions.assertArrayEquals(json, Files.readAllBytes(telegram.file()), "its JSON, not gzipped twice");
-        assertEquals("image/png", StickerConverter.forChat(tgs, "application/x-tgsticker", Network.DISCORD, false,
-                features("{\"image/png\":2}"), dir).mime(), "a chat that takes only PNG gets its first frame");
+        assertEquals("image/png", Present.of(StickerConverter.forChat(tgs, "application/x-tgsticker", Network.DISCORD, false,
+                features("{\"image/png\":2}"), dir)).mime(), "a chat that takes only PNG gets its first frame");
     }
 
     @Test

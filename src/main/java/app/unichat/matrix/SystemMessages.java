@@ -2,6 +2,7 @@ package app.unichat.matrix;
 
 import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
+import org.jspecify.annotations.Nullable;
 
 import static app.unichat.matrix.SyncEvents.blankToNull;
 import static app.unichat.matrix.SyncEvents.isBot;
@@ -16,10 +17,11 @@ final class SystemMessages {
         this.fields = fields;
     }
 
-    String of(MatrixRoom room, JsonNode ev) {
+    /** The line a state event shows as in a group, or null for none; {@link SyncProcessor} gives only events with a type and a sender. */
+    @Nullable String of(MatrixRoom room, JsonNode ev) {
         String type = text(ev, "type");
         String sender = text(ev, "sender");
-        if (isBot(sender) || !fields.isGroup(room)) return null;
+        if (type == null || sender == null || isBot(sender) || !fields.isGroup(room)) return null;
         String sn = fields.nameOf(room, sender);
         JsonNode c = ev.path("content");
         return switch (type) {

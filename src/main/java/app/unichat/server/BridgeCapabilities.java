@@ -1,5 +1,7 @@
 package app.unichat.server;
 
+import org.jspecify.annotations.Nullable;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.Connection;
@@ -42,7 +44,7 @@ final class BridgeCapabilities {
         }
     }
 
-    private static String read(Connection c) throws SQLException {
+    private static @Nullable String read(Connection c) throws SQLException {
         try (PreparedStatement s = c.prepareStatement("SELECT value FROM kv_store WHERE key = ?")) {
             s.setString(1, VERSION_ROW);
             try (ResultSet r = s.executeQuery()) {

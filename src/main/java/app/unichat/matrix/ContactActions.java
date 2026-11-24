@@ -5,6 +5,7 @@ import app.unichat.model.Account;
 import app.unichat.model.Contact;
 import app.unichat.service.ChatService.ContactSupport;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Set;
@@ -27,7 +28,7 @@ final class ContactActions {
     private final Set<String> noSearch = ConcurrentHashMap.newKeySet();
 
     /** The bridge's contacts API for {@code a}, or null when there's no bridge API (external server). */
-    private BridgeContacts bridgeContacts(Account a) {
+    private @Nullable BridgeContacts bridgeContacts(Account a) {
         BridgeProvisioner p = BridgeAccounts.provisioner;
         String url = p == null ? null : p.provisioningUrl(a.network());
         return url == null ? null : new BridgeContacts(url, core.accessToken, userId, loginIdOf(a));
@@ -62,7 +63,7 @@ final class ContactActions {
         });
     }
 
-    CompletableFuture<Contact> resolveContact(Account a, String identifier) {
+    CompletableFuture<@Nullable Contact> resolveContact(Account a, String identifier) {
         return core.call(() -> {
             BridgeContacts b = bridgeContacts(a);
             return b == null ? null : b.resolve(identifier);

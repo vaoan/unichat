@@ -4,7 +4,7 @@ paths:
 ---
 # Null (NullAway, JSpecify)
 
-- A package NullAway checks has a `package-info.java` with `@NullMarked` (each subpackage its own) and is listed in `BuildRulesTest.NULL_MARKED`. Its test classes share the package, so NullAway checks them too. Nothing is `@NullUnmarked`.
+- A package NullAway checks has a `package-info.java` with `@NullMarked` (each subpackage its own) and is listed in `NullMarkedTest.NULL_MARKED`, which reads the mark on the package declaration however it is written and fails on a class marked by itself in a package not listed. Its test classes share the package, so NullAway checks them too. Nothing is `@NullUnmarked`.
 - In a marked package a type without `@Nullable` (`org.jspecify.annotations.Nullable`) never holds null. Write `@Nullable` where null really is a value: a field set later, a "null when none" return, a parameter the code checks for null. Put it on the type: `java.nio.file.@Nullable Path`, `List<@Nullable String>`, `String @Nullable []`.
 - Fixes keep behaviour: annotate truthfully and handle the null, rather than invent a default. Make null impossible only when nothing changes (`getOrDefault` on a map's own keys).
 - A record component that its compact constructor turns from null into a value (`Contact.identifiers`, `LinkPreview.title`) stays non-null: `@Nullable` there would make its accessor nullable too. A caller passes the empty value instead.
@@ -16,3 +16,8 @@ paths:
 - A getter read twice (`x.f() != null && x.f().g()`) goes through a local: NullAway takes it, SpotBugs (`NP_NULL_ON_SOME_PATH_FROM_RETURN_VALUE`) doesn't.
 - An override of a `@Nullable` method (a wrapper such as `OldVault`, a test's `Through` or fake) says `@Nullable` too.
 - Tests: `app.unichat.Present.of(x)` for a value the test goes on with (`svc.chat(id)`, a file's bytes, a slot), `Present.message(e)` for what a failure wrapped says; a field a helper every test calls sets carries `@SuppressWarnings("NullAway.Init") // why`.
+- NullAway's own annotations (`com.uber.nullaway.annotations.MonotonicNonNull`, `EnsuresNonNull`, `RequiresNonNull`) are not JSpecify's: they need `com.uber.nullaway:nullaway-annotations` as a dependency, which the repo doesn't have. No marked package has needed them: a field set later is `@Nullable` and read through a local or `Objects.requireNonNull(field, "why")`.
+- JSON from the homeserver or a bridge (Jackson's `asText(null)`, `get`) is a stranger's: NullAway takes an unmarked library's answer as non-null, so the field, parameter or future that holds it says `@Nullable` (`MatrixRoom.name`, `SyncProcessor.confirmLocalEcho`'s event id, `CompletableFuture<@Nullable String>` from a send). A missing field is skipped or defaulted as before, never thrown on: the sync loop reads it.
+- `Set.of(…)`, `List.of(…)` and `Map.of(…)` throw on `contains(null)`/`get(null)`: a nullable value is checked before it's looked up (`NetworkFormats.sticker`).
+- Generic helpers that may answer null (`MatrixCore.call`) take `<T extends @Nullable Object>`, so a `Callable` that returns null is accepted.
+- A test field a request handler sets (`SendStickerTest.path`) is `@Nullable` and read with `Present.of`; one each test sets before use and `@AfterEach` checks carries `@SuppressWarnings("NullAway.Init") // why`, which lambdas can read too.

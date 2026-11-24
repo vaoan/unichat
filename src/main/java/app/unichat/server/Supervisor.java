@@ -3,6 +3,7 @@ package app.unichat.server;
 import app.unichat.support.PathParts;
 import app.unichat.support.Storage;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -25,7 +26,7 @@ public final class Supervisor {
     private final Map<String, Service> services = new ConcurrentHashMap<>();
 
     /** Where each running process is noted as {@code <name>.pid} ("pid startMillis"), or null. */
-    private final Path runDir;
+    private final @Nullable Path runDir;
     /** Told of a process whose output says a write didn't fit ({@link Storage#writeFailed}). */
     private final Storage storage;
 
@@ -37,7 +38,7 @@ public final class Supervisor {
         this(firstBackoff, maxBackoff, null, Storage.SHARED);
     }
 
-    Supervisor(Duration firstBackoff, Duration maxBackoff, Path runDir, Storage storage) {
+    Supervisor(Duration firstBackoff, Duration maxBackoff, @Nullable Path runDir, Storage storage) {
         this.firstBackoff = firstBackoff;
         this.maxBackoff = maxBackoff;
         this.runDir = runDir;
@@ -115,7 +116,7 @@ public final class Supervisor {
         final Path workDir;
         final List<String> command;
         final Path log;
-        volatile Process process;
+        volatile @Nullable Process process;
         volatile boolean wanted = true;
         final AtomicInteger restarts = new AtomicInteger();
         /** Crashes in a row without a stable run in between; sets the wait before the next restart. */

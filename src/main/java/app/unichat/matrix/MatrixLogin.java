@@ -6,6 +6,7 @@ import app.unichat.support.I18n;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.ConnectException;
@@ -38,18 +39,22 @@ public final class MatrixLogin {
     }
 
     /** Session from Settings, or null if none stored. */
-    public static MatrixChatService fromSettings() {
+    public static @Nullable MatrixChatService fromSettings() {
         Settings s = Settings.get();
-        if (s.homeserver() == null || s.userId() == null || s.accessToken() == null) return null;
-        return new MatrixChatService(s.homeserver(), s.userId(), s.accessToken());
+        String homeserver = s.homeserver();
+        String userId = s.userId();
+        String token = s.accessToken();
+        if (homeserver == null || userId == null || token == null) return null;
+        return new MatrixChatService(homeserver, userId, token);
     }
 
     /** Short translated message for an error coming out of this service's futures. */
     public static String userMessage(Throwable error) {
         Throwable t = Errors.unwrap(error);
         if (t instanceof MatrixException me) {
-            if (me.errcode() == null) return me.getMessage();
-            return switch (me.errcode()) {
+            String errcode = me.errcode();
+            if (errcode == null) return me.getMessage();
+            return switch (errcode) {
                 case "M_FORBIDDEN" -> I18n.t("matrix.err.forbidden");
                 case "M_LIMIT_EXCEEDED" -> I18n.t("matrix.err.limit");
                 case "M_UNKNOWN_TOKEN" -> I18n.t("matrix.err.unknownToken");
@@ -84,7 +89,8 @@ public final class MatrixLogin {
             try {
                 resp = new MatrixClient(http, base, null).post(CLIENT + "/login", body);
             } catch (MatrixException e) {
-                String msg = switch (e.errcode() == null ? "" : e.errcode()) {
+                String errcode = e.errcode();
+                String msg = switch (errcode == null ? "" : errcode) {
                     case "M_FORBIDDEN" -> I18n.t("matrix.login.badCredentials");
                     case "M_USER_DEACTIVATED" -> I18n.t("matrix.err.deactivated");
                     case "M_LIMIT_EXCEEDED" -> I18n.t("matrix.err.limit");

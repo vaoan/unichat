@@ -8,6 +8,7 @@ import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import com.fasterxml.jackson.dataformat.yaml.YAMLGenerator;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -39,10 +40,11 @@ public final class BridgeConfig {
      * @param statusEndpoint where the bridge reports its connection state (StatusEndpoint); null for none
      */
     public record Settings(String bridge, int port, String domain, String adminUserId, String homeserverUrl,
-                           Path dir, String doublePuppetToken, String telegramApiId, String telegramApiHash,
-                           String statusEndpoint) {
+                           Path dir, @Nullable String doublePuppetToken, @Nullable String telegramApiId,
+                           @Nullable String telegramApiHash, @Nullable String statusEndpoint) {
         public Settings(String bridge, int port, String domain, String adminUserId, String homeserverUrl,
-                        Path dir, String doublePuppetToken, String telegramApiId, String telegramApiHash) {
+                        Path dir, @Nullable String doublePuppetToken, @Nullable String telegramApiId,
+                        @Nullable String telegramApiHash) {
             this(bridge, port, domain, adminUserId, homeserverUrl, dir, doublePuppetToken, telegramApiId, telegramApiHash, null);
         }
     }
@@ -68,7 +70,8 @@ public final class BridgeConfig {
         set(c, "/homeserver/domain", s.domain());
         set(c, "/homeserver/software", "standard");
         // Live connection state of every account, for Unichat's status and its watchdog (both layouts).
-        if (s.statusEndpoint() != null) set(c, "/homeserver/status_endpoint", s.statusEndpoint());
+        String status = s.statusEndpoint();
+        if (status != null) set(c, "/homeserver/status_endpoint", status);
         else obj(c, "/homeserver").putNull("status_endpoint");
         set(c, "/appservice/address", "http://127.0.0.1:" + s.port());
         set(c, "/appservice/hostname", "127.0.0.1"); // NOPMD: AvoidUsingHardCodedIP, the bridge listens on the loopback only
@@ -120,7 +123,8 @@ public final class BridgeConfig {
                 }
                 case "telegram" -> {
                     ObjectNode net = obj(c, "/network");
-                    net.put("api_id", Integer.parseInt(s.telegramApiId()));
+                    net.put("api_id", Integer.parseInt(java.util.Objects.requireNonNull(s.telegramApiId(),
+                            "Telegram is set up only with its keys (BridgeInstaller.prepare refuses it without)")));
                     net.put("api_hash", s.telegramApiHash());
                     // Animated stickers as they are: Lottie as its JSON, video stickers as the WebM. Unichat draws both
                     // and forwards them as an animated WebP with their transparency (video/LottieStickers, WebmStickers).

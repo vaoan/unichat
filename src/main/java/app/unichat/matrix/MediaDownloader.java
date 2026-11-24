@@ -10,6 +10,7 @@ import app.unichat.model.Mxc;
 import app.unichat.support.I18n;
 import app.unichat.support.PathParts;
 import app.unichat.support.Urls;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.net.URI;
@@ -162,7 +163,7 @@ final class MediaDownloader {
     }
 
     /** A sticker the media folder holds from before it had its own: moved into the stickers' folder, not downloaded again. */
-    private Path adopt(String hash, Path stickers) {
+    private @Nullable Path adopt(String hash, Path stickers) {
         Path old = findCached(Settings.get().cacheDir().resolve(MEDIA), hash);
         if (old == null) return null;
         try {
@@ -237,10 +238,11 @@ final class MediaDownloader {
         }
     }
 
-    private Path download(String url, int w, int h, Path dir, String hash, java.util.function.DoubleConsumer progress) throws IOException {
+    private Path download(String url, int w, int h, Path dir, String hash, java.util.function.@Nullable DoubleConsumer progress)
+            throws IOException {
         Path tmp = dir.resolve(hash + ".download");
         Files.deleteIfExists(tmp);
-        String contentType;
+        @Nullable String contentType;
         if (url.startsWith(Mxc.SCHEME)) {
             Mxc mxc = Mxc.parse(url);
             if (mxc == null) throw new MatrixException(0, null, I18n.t("media.badUrl"));
@@ -271,7 +273,8 @@ final class MediaDownloader {
     }
 
     /** Authenticated media (Matrix 1.11) with fallback to the legacy unauthenticated endpoints. */
-    private String fetchMedia(String suffix, Path tmp, java.util.function.DoubleConsumer progress) throws IOException {
+    private @Nullable String fetchMedia(String suffix, Path tmp, java.util.function.@Nullable DoubleConsumer progress)
+            throws IOException {
         try {
             return client.download("/_matrix/client/v1/media" + suffix, true, tmp, progress);
         } catch (MatrixException e) {
@@ -280,7 +283,7 @@ final class MediaDownloader {
         }
     }
 
-    static Path findCached(Path dir, String hash) {
+    static @Nullable Path findCached(Path dir, String hash) {
         if (!Files.isDirectory(dir)) return null;
         try (DirectoryStream<Path> ds = Files.newDirectoryStream(dir, hash + "*")) {
             for (Path p : ds) {
@@ -293,7 +296,7 @@ final class MediaDownloader {
         return null;
     }
 
-    static String extension(String contentType) {
+    static String extension(@Nullable String contentType) {
         String ext = MimeTypes.extension(contentType);
         // JavaFX refuses a ".mov" by its name, but plays the same file as ".mp4".
         return ext.equals(".mov") ? ".mp4" : ext;

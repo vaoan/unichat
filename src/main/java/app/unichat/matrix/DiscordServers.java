@@ -6,6 +6,7 @@ import app.unichat.model.Network;
 import app.unichat.service.BridgeAccess.DiscordGuild;
 import app.unichat.service.ChatService.GroupOffer;
 import app.unichat.settings.Settings;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -41,7 +42,7 @@ final class DiscordServers {
     static final String PAUSED_GUILDS_KEY = "discord.guilds.paused";
 
     /** The Discord server id behind a server's space (not a category inside it, not the bridge's own folder), or null. */
-    String guildOf(String chatId) {
+    @Nullable String guildOf(String chatId) {
         MatrixRoom r = proc.room(chatId);
         if (r == null || !r.space || r.chat.network() != Network.DISCORD || r.bridgeChannelId == null || r.chat.personalSpace()) {
             return null;
@@ -72,7 +73,7 @@ final class DiscordServers {
         return out;
     }
 
-    private String serverSpace(String id, Map<String, Set<String>> parents, Set<String> seen) {
+    private @Nullable String serverSpace(String id, Map<String, Set<String>> parents, Set<String> seen) {
         if (!seen.add(id)) return null;
         if (guildOf(id) != null) return id;
         for (String p : parents.getOrDefault(id, Set.of())) {
@@ -109,7 +110,7 @@ final class DiscordServers {
     }
 
     /** Never throws: a failure is logged and tried again later; {@code failedBefore} is null for a first try. */
-    private void setGuildPausedNow(String guildId, boolean paused, Retry failedBefore) {
+    private void setGuildPausedNow(String guildId, boolean paused, @Nullable Retry failedBefore) {
         try {
             String reply = bots.query(Network.DISCORD, "guilds bridging-mode " + guildId + " " + (paused ? "nothing" : "create-on-message"));
             if (!reply.startsWith("Set guild bridging mode")) throw new MatrixException(0, null, reply);
@@ -171,7 +172,7 @@ final class DiscordServers {
     }
 
     /** The bridge's guild list, asked at most every few minutes (each ask is a message in the bot chat). */
-    private volatile List<DiscordGuild> guildCache;
+    private volatile @Nullable List<DiscordGuild> guildCache;
 
     private volatile long guildCacheAt;
 

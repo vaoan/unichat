@@ -65,7 +65,8 @@ final class ForwardedContent {
 
     /** A file's name, its invisible marks taken out, or "file". */
     static String fileName(Message m) {
-        return m.fileName() == null ? "file" : m.fileName().replaceAll("\\p{Cf}", "");
+        String name = m.fileName();
+        return name == null ? "file" : name.replaceAll("\\p{Cf}", "");
     }
 
     /**

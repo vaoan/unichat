@@ -1,5 +1,6 @@
 package app.unichat.server;
 
+import app.unichat.Present;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -108,8 +109,8 @@ class BridgeLauncherTest {
         unanswered = 5; // a wait that went on would get an answer, and no error
         IOException e = assertThrows(IOException.class, () -> l.open("gmessages", "Google Messages", msg -> { }));
         assertEquals(List.of("prepare gmessages", "start gmessages", "probe gmessages"), calls, "no waiting on a bridge that isn't running");
-        assertTrue(e.getMessage().contains("Google Messages"), e.getMessage());
-        assertTrue(e.getMessage().contains(Path.of("server", "gmessages", "bridge.log").toString()), e.getMessage());
+        assertTrue(Present.of(e.getMessage()).contains("Google Messages"), e.getMessage());
+        assertTrue(Present.of(e.getMessage()).contains(Path.of("server", "gmessages", "bridge.log").toString()), e.getMessage());
     }
 
     @Test

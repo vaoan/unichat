@@ -1,7 +1,9 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.sun.net.httpserver.HttpServer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,8 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class SendGifTest {
     @TempDir Path dir;
     private HttpServer server;
-    private volatile String sendPath;
-    private volatile String sendBody;
+    private volatile @Nullable String sendPath;
+    private volatile @Nullable String sendBody;
 
     @BeforeEach
     void fakeHomeserver() throws Exception {
@@ -58,7 +60,7 @@ class SendGifTest {
         Files.write(f, new byte[]{0, 0, 0, 24, 'f', 't', 'y', 'p'});
         MatrixChatService svc = new MatrixChatService("http://127.0.0.1:" + server.getAddress().getPort(), "@me:example.org", "t");
         svc.sendGif("!c:example.org", f, "video/mp4", 480, 360, "$original").get();
-        assertTrue(sendPath.contains("/send/m.room.message/"), sendPath);
+        assertTrue(Present.of(sendPath).contains("/send/m.room.message/"), sendPath);
         JsonNode c = MatrixClient.JSON.readTree(sendBody);
         assertEquals("m.video", c.path("msgtype").asText());
         assertEquals("mxc://s/gif1", c.path("url").asText());

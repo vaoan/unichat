@@ -1,8 +1,10 @@
 package app.unichat.server;
 
+import app.unichat.Present;
 import com.sun.net.httpserver.HttpServer;
 import java.security.NoSuchAlgorithmException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,7 +39,7 @@ class BinaryStoreTest {
     private volatile byte[] served = BINARY;
     private volatile String publishedSum;
     /** The SHA-256 the app ships pinned for the asset (null: not pinned). */
-    private volatile String pinnedSum;
+    private volatile @Nullable String pinnedSum;
 
     @BeforeEach
     void fakeReleases() throws Exception {
@@ -108,9 +110,9 @@ class BinaryStoreTest {
         Files.write(store.path("discord"), BINARY);
         assertTrue(store.path("discord").toFile().setExecutable(true, true));
         Files.writeString(dir.resolve("discord.version"), "v0.7.7");
-        assertFalse(store.isInstalled(m.bridge("discord")), "the official v0.7.7 is not Unichat's build");
+        assertFalse(store.isInstalled(Present.of(m.bridge("discord"))), "the official v0.7.7 is not Unichat's build");
         Files.writeString(dir.resolve("discord.version"), "v0.7.7+natives-2");
-        assertTrue(store.isInstalled(m.bridge("discord")));
+        assertTrue(store.isInstalled(Present.of(m.bridge("discord"))));
     }
 
     @Test
@@ -148,7 +150,7 @@ class BinaryStoreTest {
     void checksumMismatchInstallsNothing() {
         pinnedSum = "0".repeat(64);
         IOException e = assertThrows(IOException.class, () -> store().install(WA));
-        assertTrue(e.getMessage().contains("dañado"), e.getMessage());
+        assertTrue(Present.of(e.getMessage()).contains("dañado"), e.getMessage());
         assertNothingInstalled();
     }
 
@@ -158,7 +160,7 @@ class BinaryStoreTest {
         served = "#!/bin/sh\necho tampered\n".getBytes(StandardCharsets.UTF_8);
         publishedSum = sha(served);
         IOException e = assertThrows(IOException.class, () -> store().install(WA));
-        assertTrue(e.getMessage().contains("dañado"), e.getMessage());
+        assertTrue(Present.of(e.getMessage()).contains("dañado"), e.getMessage());
         assertNothingInstalled();
     }
 
@@ -166,7 +168,7 @@ class BinaryStoreTest {
     void anAssetWithNoPinnedHashIsNeverDownloaded() {
         pinnedSum = null;
         IOException e = assertThrows(IOException.class, () -> store().install(WA));
-        assertTrue(e.getMessage().contains("mautrix-whatsapp-darwin-arm64"), e.getMessage());
+        assertTrue(Present.of(e.getMessage()).contains("mautrix-whatsapp-darwin-arm64"), e.getMessage());
         assertEquals(0, downloads.get());
         assertNothingInstalled();
     }

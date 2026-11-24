@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -220,7 +221,7 @@ final class RestServer implements AutoCloseable {
     }
 
     /** Resting rooms' account data, as {@link #tags} has it. */
-    private void tags(HttpExchange ex, JsonNode rooms, String since) throws IOException {
+    private void tags(HttpExchange ex, JsonNode rooms, @Nullable String since) throws IOException {
         log.add("tags " + names(rooms) + (since == null ? "" : " since=" + since));
         changes.changed();
         try {
