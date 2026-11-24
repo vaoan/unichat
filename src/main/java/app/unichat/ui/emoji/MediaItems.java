@@ -10,11 +10,15 @@ import java.time.Instant;
 public final class MediaItems {
     private MediaItems() {}
 
-    /** One's own sticker sent as a converted copy is the sticker it was made from; what others write there isn't trusted. */
-    @SuppressWarnings("NullAway") // a sticker or GIF a stranger sent without an address still makes an item, as before (MediaLibrary.same matches it to none)
+    /**
+     * One's own sticker sent as a converted copy is the sticker it was made from; what others write there isn't trusted.
+     * Only for a message with an address: what's offered for the library ({@code MessageActions}' FAVORITE, "Ver en
+     * grande", what the chat shows) has one.
+     */
     public static MediaLibrary.Item of(Message m) {
         MediaLibrary.Kind kind = m.type() == MessageType.STICKER ? MediaLibrary.Kind.STICKER : MediaLibrary.Kind.GIF;
-        MediaLibrary.Item item = new MediaLibrary.Item(kind, m.mediaUrl(), m.mimeType(), m.width(), m.height(), m.mediaInfo());
+        String url = java.util.Objects.requireNonNull(m.mediaUrl(), "a library item is offered only for a message with an address");
+        MediaLibrary.Item item = new MediaLibrary.Item(kind, url, m.mimeType(), m.width(), m.height(), m.mediaInfo());
         return m.outgoing() ? MediaLibrary.original(item) : item;
     }
 

@@ -53,7 +53,8 @@ public final class MessageActions {
         }
         // Pinned in Unichat (no bridge carries pins): what the server has, so the id stays; never a join or a new name.
         if (onServer && m.type() != MessageType.SYSTEM) out.add(Action.PIN);
-        if (isStickerOrGif(m)) out.add(Action.FAVORITE);
+        // Kept by its address: one without (a stranger's) would be a favourite of nothing, and break the library.
+        if (isStickerOrGif(m) && m.mediaUrl() != null) out.add(Action.FAVORITE);
     }
 
     /** What only mine can have done: an edit, a correction, a deletion. */
