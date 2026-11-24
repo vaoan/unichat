@@ -198,7 +198,7 @@ final class RoomFields {
     }
 
     String nameOf(MatrixRoom room, String userId) {
-        Member m = room.members.get(userId);
+        Member m = userId.isBlank() ? null : room.members.get(userId); // a blank id (a sender-less event) names nobody
         String name = m == null ? null : m.name();
         if (name != null && !name.isBlank()) return name;
         return fallbackName(userId);

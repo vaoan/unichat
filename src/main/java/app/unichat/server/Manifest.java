@@ -92,7 +92,7 @@ public final class Manifest {
     public Map<String, Component> bridges() { return bridges; }
     /** Never null: versions.env pins the homeserver, as every manifest a test makes does. */
     public String tuwunelVersion() {
-        return Objects.requireNonNull(settings.get("TUWUNEL_VERSION"), "versions.env pins the homeserver");
+        return Objects.requireNonNull(settings.get("TUWUNEL_VERSION"), "TUWUNEL_VERSION missing from versions.env");
     }
 
     /** The homeserver as a download: Unichat's own build, in the natives release (tuwunel has none for Mac or Windows). */

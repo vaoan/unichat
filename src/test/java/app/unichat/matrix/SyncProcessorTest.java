@@ -146,6 +146,15 @@ class SyncProcessorTest {
         assertFalse(m.outgoing());
     }
 
+    /** A member event with a blank state_key names nobody: a sender-less message never takes its name. */
+    @Test
+    void aMessageWithoutASenderNeverTakesABlankMembersName() {
+        String room = "!blank:example.org";
+        sync(room, "{'state':{'events':[" + member(ME, "Me") + "," + member("", "Admin") + "]},'timeline':{'events':[]}}", false);
+        Message m = Present.of(proc.standalone(room, json("{'type':'m.room.message','event_id':'$1','content':{'msgtype':'m.text','body':'hola'}}")));
+        assertEquals("", m.senderName(), "nobody known, not the blank member");
+    }
+
     @Test
     void aMessageFetchedOnItsOwnIsReadButNotAddedToTheChat() {
         String room = "!old:example.org";
