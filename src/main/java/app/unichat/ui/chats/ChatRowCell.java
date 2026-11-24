@@ -20,6 +20,7 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -45,7 +46,7 @@ final class ChatRowCell extends ListCell<Chat> implements ListRows.Redrawable {
     private final Node mutedFlag = Icons.icon(Icons.BELL_OFF, 13);
     private final Node pinnedFlag = Icons.icon(Icons.PIN, 13);
     /** The account tag shown now: drawn again only when it changes, and always the first time (or an empty one shows). */
-    private String shownAccount;
+    private @Nullable String shownAccount;
     private boolean accountDrawn;
     private final HBox root;
 
@@ -151,8 +152,9 @@ final class ChatRowCell extends ListCell<Chat> implements ListRows.Redrawable {
         if (!c.typing().isEmpty()) {
             TypingDots.show(preview, c.group() ? Formats.typing(c.typing()) : I18n.t("chatRow.typing"));
         } else {
-            String who = c.lastOutgoing() ? I18n.t("chatRow.you") : c.group() && c.lastSenderName() != null
-                    ? c.lastSenderName().split(" ")[0] + ": " : "";
+            String sender = c.lastSenderName();
+            String who = c.lastOutgoing() ? I18n.t("chatRow.you") : c.group() && sender != null
+                    ? sender.split(" ")[0] + ": " : "";
             TypingDots.show(preview, null); // cells are recycled: this one may have been someone typing
             preview.setText(who + c.lastPreview());
         }

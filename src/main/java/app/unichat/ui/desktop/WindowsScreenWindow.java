@@ -9,9 +9,11 @@ import com.sun.jna.ptr.IntByReference;
 import com.sun.jna.ptr.PointerByReference;
 import com.sun.jna.win32.StdCallLibrary;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Arrays;
 import java.util.HexFormat;
+import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
 /**
@@ -45,18 +47,18 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
     /** Kept in a field: a callback JNA hands to Windows must outlive every message, or it's collected under it. */
     private final WindowProc proc = new WindowProc() {
         @Override
-        public Pointer callback(Pointer window, int msg, Pointer wParam, Pointer lParam) {
+        public @Nullable Pointer callback(Pointer window, int msg, @Nullable Pointer wParam, @Nullable Pointer lParam) {
             return message(window, msg, wParam, lParam);
         }
     };
     private final WString className = new WString("UnichatScreen" + CLASSES.incrementAndGet());
     private final Memory displayGuid = guidMemory();
-    private WindowsScreen.Handler handler;
-    private Pointer instance;
+    private WindowsScreen.@Nullable Handler handler;
+    private @Nullable Pointer instance;
     private boolean classRegistered;
-    private volatile Pointer hwnd;
+    private volatile @Nullable Pointer hwnd;
     private boolean sessionRegistered;
-    private Pointer powerNotification;
+    private @Nullable Pointer powerNotification;
 
     @Override
     public void open(WindowsScreen.Handler onMessage) {
@@ -70,24 +72,32 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
             c.cbSize = c.size();
             classRegistered = User32.LIB.RegisterClassExW(c) != 0;
             check(classRegistered, "RegisterClassExW");
-            hwnd = User32.LIB.CreateWindowExW(0, className, className, 0, 0, 0, 0, 0, HWND_MESSAGE, null, instance, null);
-            check(hwnd != null, "CreateWindowExW");
-            sessionRegistered = Wtsapi32.LIB.WTSRegisterSessionNotification(hwnd, NOTIFY_FOR_THIS_SESSION);
+            Pointer window = createWindow();
+            sessionRegistered = Wtsapi32.LIB.WTSRegisterSessionNotification(window, NOTIFY_FOR_THIS_SESSION);
             check(sessionRegistered, "WTSRegisterSessionNotification");
-            powerNotification = User32.LIB.RegisterPowerSettingNotification(hwnd, displayGuid, DEVICE_NOTIFY_WINDOW_HANDLE);
+            powerNotification = User32.LIB.RegisterPowerSettingNotification(window, displayGuid, DEVICE_NOTIFY_WINDOW_HANDLE);
             check(powerNotification != null, "RegisterPowerSettingNotification");
         } catch (RuntimeException | LinkageError e) {
             unregister();
-            if (hwnd != null) User32.LIB.DestroyWindow(hwnd);
+            Pointer made = hwnd;
+            if (made != null) User32.LIB.DestroyWindow(made);
             hwnd = null;
             unregisterClass();
             throw e;
         }
-        askLockAtStart();
+        askLockAtStart(onMessage);
+    }
+
+    /** The message-only window, kept in {@link #hwnd} at once so a failure after it destroys it. */
+    private Pointer createWindow() {
+        Pointer window = User32.LIB.CreateWindowExW(0, className, className, 0, 0, 0, 0, 0, HWND_MESSAGE, null, instance, null);
+        hwnd = window;
+        if (window == null) throw failed("CreateWindowExW");
+        return window;
     }
 
     /** Windows tells only changes; the macOS helper says the state at start, and so does this. */
-    private void askLockAtStart() {
+    private static void askLockAtStart(WindowsScreen.Handler onMessage) {
         PointerByReference buffer = new PointerByReference();
         IntByReference bytes = new IntByReference();
         try {
@@ -95,7 +105,7 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
                 return; // unknown counts as not locked
             }
             try {
-                lockAtStart(handler, buffer.getValue(), bytes.getValue(), System.getProperty("os.version", ""));
+                lockAtStart(onMessage, buffer.getValue(), bytes.getValue(), System.getProperty("os.version", ""));
             } finally {
                 Wtsapi32.LIB.WTSFreeMemory(buffer.getValue());
             }
@@ -108,7 +118,7 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
      * Tells {@code onMessage} a WTS_SESSION_LOCK when the WTSINFOEXW at {@code info} ({@code bytes} long) says the
      * session is locked; anything it can't read, and Windows 7's inverted flag, tells nothing.
      */
-    static void lockAtStart(WindowsScreen.Handler onMessage, Pointer info, int bytes, String osVersion) {
+    static void lockAtStart(WindowsScreen.Handler onMessage, @Nullable Pointer info, int bytes, String osVersion) {
         if (info == null || bytes < SESSION_INFO_SIZE || osVersion.startsWith(FLAGS_INVERTED)) return;
         if (info.getInt(0) != WTSINFOEX_LEVEL || info.getInt(SESSION_FLAGS) != WTS_SESSIONSTATE_LOCK) return;
         onMessage.message(ScreenMessages.WM_WTSSESSION_CHANGE, ScreenMessages.WTS_SESSION_LOCK,
@@ -133,7 +143,7 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
         if (h != null) User32.LIB.PostMessageW(h, WM_CLOSE, null, null);
     }
 
-    private Pointer message(Pointer window, int msg, Pointer wParam, Pointer lParam) {
+    private @Nullable Pointer message(Pointer window, int msg, @Nullable Pointer wParam, @Nullable Pointer lParam) {
         if (msg == WM_CLOSE) {
             unregister();
             User32.LIB.DestroyWindow(window);
@@ -148,7 +158,7 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
         int display = msg == ScreenMessages.WM_POWERBROADCAST && w == ScreenMessages.PBT_POWERSETTINGCHANGE
                 ? displayState(lParam) : ScreenMessages.NO_DISPLAY_STATE;
         try {
-            handler.message(msg, w, display);
+            Objects.requireNonNull(handler, "open sets it before the window exists").message(msg, w, display);
         } catch (RuntimeException e) {
             System.err.println("Screen lock and display watch: a message failed: " + e);
         }
@@ -156,9 +166,11 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
     }
 
     private void unregister() {
-        if (powerNotification != null) User32.LIB.UnregisterPowerSettingNotification(powerNotification);
+        Pointer power = powerNotification;
+        if (power != null) User32.LIB.UnregisterPowerSettingNotification(power);
         powerNotification = null;
-        if (sessionRegistered) Wtsapi32.LIB.WTSUnRegisterSessionNotification(hwnd);
+        Pointer window = hwnd;
+        if (sessionRegistered && window != null) Wtsapi32.LIB.WTSUnRegisterSessionNotification(window);
         sessionRegistered = false;
     }
 
@@ -168,10 +180,14 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
     }
 
     private static void check(boolean ok, String call) {
-        if (!ok) throw new IllegalStateException(call + " failed (error " + Native.getLastError() + ")");
+        if (!ok) throw failed(call);
     }
 
-    private static long value(Pointer p) {
+    private static IllegalStateException failed(String call) {
+        return new IllegalStateException(call + " failed (error " + Native.getLastError() + ")");
+    }
+
+    private static long value(@Nullable Pointer p) {
         return p == null ? 0 : Pointer.nativeValue(p);
     }
 
@@ -179,7 +195,7 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
      * The data of the POWERBROADCAST_SETTING at {@code setting} (its GUID, its DataLength, then a DWORD), when it is the
      * display's state; {@link ScreenMessages#NO_DISPLAY_STATE} otherwise.
      */
-    static int displayState(Pointer setting) {
+    static int displayState(@Nullable Pointer setting) {
         if (setting == null || !Arrays.equals(setting.getByteArray(0, SETTING_LENGTH), displayGuid())) {
             return ScreenMessages.NO_DISPLAY_STATE;
         }
@@ -199,7 +215,7 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
     /** LRESULT (CALLBACK *WNDPROC)(HWND, UINT, WPARAM, LPARAM): the pointer-sized ones as pointers. */
     @FunctionalInterface
     interface WindowProc extends StdCallLibrary.StdCallCallback {
-        Pointer callback(Pointer hwnd, int msg, Pointer wParam, Pointer lParam);
+        @Nullable Pointer callback(Pointer hwnd, int msg, @Nullable Pointer wParam, @Nullable Pointer lParam);
     }
 
     /** WNDCLASSEXW. */
@@ -212,25 +228,25 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
         @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
         public int style;
         @SuppressFBWarnings(value = "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD", justification = "set here, read by Windows from the JNA structure")
-        public WindowProc lpfnWndProc;
+        public @Nullable WindowProc lpfnWndProc;
         @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
         public int cbClsExtra;
         @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
         public int cbWndExtra;
         @SuppressFBWarnings(value = "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD", justification = "set here, read by Windows from the JNA structure")
-        public Pointer hInstance;
+        public @Nullable Pointer hInstance;
         @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
-        public Pointer hIcon;
+        public @Nullable Pointer hIcon;
         @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
-        public Pointer hCursor;
+        public @Nullable Pointer hCursor;
         @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
-        public Pointer hbrBackground;
+        public @Nullable Pointer hbrBackground;
         @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
-        public WString lpszMenuName;
+        public @Nullable WString lpszMenuName;
         @SuppressFBWarnings(value = "URF_UNREAD_PUBLIC_OR_PROTECTED_FIELD", justification = "set here, read by Windows from the JNA structure")
-        public WString lpszClassName;
+        public @Nullable WString lpszClassName;
         @SuppressFBWarnings(value = "UUF_UNUSED_PUBLIC_OR_PROTECTED_FIELD", justification = "part of WNDCLASSEXW's layout: JNA sends it to Windows as zero")
-        public Pointer hIconSm;
+        public @Nullable Pointer hIconSm;
     }
 
     @SuppressWarnings({"PMD.MethodNamingConventions", "checkstyle:MethodName", "PMD.ExcessiveParameterList"}) // JNA binds each by its Win32 name and signature
@@ -239,24 +255,24 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
 
         short RegisterClassExW(WndClassEx c);
 
-        boolean UnregisterClassW(WString name, Pointer instance);
+        boolean UnregisterClassW(WString name, @Nullable Pointer instance);
 
-        Pointer CreateWindowExW(int exStyle, WString cls, WString name, int style, int x, int y, int width, int height,
-                Pointer parent, Pointer menu, Pointer instance, Pointer param);
+        @Nullable Pointer CreateWindowExW(int exStyle, WString cls, WString name, int style, int x, int y, int width, int height,
+                Pointer parent, @Nullable Pointer menu, @Nullable Pointer instance, @Nullable Pointer param);
 
         boolean DestroyWindow(Pointer hwnd);
 
-        Pointer DefWindowProcW(Pointer hwnd, int msg, Pointer wParam, Pointer lParam);
+        @Nullable Pointer DefWindowProcW(Pointer hwnd, int msg, @Nullable Pointer wParam, @Nullable Pointer lParam);
 
-        int GetMessageW(Pointer msg, Pointer hwnd, int min, int max);
+        int GetMessageW(Pointer msg, @Nullable Pointer hwnd, int min, int max);
 
-        Pointer DispatchMessageW(Pointer msg);
+        @Nullable Pointer DispatchMessageW(Pointer msg);
 
-        boolean PostMessageW(Pointer hwnd, int msg, Pointer wParam, Pointer lParam);
+        boolean PostMessageW(Pointer hwnd, int msg, @Nullable Pointer wParam, @Nullable Pointer lParam);
 
         void PostQuitMessage(int code);
 
-        Pointer RegisterPowerSettingNotification(Pointer recipient, Pointer guid, int flags);
+        @Nullable Pointer RegisterPowerSettingNotification(Pointer recipient, Pointer guid, int flags);
 
         boolean UnregisterPowerSettingNotification(Pointer handle);
     }
@@ -266,7 +282,7 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
     interface Kernel32 extends StdCallLibrary {
         Kernel32 LIB = Native.load("kernel32", Kernel32.class);
 
-        Pointer GetModuleHandleW(WString name);
+        @Nullable Pointer GetModuleHandleW(@Nullable WString name);
     }
 
     @SuppressWarnings({"PMD.MethodNamingConventions", "checkstyle:MethodName"}) // JNA binds each by its Win32 name
@@ -277,7 +293,7 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
 
         boolean WTSUnRegisterSessionNotification(Pointer hwnd);
 
-        boolean WTSQuerySessionInformationW(Pointer server, int session, int infoClass, PointerByReference buffer,
+        boolean WTSQuerySessionInformationW(@Nullable Pointer server, int session, int infoClass, PointerByReference buffer,
                 IntByReference bytes);
 
         void WTSFreeMemory(Pointer memory);

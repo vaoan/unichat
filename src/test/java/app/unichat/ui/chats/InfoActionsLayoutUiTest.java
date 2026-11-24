@@ -9,6 +9,7 @@ import javafx.scene.Scene;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -44,7 +45,7 @@ class InfoActionsLayoutUiTest {
                     scene.getRoot().setStyle("-fx-font-size: " + px + "px;");
                     stage[0].setScene(scene);
                     stage[0].show();
-                    p.show(svc.chat("!family:demo"));
+                    p.show(Present.of(svc.chat("!family:demo")));
                     return p;
                 });
                 FxWait.until("the actions show", () -> pane.lookupAll(".info-action").size() == 6);

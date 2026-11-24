@@ -3,6 +3,7 @@ package app.unichat.ui.chats;
 import app.unichat.model.Chat;
 import app.unichat.model.Network;
 import org.junit.jupiter.api.Test;
+import app.unichat.Present;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -51,7 +52,7 @@ class InboxRowsTest {
         InboxRows.Rows r = InboxRows.build(chats, ChatFilter.DEFAULT, Map.of());
         assertEquals(List.of("!pedro", "!srv", "!mama"), ids(r), "like a Telegram forum: the server sums up its channels");
         assertEquals(2, r.unread().get("!srv"));
-        assertEquals("!general", r.latest().get("!srv").id());
+        assertEquals("!general", Present.of(r.latest().get("!srv")).id());
     }
 
     @Test

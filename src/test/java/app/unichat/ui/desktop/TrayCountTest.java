@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
+import app.unichat.Present;
 
 import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
@@ -32,6 +33,7 @@ class TrayCountTest {
         assertEquals("99+", Formats.badge(12345));
     }
 
+    @SuppressWarnings("NullAway") // headless: no AWT menu can be made, and this helper is never asked for one
     @Test
     @DisabledOnOs(OS.WINDOWS)
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
@@ -42,7 +44,7 @@ class TrayCountTest {
         Path helper = Files.writeString(dir.resolve("helper"),
                 "#!/bin/sh\nexec 3>'" + told + "'\nwhile IFS= read -r a; do echo \"$a\" >&3; done\n");
         assertTrue(helper.toFile().setExecutable(true));
-        NativeBar bar = NativeBar.start(helper, null, () -> { }, id -> { }, () -> { });
+        NativeBar bar = Present.of(NativeBar.start(helper, null, () -> { }, id -> { }, () -> { }));
         try (BufferedReader received = Files.newBufferedReader(told)) {
             bar.setCount(3);
             bar.setCount(150);

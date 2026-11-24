@@ -30,6 +30,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -62,7 +63,7 @@ public final class StickerGrid extends ScrollPane {
     /** On top, kept across redraws (the focus stays in it while typing): a word or an emoji finds stickers. */
     private final TextField search = new TextField();
     private final Node searchBox;
-    private EmojiSearch names;
+    private @Nullable EmojiSearch names;
     /** Runs at each redraw (a set arrived, a favourite changed): the suggestions follow. */
     private Runnable refreshed = () -> { };
 
@@ -157,8 +158,12 @@ public final class StickerGrid extends ScrollPane {
     }
 
     private EmojiSearch names() {
-        if (names == null) names = EmojiSearch.forLanguage(I18n.locale().getLanguage());
-        return names;
+        EmojiSearch n = names;
+        if (n == null) {
+            n = EmojiSearch.forLanguage(I18n.locale().getLanguage());
+            names = n;
+        }
+        return n;
     }
 
     /** Every emoji, in the picker's order. */
@@ -178,7 +183,7 @@ public final class StickerGrid extends ScrollPane {
         if (max > 0) setVvalue(Math.min(1, n.getBoundsInParent().getMinY() / max));
     }
 
-    private void section(String title, List<MediaLibrary.Item> items, Function<MediaLibrary.Item, String> what, boolean accepted, Node action) {
+    private void section(String title, List<MediaLibrary.Item> items, Function<MediaLibrary.Item, String> what, boolean accepted, @Nullable Node action) {
         if (items.isEmpty()) return;
         Label t = new Label(title);
         t.getStyleClass().add("emoji-category");

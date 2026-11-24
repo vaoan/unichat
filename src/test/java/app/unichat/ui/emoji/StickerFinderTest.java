@@ -4,6 +4,7 @@ import app.unichat.model.MediaLibrary;
 import app.unichat.model.StickerPack;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -21,7 +22,7 @@ class StickerFinderTest {
             "🐱", "cara de gato|gato"));
     private static final List<String> ALL = List.of("😂", "❤️", "👽", "🐱");
 
-    private static MediaLibrary.Item sticker(String url, String emoji) {
+    private static MediaLibrary.Item sticker(String url, @Nullable String emoji) {
         var info = new ObjectMapper().createObjectNode();
         if (emoji != null) info.putObject("fi.mau.bridged_sticker").put("emoji", emoji);
         return new MediaLibrary.Item(MediaLibrary.Kind.STICKER, url, "image/webp", 512, 512, info);

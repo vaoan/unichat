@@ -612,11 +612,11 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     @Override public @Nullable Chat chat(String chatId) { return core.chat(chatId); }
     @Override public void keepCached(java.util.Collection<String> urls) { media.keep(urls); }
     @Override public void keepSaved(java.util.Collection<String> urls) { media.save(urls); }
-    @Override public CompletableFuture<Path> media(String url, int width, int height) { return media.media(url, width, height); }
-    @Override public CompletableFuture<Path> media(String url, int width, int height, java.util.function.DoubleConsumer progress) {
+    @Override public CompletableFuture<Path> media(@Nullable String url, int width, int height) { return media.media(url, width, height); }
+    @Override public CompletableFuture<Path> media(@Nullable String url, int width, int height, java.util.function.DoubleConsumer progress) {
         return media.media(url, width, height, progress);
     }
-    @Override public CompletableFuture<Path> sticker(String url, java.util.function.DoubleConsumer progress) {
+    @Override public CompletableFuture<Path> sticker(@Nullable String url, java.util.function.DoubleConsumer progress) {
         return media.sticker(url, progress);
     }
     @Override public boolean gone(Throwable error) { return MediaDownloader.gone(error); }

@@ -2,6 +2,7 @@ package app.unichat.ui.desktop;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
+import app.unichat.Present;
 
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -32,7 +33,7 @@ class WindowsScreenStartTest {
         }, log::add);
         screen.start(told::add);
         assertFalse(screen.registered().get(), "not registered");
-        screen.thread().join(); // lesson-ok: test-future-join (a Thread's join, interruptible)
+        Present.of(screen.thread()).join(); // lesson-ok: test-future-join (a Thread's join, interruptible)
         assertEquals(List.of(false), told, "not away, said once");
         assertEquals(1, log.size(), "one log line: " + log);
         assertTrue(log.get(0).contains("WTSRegisterSessionNotification failed"), "it says why: " + log);
@@ -44,6 +45,7 @@ class WindowsScreenStartTest {
         List<String> log = new CopyOnWriteArrayList<>();
         WindowsScreen screen = new WindowsScreen(new WindowsScreen.MessageWindow() {
             @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set by open(), which WindowsScreen calls before run()")
+            @SuppressWarnings("NullAway.Init") // set by open(), which WindowsScreen calls before run()
             private WindowsScreen.Handler handler;
 
             @Override
@@ -65,7 +67,7 @@ class WindowsScreenStartTest {
         }, log::add);
         screen.start(told::add);
         assertTrue(screen.registered().get());
-        screen.thread().join(); // lesson-ok: test-future-join (a Thread's join)
+        Present.of(screen.thread()).join(); // lesson-ok: test-future-join (a Thread's join)
         assertEquals(List.of(true, false, false), told, "locked, then unlocked, then here as the watch ends");
         assertEquals(List.of(), log);
     }
@@ -75,6 +77,7 @@ class WindowsScreenStartTest {
         List<Boolean> told = new CopyOnWriteArrayList<>();
         WindowsScreen screen = new WindowsScreen(new WindowsScreen.MessageWindow() {
             @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set by open(), which WindowsScreen calls before run()")
+            @SuppressWarnings("NullAway.Init") // set by open(), which WindowsScreen calls before run()
             private WindowsScreen.Handler handler;
 
             @Override
@@ -97,7 +100,7 @@ class WindowsScreenStartTest {
             told.add(a);
             if (a) throw new IllegalStateException("a listener's bug");
         });
-        screen.thread().join(); // lesson-ok: test-future-join (a Thread's join)
+        Present.of(screen.thread()).join(); // lesson-ok: test-future-join (a Thread's join)
         assertEquals(List.of(true, false, false), told, "the unlock still arrives");
     }
     @Test
@@ -106,6 +109,7 @@ class WindowsScreenStartTest {
         List<String> log = new CopyOnWriteArrayList<>();
         WindowsScreen screen = new WindowsScreen(new WindowsScreen.MessageWindow() {
             @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set by open(), which WindowsScreen calls before run()")
+            @SuppressWarnings("NullAway.Init") // set by open(), which WindowsScreen calls before run()
             private WindowsScreen.Handler handler;
 
             @Override
@@ -124,7 +128,7 @@ class WindowsScreenStartTest {
             public void close() { /* the fake ignores it */ }
         }, log::add);
         screen.start(told::add);
-        screen.thread().join(); // lesson-ok: test-future-join (a Thread's join)
+        Present.of(screen.thread()).join(); // lesson-ok: test-future-join (a Thread's join)
         assertEquals(List.of(true, false), told, "no watch left to say unlocked: the screen counts as here");
         assertEquals(1, log.size(), "one log line: " + log);
         assertTrue(log.get(0).contains("GetMessageW failed (error 1400)"), "it says why: " + log);

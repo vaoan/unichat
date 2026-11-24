@@ -3,6 +3,7 @@ package app.unichat.ui.media;
 import app.unichat.service.MediaSource;
 import app.unichat.support.BoundedMap;
 import javafx.scene.image.Image;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Collections;
 import java.util.Map;
@@ -27,7 +28,7 @@ public final class ImageCache {
     private static final Map<String, Long> FAILED = new ConcurrentHashMap<>();
     private static final long RETRY_AFTER_MS = 10 * 60 * 1000;
 
-    public static Image get(String url) {
+    public static @Nullable Image get(String url) {
         return CACHE.get(url);
     }
 

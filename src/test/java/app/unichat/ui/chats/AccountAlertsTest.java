@@ -4,6 +4,7 @@ import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
 import app.unichat.model.Network;
 import org.junit.jupiter.api.Test;
+import app.unichat.Present;
 
 import java.util.List;
 
@@ -25,7 +26,7 @@ class AccountAlertsTest {
         assertNull(AccountAlerts.storageLine(false, 50L << 30, false));
         assertEquals("Queda poco espacio en el disco (512.0 MB libres): los mensajes nuevos pueden no llegar hasta que liberes espacio.",
                 AccountAlerts.storageLine(true, 512L << 20, false));
-        assertTrue(AccountAlerts.storageLine(true, 0, true).contains("(0 B libres)"), "a full one, failing too: the disk is what to fix");
+        assertTrue(Present.of(AccountAlerts.storageLine(true, 0, true)).contains("(0 B libres)"), "a full one, failing too: the disk is what to fix");
         assertEquals("El servidor no pudo guardar en el disco; reiniciándolo…", AccountAlerts.storageLine(false, 50L << 30, true));
     }
 

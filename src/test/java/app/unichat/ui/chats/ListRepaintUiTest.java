@@ -29,8 +29,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class ListRepaintUiTest {
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // open() (@BeforeEach) sets it on the FX thread
     private Stage stage;
     private Scene scene;
+    @SuppressWarnings("NullAway.Init") // open() (@BeforeEach) sets it on the FX thread
     private MainView view;
 
     @BeforeAll

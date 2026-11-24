@@ -2,13 +2,18 @@ package app.unichat.ui.desktop;
 
 import app.unichat.ui.FxWait;
 import javafx.application.Platform;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 
 import java.awt.EventQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CountDownLatch;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -18,8 +23,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class NotifierUiTest {
-    @Test
-    void theTrayIsBuiltOnAwtsThreadAndSaysWhenItExists() throws Exception {
+    @BeforeAll
+    static void toolkit() throws Exception {
         CompletableFuture<Void> up = new CompletableFuture<>();
         try {
             Platform.startup(() -> up.complete(null));
@@ -28,6 +33,10 @@ class NotifierUiTest {
         }
         up.get();
         Platform.setImplicitExit(false);
+    }
+
+    @Test
+    void theTrayIsBuiltOnAwtsThreadAndSaysWhenItExists() throws Exception {
         CountDownLatch release = new CountDownLatch(1);
         CompletableFuture<Void> holding = new CompletableFuture<>();
         EventQueue.invokeLater(() -> { // AWT's thread busy: the tray waits for it
@@ -47,5 +56,20 @@ class NotifierUiTest {
         assertFalse(ready.get(), "no tray without a display");
         assertTrue(onAwt.get(), "it says so from AWT's thread: whoever listens hops to theirs");
         n.dispose();
+    }
+
+    /** A click on the tray before any notice handed the window a null chat, and opening it threw. */
+    @Test
+    void theTrayClickedBeforeAnyNoticeBringsTheWindowAlone() throws InterruptedException {
+        AtomicInteger shown = new AtomicInteger();
+        List<String> opened = new CopyOnWriteArrayList<>();
+        Notifier n = FxWait.fx(() -> new Notifier(shown::incrementAndGet, () -> { }, opened::add, () -> { }));
+        try {
+            n.openLast();
+            assertEquals(1, shown.get(), "the window comes");
+            assertEquals(List.of(), opened, "no chat to open");
+        } finally {
+            n.dispose();
+        }
     }
 }

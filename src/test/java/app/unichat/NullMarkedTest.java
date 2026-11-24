@@ -29,7 +29,8 @@ class NullMarkedTest {
     private static final List<String> NULL_MARKED = List.of("app.unichat.support", "app.unichat.model", "app.unichat.settings",
             "app.unichat.service", "app.unichat.cloud", "app.unichat.matrix", "app.unichat.server", "app.unichat.assist",
             "app.unichat.autosave", "app.unichat.bridge", "app.unichat.cloak", "app.unichat.gif", "app.unichat.links", "app.unichat.login",
-            "app.unichat.stt", "app.unichat.update", "app.unichat.video", "app.unichat.voice");
+            "app.unichat.stt", "app.unichat.update", "app.unichat.video", "app.unichat.voice", "app.unichat.ui.chats",
+            "app.unichat.ui.desktop", "app.unichat.ui.emoji", "app.unichat.ui.login", "app.unichat.ui.media");
 
     /** The mark, by its simple or its qualified name, however it's spaced. */
     private static final Pattern MARK = Pattern.compile("@\\s*(org\\s*\\.\\s*jspecify\\s*\\.\\s*annotations\\s*\\.\\s*)?NullMarked\\b");

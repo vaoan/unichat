@@ -14,6 +14,7 @@ import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -47,7 +48,7 @@ class ChatOptionsUiTest {
             stage.setOpacity(0);
             stage.setScene(new Scene(o, 600, 800));
             stage.show();
-            new ChatOptions(svc, n -> o.getChildren().setAll(n), () -> o.getChildren().clear(), t -> { }).open(svc.chat(id), () -> { });
+            new ChatOptions(svc, n -> o.getChildren().setAll(n), () -> o.getChildren().clear(), t -> { }).open(Present.of(svc.chat(id)), () -> { });
             return o;
         });
         FxWait.until("the sheet shows", () -> overlay.lookup(".chat-options") != null);
@@ -119,7 +120,7 @@ class ChatOptionsUiTest {
         assertEquals(EnumSet.complementOf(EnumSet.of(SaveKind.GIFS)), svc.autoSaves(id), "GIFs left out");
         String where = FxWait.fx(() -> overlay.lookupAll(".label").stream().map(n -> ((javafx.scene.control.Label) n).getText())
                 .filter(t -> t != null && t.startsWith("Carpeta:")).findFirst().orElseThrow());
-        assertTrue(where.contains(SaveFolders.shown(SaveFolders.of(svc.chat(id)))) && where.contains("test-autosave"), where);
+        assertTrue(where.contains(SaveFolders.shown(SaveFolders.of(Present.of(svc.chat(id))))) && where.contains("test-autosave"), where);
         FxWait.onFx(on::fire);
         assertTrue(svc.autoSaves(id).isEmpty(), "off");
         CheckBox showMedia = FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)

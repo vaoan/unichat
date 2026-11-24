@@ -11,6 +11,7 @@ import javafx.scene.Node;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.layout.FlowPane;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -30,7 +31,7 @@ final class StickerSetSection {
 
     private final StickerSets svc;
     private final Runnable refresh;
-    private List<StickerPack.Ref> yours;
+    private @Nullable List<StickerPack.Ref> yours;
     private long askedAt;
     private boolean asking;
     /** Sets opened from a sticker that aren't among yours, newest first. */
@@ -44,7 +45,7 @@ final class StickerSetSection {
     java.util.function.LongSupplier clock = System::currentTimeMillis;
     /** Sets are brought for searching one after another: each is asked of Telegram sticker by sticker. */
     private boolean bringingAll;
-    private String scrollTo;
+    private @Nullable String scrollTo;
 
     StickerSetSection(StickerSets svc, Runnable refresh) {
         this.svc = svc;
@@ -103,7 +104,7 @@ final class StickerSetSection {
     }
 
     /** The first set listed that isn't here, being brought, or failed a moment ago; null when none. */
-    private String missing() {
+    private @Nullable String missing() {
         List<StickerPack.Ref> all = new ArrayList<>(others);
         if (yours != null) all.addAll(yours);
         long now = clock.getAsLong();
@@ -117,8 +118,16 @@ final class StickerSetSection {
     /** The sets brought so far: yours first, then others opened. */
     List<StickerPack> loaded() {
         List<StickerPack> out = new ArrayList<>();
-        if (yours != null) for (StickerPack.Ref r : yours) if (packs.containsKey(r.url())) out.add(packs.get(r.url()));
-        for (StickerPack.Ref r : others) if (packs.containsKey(r.url()) && !out.contains(packs.get(r.url()))) out.add(packs.get(r.url()));
+        if (yours != null) {
+            for (StickerPack.Ref r : yours) {
+                StickerPack p = packs.get(r.url());
+                if (p != null) out.add(p);
+            }
+        }
+        for (StickerPack.Ref r : others) {
+            StickerPack p = packs.get(r.url());
+            if (p != null && !out.contains(p)) out.add(p);
+        }
         return out;
     }
 

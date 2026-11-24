@@ -541,7 +541,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     public void addLinkMedia(String url, app.unichat.model.LinkMedia media) { addLinkPreview(url, app.unichat.model.LinkPreview.of(url, media, null)); }
 
     @Override
-    public CompletableFuture<Path> media(String url, int width, int height) {
+    public CompletableFuture<Path> media(@Nullable String url, int width, int height) {
         if (url == null) return CompletableFuture.failedFuture(new IllegalArgumentException(I18n.t("error.noUrl")));
         if (url.startsWith("file:")) return CompletableFuture.completedFuture(Path.of(java.net.URI.create(url)));
         if (url.startsWith("demo://") || url.startsWith("mxc://demo/")) {

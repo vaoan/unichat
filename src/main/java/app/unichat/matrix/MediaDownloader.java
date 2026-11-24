@@ -94,12 +94,12 @@ final class MediaDownloader {
     int watched() { return watching.size(); }
 
     /** {@link #media(String, int, int)}, telling {@code progress} how much has arrived while it downloads. */
-    CompletableFuture<Path> media(String url, int width, int height, java.util.function.DoubleConsumer progress) {
+    CompletableFuture<Path> media(@Nullable String url, int width, int height, java.util.function.DoubleConsumer progress) {
         return watched(key(MEDIA, url, width, height), progress, () -> media(url, width, height));
     }
 
     /** A sticker's original, in the stickers' own folder, telling {@code progress} how much has arrived. */
-    CompletableFuture<Path> sticker(String url, java.util.function.DoubleConsumer progress) {
+    CompletableFuture<Path> sticker(@Nullable String url, java.util.function.DoubleConsumer progress) {
         return watched(key(STICKERS, url, 0, 0), progress, () -> fetch(url, 0, 0, STICKERS));
     }
 
@@ -114,17 +114,17 @@ final class MediaDownloader {
     }
 
     /** A download's key in flight: the media folder's as it always was, another folder's apart. */
-    private static String key(String folder, String url, int width, int height) {
+    private static String key(String folder, @Nullable String url, int width, int height) {
         String k = cacheKey(url, width, height);
         return folder.equals(MEDIA) ? k : folder + ":" + k;
     }
 
     /** The local file of {@code url}: from the cache, or downloaded once however many ask at the same time. */
-    CompletableFuture<Path> media(String url, int width, int height) {
+    CompletableFuture<Path> media(@Nullable String url, int width, int height) {
         return fetch(url, width, height, MEDIA);
     }
 
-    private CompletableFuture<Path> fetch(String url, int width, int height, String folder) {
+    private CompletableFuture<Path> fetch(@Nullable String url, int width, int height, String folder) {
         if (url == null || url.isBlank()) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.noUrl")));
         if (url.startsWith("file:")) {
             return ownFiles.contains(url) ? CompletableFuture.completedFuture(Path.of(URI.create(url)))
@@ -218,7 +218,7 @@ final class MediaDownloader {
      * A bridge's direct media and web addresses only come as the original, whatever the size asked: one file for all of them.
      * Each size used to be a whole copy (a GIF of several MB, twice or more).
      */
-    static String cacheKey(String url, int width, int height) {
+    static String cacheKey(@Nullable String url, int width, int height) {
         Mxc mxc = Mxc.parse(url);
         boolean scalable = mxc != null && BridgePorts.directMediaBase(mxc.server()) == null;
         return url + "|" + (scalable ? Math.max(0, width) + "x" + Math.max(0, height) : "0x0");

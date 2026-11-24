@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
 import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
+import app.unichat.Present;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -34,11 +35,12 @@ class NativeBarScreenTest {
      * A helper that waits for a "go" (any line), says {@code lines}, waits for another before saying {@code after}, then
      * ends. It is running before {@link MacScreen} starts, so that start reports nothing of its own.
      */
+    @SuppressWarnings("NullAway") // headless: no AWT menu can be made, and this helper is never asked for one
     private NativeBar helper(String lines, String after, Runnable ended) throws IOException {
         Path helper = Files.writeString(dir.resolve("helper"),
                 "#!/bin/sh\nread a\nprintf '" + lines + "'\nread b\nprintf '" + after + "'\n");
         assertTrue(helper.toFile().setExecutable(true));
-        return NativeBar.start(helper, null, ended, id -> { }, () -> { });
+        return Present.of(NativeBar.start(helper, null, ended, id -> { }, () -> { }));
     }
 
     @Test
@@ -108,6 +110,7 @@ class NativeBarScreenTest {
         assertEquals(false, NativeBar.screenLine("screen\t0"));
     }
 
+    @SuppressWarnings("NullAway") // headless: no AWT menu can be made, and this helper is never asked for one
     @Test
     void aLockSaidBeforeAnyoneListensIsHeardWhenTheyDo() throws Exception {
         // Started locked: the helper says so at once, before UnichatApp's followSeen listens. "show" comes after it on
@@ -117,7 +120,7 @@ class NativeBarScreenTest {
         new MacScreen().start(away -> { });
         CountDownLatch read = new CountDownLatch(1);
         CountDownLatch ended = new CountDownLatch(1);
-        NativeBar bar = NativeBar.start(script, null, ended::countDown, id -> { }, read::countDown);
+        NativeBar bar = Present.of(NativeBar.start(script, null, ended::countDown, id -> { }, read::countDown));
         List<Boolean> told = new CopyOnWriteArrayList<>();
         try {
             read.await();

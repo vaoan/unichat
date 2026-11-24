@@ -19,6 +19,7 @@ import javafx.scene.input.KeyCode;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.util.HashSet;
 import java.util.List;
@@ -26,6 +27,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.Objects;
 
 /** A server's channels, which slide over the chat list like a Telegram forum's topics. */
 final class SpaceChannelsView extends VBox {
@@ -39,12 +41,12 @@ final class SpaceChannelsView extends VBox {
     private final Button back;
     private final Set<String> channelsAsked = new HashSet<>();
     /** The server showing, or null. */
-    private String openId;
+    private @Nullable String openId;
     private InboxRows.Rows rows = InboxRows.Rows.EMPTY;
     private boolean updating;
 
     SpaceChannelsView(ChatService svc, Spaces spaces, Supplier<ListCell<Chat>> cells, Consumer<Chat> open,
-                      Function<Chat, ContextMenu> rowMenu, Runnable onBack) {
+                      Function<Chat, @Nullable ContextMenu> rowMenu, Runnable onBack) {
         this.svc = svc;
         this.spaces = spaces;
         this.open = open;
@@ -64,7 +66,7 @@ final class SpaceChannelsView extends VBox {
         Nodes.show(this, false);
     }
 
-    private void configureList(Supplier<ListCell<Chat>> cells, Function<Chat, ContextMenu> rowMenu, Runnable onBack) {
+    private void configureList(Supplier<ListCell<Chat>> cells, Function<Chat, @Nullable ContextMenu> rowMenu, Runnable onBack) {
         list.getStyleClass().addAll("chat-list", "space-list");
         list.setCellFactory(v -> cells.get());
         Label noChannels = new Label(I18n.t("spaceChannels.loading"));
@@ -87,7 +89,7 @@ final class SpaceChannelsView extends VBox {
         setVgrow(list, Priority.ALWAYS);
     }
 
-    String openId() { return openId; }
+    @Nullable String openId() { return openId; }
 
     boolean isOpen() { return openId != null; }
 
@@ -114,12 +116,13 @@ final class SpaceChannelsView extends VBox {
 
     /** Reads the open server's channels from {@code all}, for {@link #showRows} to put on screen. */
     void refresh(List<Chat> all, ChatFilter f) {
-        if (openId == null) {
+        String id = openId;
+        if (id == null) {
             rows = InboxRows.Rows.EMPTY;
         } else {
-            Chat s = svc.chat(openId);
+            Chat s = Objects.requireNonNull(svc.chat(id), "ChatListPane.refresh closes a server that's gone first");
             title.setText(s.title());
-            rows = InboxRows.channels(all, openId, f.accountId(), spaces.names());
+            rows = InboxRows.channels(all, id, f.accountId(), spaces.names());
             list.setAccessibleText(I18n.t("spaceChannels.listLabel", s.title()));
         }
     }
@@ -145,7 +148,7 @@ final class SpaceChannelsView extends VBox {
         back.getTooltip().setText(text);
     }
 
-    void select(String chatId) {
+    void select(@Nullable String chatId) {
         int si = -1;
         for (int i = 0; i < items.size(); i++) if (items.get(i).id().equals(chatId)) si = i;
         if (si >= 0) list.getSelectionModel().select(si);

@@ -45,7 +45,7 @@ public final class AudioBar extends HBox {
         boolean showing = m != null;
         setVisible(showing);
         setManaged(showing);
-        if (!showing) return;
+        if (m == null) return;
         String sender = m.outgoing() ? I18n.t("common.you") : m.senderName();
         Chat c = playback.chat();
         String title = c == null || c.title() == null || c.title().equals(sender) ? sender : sender + " · " + c.title();

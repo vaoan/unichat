@@ -15,6 +15,7 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -92,7 +93,7 @@ class TypingDotsUiTest {
             v.openChatId("!family:demo");
             return v;
         });
-        Chat chat = svc.chat("!family:demo");
+        Chat chat = Present.of(svc.chat("!family:demo"));
         FxWait.onFx(() -> {
             chat.setTyping(Set.of("Laura"));
             view.thread().refreshHeader();

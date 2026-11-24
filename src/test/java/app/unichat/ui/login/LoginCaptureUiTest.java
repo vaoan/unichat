@@ -10,6 +10,8 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
+import org.jspecify.annotations.Nullable;
 
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -36,7 +38,7 @@ class LoginCaptureUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private static volatile String agent;
+    private static volatile @Nullable String agent;
 
     private static void page(HttpServer server, String path, String html) {
         server.createContext(path, ex -> {
@@ -89,7 +91,7 @@ class LoginCaptureUiTest {
         });
         try {
             Map<String, String> v = done.get();
-            assertTrue(v.get("cookie_header").contains("JSESSIONID=ajax123"), "an HttpOnly cookie too");
+            assertTrue(Present.of(v.get("cookie_header")).contains("JSESSIONID=ajax123"), "an HttpOnly cookie too");
             assertEquals("UA", agent, "the browser the bridge asked for");
             assertEquals("{\"clientVersion\":\"1.2.3\"}", v.get("track"));
             assertEquals("urn:li:page:d_flagship3_feed", v.get("page"));
@@ -122,8 +124,8 @@ class LoginCaptureUiTest {
         });
         try {
             Map<String, String> v = done.get();
-            assertTrue(v.get("cookie_header").contains("JSESSIONID=ajax123"));
-            assertTrue(v.get("track").contains("clientVersion"));
+            assertTrue(Present.of(v.get("cookie_header")).contains("JSESSIONID=ajax123"));
+            assertTrue(Present.of(v.get("track")).contains("clientVersion"));
         } finally {
             server.stop(0);
             Platform.runLater(() -> { if (owner[0] != null) owner[0].close(); });

@@ -15,6 +15,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import app.unichat.Present;
 
 import java.awt.Color;
 import java.awt.Graphics2D;
@@ -98,8 +99,8 @@ class VideoUiTest {
             root.getChildren().add(video[0]);
             return null;
         });
-        await(() -> video[0].player() != null && video[0].player().getStatus() == MediaPlayer.Status.PLAYING, "plays");
-        MediaPlayer player = video[0].player();
+        await(() -> playing(video[0]), "plays");
+        MediaPlayer player = Present.of(video[0].player());
         assertTrue(player.isMute());
         assertEquals(MediaPlayer.INDEFINITE, player.getCycleCount());
 
@@ -122,12 +123,12 @@ class VideoUiTest {
             root.getChildren().add(video[0]);
             return null;
         });
-        await(() -> video[0].player() != null && video[0].player().getStatus() == MediaPlayer.Status.PLAYING, "plays");
+        await(() -> playing(video[0]), "plays");
         try {
             app.unichat.support.Seen.reset(false);
             await(() -> video[0].player() == null, "let go while unseen");
             app.unichat.support.Seen.reset(true);
-            await(() -> video[0].player() != null && video[0].player().getStatus() == MediaPlayer.Status.PLAYING, "plays again once seen");
+            await(() -> playing(video[0]), "plays again once seen");
         } finally {
             app.unichat.support.Seen.reset(true);
             FxWait.onFx(stage::close);
@@ -159,7 +160,7 @@ class VideoUiTest {
         Stage owner = window(root);
         Stage viewer = fx(() -> VideoViewer.show(owner, CompletableFuture.completedFuture(clip), "clip", null, p -> { }));
         await(() -> viewer.getProperties().get(VideoViewer.PLAYER) instanceof MediaPlayer p && p.getStatus() == MediaPlayer.Status.PLAYING, "viewer plays");
-        MediaPlayer player = (MediaPlayer) viewer.getProperties().get(VideoViewer.PLAYER);
+        MediaPlayer player = Present.of((MediaPlayer) viewer.getProperties().get(VideoViewer.PLAYER));
         await(() -> player.getCurrentTime().greaterThan(javafx.util.Duration.ZERO), "a frame on screen");
         FxWait.settled();
         fx(() -> {
@@ -182,7 +183,7 @@ class VideoUiTest {
         Stage owner = window(root);
         Stage viewer = fx(() -> VideoViewer.show(owner, CompletableFuture.completedFuture(clip), "clip", () -> { }, p -> { }));
         await(() -> viewer.getProperties().get(VideoViewer.PLAYER) instanceof MediaPlayer p && p.getStatus() == MediaPlayer.Status.PLAYING, "viewer plays");
-        MediaPlayer player = (MediaPlayer) viewer.getProperties().get(VideoViewer.PLAYER);
+        MediaPlayer player = Present.of((MediaPlayer) viewer.getProperties().get(VideoViewer.PLAYER));
         double rate = fx(player::getRate);
         key(viewer, javafx.scene.input.KeyCode.PERIOD, ">");
         assertEquals(VideoControls.nextRate(rate, 1), fx(player::getRate), 0.001, "> speeds up");
@@ -252,7 +253,7 @@ class VideoUiTest {
         Stage owner = window(root);
         Stage viewer = fx(() -> VideoViewer.show(owner, CompletableFuture.completedFuture(clip), "clip", () -> { }, p -> { }));
         await(() -> viewer.getProperties().get(VideoViewer.PLAYER) instanceof MediaPlayer p && p.getStatus() == MediaPlayer.Status.PLAYING, "viewer plays");
-        MediaPlayer player = (MediaPlayer) viewer.getProperties().get(VideoViewer.PLAYER);
+        MediaPlayer player = Present.of((MediaPlayer) viewer.getProperties().get(VideoViewer.PLAYER));
         fx(() -> {
             viewer.getScene().getRoot().lookupAll(".icon-button").stream()
                     .filter(n -> n.getAccessibleText() != null && n.getAccessibleText().startsWith("Repetir"))
@@ -315,8 +316,7 @@ class VideoUiTest {
     @Test
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aWebmStickerPlaysConverted() throws Exception {
-        Path ffmpeg = app.unichat.video.Ffmpeg.find();
-        org.junit.jupiter.api.Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path ffmpeg = Present.orSkip(app.unichat.video.Ffmpeg.find(), "no ffmpeg");
         Path webm = dir.resolve("sticker.webm");
         Process make = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi",
                 "-i", "testsrc=s=128x128:d=1:r=10,format=yuva420p", "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", webm.toString())
@@ -392,8 +392,7 @@ class VideoUiTest {
     @Test
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aVideoJavaFxCantReadIsConvertedAndPlays() throws Exception {
-        Path ffmpeg = app.unichat.video.Ffmpeg.find();
-        org.junit.jupiter.api.Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path ffmpeg = Present.orSkip(app.unichat.video.Ffmpeg.find(), "no ffmpeg");
         Path webm = dir.resolve("video.webm");
         Process make = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=160x120:d=1:r=10",
                 "-c:v", "libvpx-vp9", webm.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
@@ -406,5 +405,10 @@ class VideoUiTest {
             viewer.close();
             owner.close();
         });
+    }
+
+    private static boolean playing(InlineVideo v) {
+        MediaPlayer p = v.player();
+        return p != null && p.getStatus() == MediaPlayer.Status.PLAYING;
     }
 }

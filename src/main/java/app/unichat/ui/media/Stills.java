@@ -3,6 +3,7 @@ package app.unichat.ui.media;
 import app.unichat.support.BoundedMap;
 
 import javafx.scene.image.Image;
+import org.jspecify.annotations.Nullable;
 
 import java.lang.ref.SoftReference;
 import java.util.Collections;
@@ -20,16 +21,16 @@ final class Stills {
     private Stills() {}
 
     /** The picture of {@code url} decoded at that size, or null. */
-    static Image get(String url, int w, int h) {
+    static @Nullable Image get(@Nullable String url, int w, int h) {
         SoftReference<Image> r = CACHE.get(key(url, w, h));
         return r == null ? null : r.get();
     }
 
-    static void put(String url, int w, int h, Image img) {
+    static void put(@Nullable String url, int w, int h, @Nullable Image img) {
         if (url != null && img != null && !img.isError()) CACHE.put(key(url, w, h), new SoftReference<>(img));
     }
 
-    private static String key(String url, int w, int h) {
+    private static String key(@Nullable String url, int w, int h) {
         return url + "|" + w + "x" + h;
     }
 }

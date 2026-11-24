@@ -4,6 +4,7 @@ import app.unichat.model.Account;
 import app.unichat.model.AccountStatus;
 import app.unichat.model.Network;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -58,7 +59,7 @@ public final class AccountAlerts {
     }
 
     /** "Sincronizando Telegram y Discord…" while those reconnect, for the top bar; null when every network is up to date. */
-    public static String syncingLine(List<Alert> alerts) {
+    public static @Nullable String syncingLine(List<Alert> alerts) {
         List<Alert> syncing = alerts.stream().filter(Alert::syncing).toList();
         return syncing.isEmpty() ? null : line(syncing, "main.syncingNetworks");
     }
@@ -67,7 +68,7 @@ public final class AccountAlerts {
      * The top bar's line about the disk, null when it's fine: low on room (what to fix, whatever failed) or a process of
      * the server that couldn't write (being started over).
      */
-    public static String storageLine(boolean low, long free, boolean failing) {
+    public static @Nullable String storageLine(boolean low, long free, boolean failing) {
         if (low) return I18n.t("main.diskLow", free <= 0 ? "0 B" : app.unichat.ui.Formats.fileSize(free));
         return failing ? I18n.t("main.diskFailing") : null;
     }

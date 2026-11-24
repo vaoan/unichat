@@ -5,6 +5,7 @@ import app.unichat.model.MessageType;
 import java.io.IOException;
 import java.net.URISyntaxException;
 import org.junit.jupiter.api.Test;
+import app.unichat.Present;
 
 import java.awt.image.BufferedImage;
 import java.nio.file.Files;
@@ -137,7 +138,7 @@ class AnimatedImageTest {
             Files.copy(in, f, java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
         AnimatedImage.RawFrames raw = AnimatedImage.composeWebp(f, 96, 96);
-        List<BufferedImage> libwebp = app.unichat.video.AnimDump.frames(f);
+        List<BufferedImage> libwebp = Present.of(app.unichat.video.AnimDump.frames(f));
         assertEquals(libwebp.size(), raw.images().size());
         for (int i = 0; i < libwebp.size(); i++) {
             assertEquals(libwebp.get(i).getRGB(40, 32), raw.images().get(i).getRGB(40, 32), "frame " + i + " as libwebp has it");

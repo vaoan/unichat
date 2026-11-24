@@ -3,6 +3,7 @@ package app.unichat.ui.emoji;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.StickerPack;
 import app.unichat.support.I18n;
+import org.jspecify.annotations.Nullable;
 
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -50,9 +51,10 @@ final class StickerFinder {
     }
 
     /** The emoji a sticker stands for, as its set gave it; null when it says none. */
-    static String emoji(MediaLibrary.Item i) {
-        if (i.info() == null) return null;
-        String e = i.info().path("fi.mau.bridged_sticker").path("emoji").asText("");
+    static @Nullable String emoji(MediaLibrary.Item i) {
+        com.fasterxml.jackson.databind.JsonNode info = i.info();
+        if (info == null) return null;
+        String e = info.path("fi.mau.bridged_sticker").path("emoji").asText("");
         return e.isBlank() ? null : plain(e);
     }
 

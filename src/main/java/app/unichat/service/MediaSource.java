@@ -1,6 +1,7 @@
 package app.unichat.service;
 
 import app.unichat.model.LinkMedia;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.concurrent.CompletableFuture;
@@ -10,12 +11,13 @@ import java.util.concurrent.CompletableFuture;
 public interface MediaSource {
     /**
      * Returns a local file for a media/avatar URL (mxc://, http(s)://, file:), downloading and
-     * caching it if needed. Thumbnails: pass width/height > 0 to request a scaled version.
+     * caching it if needed. Thumbnails: pass width/height > 0 to request a scaled version. No address (null): a
+     * failed future, never a throw.
      */
-    CompletableFuture<Path> media(String url, int width, int height);
+    CompletableFuture<Path> media(@Nullable String url, int width, int height);
 
     /** The same, telling {@code progress} how much has arrived (0 to 1) while it downloads, when that's known. */
-    default CompletableFuture<Path> media(String url, int width, int height, java.util.function.DoubleConsumer progress) {
+    default CompletableFuture<Path> media(@Nullable String url, int width, int height, java.util.function.DoubleConsumer progress) {
         return media(url, width, height);
     }
 
@@ -23,7 +25,7 @@ public interface MediaSource {
      * A sticker's file, kept in a room of its own (Ajustes → Privacidad: how many, how many MB), so photos and videos
      * never push the chats' stickers out and they don't load again and again.
      */
-    default CompletableFuture<Path> sticker(String url, java.util.function.DoubleConsumer progress) {
+    default CompletableFuture<Path> sticker(@Nullable String url, java.util.function.DoubleConsumer progress) {
         return media(url, 0, 0, progress);
     }
 

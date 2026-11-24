@@ -11,6 +11,7 @@ public final class MediaItems {
     private MediaItems() {}
 
     /** One's own sticker sent as a converted copy is the sticker it was made from; what others write there isn't trusted. */
+    @SuppressWarnings("NullAway") // a sticker or GIF a stranger sent without an address still makes an item, as before (MediaLibrary.same matches it to none)
     public static MediaLibrary.Item of(Message m) {
         MediaLibrary.Kind kind = m.type() == MessageType.STICKER ? MediaLibrary.Kind.STICKER : MediaLibrary.Kind.GIF;
         MediaLibrary.Item item = new MediaLibrary.Item(kind, m.mediaUrl(), m.mimeType(), m.width(), m.height(), m.mediaInfo());

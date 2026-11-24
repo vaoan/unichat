@@ -40,6 +40,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -61,20 +62,23 @@ public final class ChatListPane extends VBox {
     private final ToggleGroup chips = new ToggleGroup();
     private final Spaces spaces;
     private final FlowPane chipRow;
-    private Runnable onNewChat;
+    private @Nullable Runnable onNewChat;
     private final Consumer<Chat> onOpen;
-    private String selectedId;
+    private @Nullable String selectedId;
     /** What the favorites row was built from ({@link #showFavorites}). */
-    private String favoritesShown;
+    private @Nullable String favoritesShown;
     private boolean updating;
     /** The server row the keyboard is on, if any (it opens on Enter, not on arrowing). */
-    private String arrowedRow;
+    private @Nullable String arrowedRow;
     private InboxRows.Rows rows = InboxRows.Rows.EMPTY;
     /** The accounts as of the last refresh: list cells need them, and computing them walks every room. */
     private List<Account> accounts = List.of();
     /** A server's channels, covering the list while open. */
     private final SpaceChannelsView channels;
-    private javafx.scene.control.Button newChat;
+    private final javafx.scene.control.Button newChat = Icons.iconButton(Icons.PLUS, I18n.t("chatList.newChat"), () -> {
+        Runnable r = onNewChat;
+        if (r != null) r.run();
+    });
     private final FolderDialogs folderDialogs;
     private final FolderView folderView;
     /** In folders (the names, one folder, or a server opened from one). */
@@ -130,7 +134,6 @@ public final class ChatListPane extends VBox {
         title.getStyleClass().add("pane-title");
         Region headerSpacer = new Region();
         HBox.setHgrow(headerSpacer, Priority.ALWAYS);
-        newChat = Icons.iconButton(Icons.PLUS, I18n.t("chatList.newChat"), () -> { if (onNewChat != null) onNewChat.run(); });
         newChat.setTooltip(new javafx.scene.control.Tooltip(I18n.t("chatList.newChatTip", Shortcuts.key("N"))));
         HBox header = new HBox(6, title, headerSpacer, newChat);
         header.getStyleClass().add("chat-list-header");
@@ -265,7 +268,8 @@ public final class ChatListPane extends VBox {
         List<Chat> visible = new java.util.ArrayList<>(rows.rows());
         spaces.checkPending();
         visible.addAll(offerRows(f));
-        if (channels.isOpen() && (f.searching() || svc.chat(channels.openId()) == null)) channels.close();
+        String server = channels.openId();
+        if (server != null && (f.searching() || svc.chat(server) == null)) channels.close();
         if (f.searching()) leaveFolders();
         if (foldersOpen() && !channels.isOpen()) folderView.refresh(all); // closeSpace refreshes it
         channels.refresh(all, f);
@@ -291,7 +295,8 @@ public final class ChatListPane extends VBox {
             case ARCHIVE -> I18n.t("chatList.title.archived");
         };
         newChat.setVisible(!foldersOpen()); // beside the title Carpetas, + would read as a new folder
-        title.setText(foldersOpen() ? I18n.t("chatList.title.folders") : f.network() == null ? base : f.network().displayName());
+        Network n = f.network();
+        title.setText(foldersOpen() ? I18n.t("chatList.title.folders") : n == null ? base : n.displayName());
         refreshAccountRow(f);
         refreshView();
         empty.setText(f.searching() ? I18n.t("chatList.empty.noResults", f.query())
@@ -422,21 +427,22 @@ public final class ChatListPane extends VBox {
 
     /** "Todas · Personal · Trabajo" chips, shown only for a network with several accounts. */
     private void refreshAccountRow(ChatFilter f) {
-        List<Account> ofNetwork = f.network() == null ? List.of() : Accounts.of(this.accounts, f.network());
+        Network n = f.network();
+        List<Account> ofNetwork = n == null ? List.of() : Accounts.of(this.accounts, n);
         // Only offer per-account filters when every chat of the network knows its account; otherwise a filter
         // would silently hide chats (Matrix bridges don't always say which login a portal belongs to).
-        boolean attributed = f.network() != null && svc.chats().stream()
-                .filter(c -> c.network() == f.network() && !c.bridgeBot()).allMatch(c -> c.accountId() != null);
+        boolean attributed = n != null && svc.chats().stream()
+                .filter(c -> c.network() == n && !c.bridgeBot()).allMatch(c -> c.accountId() != null);
         boolean show = ofNetwork.size() > 1 && !f.searching() && attributed;
         Nodes.show(accountRow, show);
         accountRow.getChildren().clear();
-        if (!show) return;
+        if (!show || n == null) return;
         ToggleGroup group = new ToggleGroup();
         accountRow.getChildren().add(accountChip(I18n.t("chatList.allAccounts"), f.accountId() == null, group,
-                () -> filter.set(filter.get().withAccount(f.network(), null))));
+                () -> filter.set(filter.get().withAccount(n, null))));
         for (Account a : ofNetwork) {
             accountRow.getChildren().add(accountChip(Accounts.name(a), a.id().equals(f.accountId()), group,
-                    () -> filter.set(filter.get().withAccount(f.network(), a.id()))));
+                    () -> filter.set(filter.get().withAccount(n, a.id()))));
         }
     }
 
@@ -572,7 +578,7 @@ public final class ChatListPane extends VBox {
     }
 
     /** The menu of a row, if it has one: a channel to join or a server to add aren't chats yet. */
-    ContextMenu rowMenu(Chat c) {
+    @Nullable ContextMenu rowMenu(Chat c) {
         return c.space() || channels.actsLikeChat(c) ? menuFor(c) : null;
     }
 
@@ -624,7 +630,7 @@ public final class ChatListPane extends VBox {
 
     SpaceChannelsView channels() { return channels; }
 
-    String selectedId() { return selectedId; }
+    @Nullable String selectedId() { return selectedId; }
 
     List<Account> accounts() { return accounts; }
 

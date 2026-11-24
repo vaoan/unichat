@@ -6,6 +6,7 @@ import app.unichat.model.AccountStatus;
 import app.unichat.model.Chat;
 import app.unichat.model.Network;
 import app.unichat.settings.Settings;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -30,12 +31,12 @@ public final class Accounts {
     }
 
     /** Name of the account a chat belongs to, only when its network has several accounts; else null. */
-    public static String forChat(NetworkAccounts svc, Chat c) {
+    public static @Nullable String forChat(NetworkAccounts svc, Chat c) {
         return c.accountId() == null ? null : forChat(svc.accounts(), c);
     }
 
     /** Same, from an accounts list already fetched (list cells: computing it walks every room). */
-    static String forChat(List<Account> accounts, Chat c) {
+    static @Nullable String forChat(List<Account> accounts, Chat c) {
         if (c.accountId() == null) return null;
         List<Account> list = of(accounts, c.network());
         if (list.size() < 2) return null;

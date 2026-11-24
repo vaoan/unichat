@@ -33,6 +33,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import javafx.scene.layout.StackPane;
+import org.jspecify.annotations.Nullable;
 
 /**
  * GIFs tab: search across the providers turned on in Ajustes → GIFs, plus favourite and recent GIFs (shared by every
@@ -56,7 +57,7 @@ public final class GifGrid extends VBox {
     private int generation;
     private final TileCache libraryTiles = new TileCache();
     /** What the results on screen were searched for, and when; trending changes, so not for ever. */
-    private String resultsFor;
+    private @Nullable String resultsFor;
     private long resultsAt;
     private static final long RESULTS_LAST_MS = 10 * 60_000;
 
@@ -87,7 +88,7 @@ public final class GifGrid extends VBox {
     /** Rebuilds for the open chat: notices, favourites/recents, then search results (or trending). */
     public void refresh() {
         String q0 = search.getText().strip();
-        String shownFor = q0 + "|" + accepts() + "|" + GifProviders.active(k -> Settings.get().getString(k, null)).size();
+        String shownFor = q0 + "|" + accepts() + "|" + GifProviders.active(k -> Settings.get().getString(k)).size();
         // Changing chats shouldn't search the web again or reload what's on screen.
         if (shownFor.equals(resultsFor) && System.currentTimeMillis() - resultsAt < RESULTS_LAST_MS) {
             refreshLibrary();
@@ -98,7 +99,7 @@ public final class GifGrid extends VBox {
         content.getChildren().clear();
         boolean accepted = accepts();
         if (!accepted) content.getChildren().add(Labels.help(I18n.t("gif.networkRefuses")));
-        GifSearch providers = new GifSearch(GifProviders.active(k -> Settings.get().getString(k, null)));
+        GifSearch providers = new GifSearch(GifProviders.active(k -> Settings.get().getString(k)));
         String q = search.getText().strip();
         content.getChildren().add(libraryBox);
         refreshLibrary();

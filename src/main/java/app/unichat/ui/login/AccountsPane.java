@@ -30,10 +30,12 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.Objects;
 
 /**
  * The settings page "accounts": every connected account one per row, "Agregar cuenta" (add account) → pick a network (one per row,
@@ -47,8 +49,8 @@ public final class AccountsPane extends VBox {
     private final StackPane body = new StackPane();
     private final Label title = new Label();
     private final Button back;
-    private Runnable onBack;
-    private LoginWizard wizard;
+    private @Nullable Runnable onBack;
+    private @Nullable LoginWizard wizard;
     private final LoginChoosers choosers;
     private final LoginWizard.Navigation navigation = new LoginWizard.Navigation() {
         @Override public void openBotChat(String chatId) {
@@ -70,7 +72,10 @@ public final class AccountsPane extends VBox {
         setSpacing(14);
 
         title.getStyleClass().add("sheet-title");
-        back = Icons.iconButton(Icons.BACK, I18n.t("common.back"), () -> { if (onBack != null) onBack.run(); });
+        back = Icons.iconButton(Icons.BACK, I18n.t("common.back"), () -> {
+            Runnable action = onBack;
+            if (action != null) action.run();
+        });
         Region grow = new Region();
         HBox.setHgrow(grow, Priority.ALWAYS);
         HBox head = new HBox(6, back, title, grow);
@@ -82,21 +87,23 @@ public final class AccountsPane extends VBox {
 
     /** Stops listening to the service; called when the sheet closes. */
     public void dispose() {
-        if (wizard != null) wizard.dispose();
+        LoginWizard w = wizard;
+        if (w != null) w.dispose();
         wizard = null;
-        if (bridgeLogin != null) bridgeLogin.dispose();
+        BridgeLoginPane pane = bridgeLogin;
+        if (pane != null) pane.dispose();
         bridgeLogin = null;
     }
 
     /** The dynamic login on screen (local server), if any. */
-    private BridgeLoginPane bridgeLogin;
+    private @Nullable BridgeLoginPane bridgeLogin;
 
     /** Re-reads accounts if the list is showing (accountsChanged). The wizard updates itself. */
     public void refresh() {
         if (wizard == null && onBack == null) showList();
     }
 
-    private void setView(String heading, Node content, Runnable backAction) {
+    private void setView(String heading, Node content, @Nullable Runnable backAction) {
         title.setText(heading);
         onBack = backAction;
         Nodes.show(back, backAction != null);
@@ -312,7 +319,9 @@ public final class AccountsPane extends VBox {
                 m.prepareBridge(n);
                 Platform.runLater(() -> {
                     if (getScene() == null) return;
-                    bridgeLogin = new BridgeLoginPane(n, m.bridgeLogin(n), () -> getScene() == null ? null : getScene().getWindow(),
+                    BridgeLoginPane pane = new BridgeLoginPane(n,
+                            Objects.requireNonNull(m.bridgeLogin(n), "startLogin saw the bridge's own login before preparing it"),
+                            () -> Nodes.window(this),
                             () -> {
                                 m.loginFinished(n);
                                 dispose();
@@ -323,7 +332,8 @@ public final class AccountsPane extends VBox {
                                 dispose();
                                 startBotLogin(n);
                             });
-                    setView(I18n.t("login.connectTitle", n.displayName()), bridgeLogin, () -> {
+                    bridgeLogin = pane;
+                    setView(I18n.t("login.connectTitle", n.displayName()), pane, () -> {
                         dispose();
                         showPicker();
                     });
@@ -343,9 +353,10 @@ public final class AccountsPane extends VBox {
                 loading.fail(I18n.t("accounts.startFailed", LoginTexts.rootMessage(err)));
                 return;
             }
-            wizard = new LoginWizard(svc, toast, navigation, n, botChatId, since);
+            LoginWizard w = new LoginWizard(svc, toast, navigation, n, botChatId, since);
+            wizard = w;
             Runnable cancel = () -> {
-                wizard.cancel();
+                w.cancel();
                 showPicker();
             };
             if (CookieLogin.isCookieNetwork(n)) {
@@ -353,7 +364,7 @@ public final class AccountsPane extends VBox {
             } else if (n == Network.DISCORD) {
                 choosers.showDiscordChoice(n, botChatId, cancel);
             } else {
-                setView(I18n.t("login.connectTitle", n.displayName()), wizard.root, cancel);
+                setView(I18n.t("login.connectTitle", n.displayName()), w.root, cancel);
             }
         }));
     }

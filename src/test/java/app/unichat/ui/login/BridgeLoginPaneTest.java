@@ -8,6 +8,8 @@ import com.google.zxing.common.HybridBinarizer;
 import com.google.zxing.qrcode.QRCodeReader;
 import javafx.scene.image.WritableImage;
 import org.junit.jupiter.api.Test;
+import app.unichat.Present;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -17,15 +19,15 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BridgeLoginPaneTest {
-    private static BridgeLogin.Field field(String type, String pattern) {
+    private static BridgeLogin.Field field(String type, @Nullable String pattern) {
         return new BridgeLogin.Field(type, "f", "Field", "", null, false, pattern, List.of());
     }
 
     @Test
     void phoneNeedsTheCountryCode() {
-        assertTrue(BridgeLoginPane.invalid(field("phone_number", null), "3001234567").contains("código de país"));
+        assertTrue(Present.of(BridgeLoginPane.invalid(field("phone_number", null), "3001234567")).contains("código de país"));
         assertNull(BridgeLoginPane.invalid(field("phone_number", null), "+573001234567"));
-        assertTrue(BridgeLoginPane.invalid(field("password", null), "").startsWith("Completa"));
+        assertTrue(Present.of(BridgeLoginPane.invalid(field("password", null), "")).startsWith("Completa"));
     }
 
     @Test

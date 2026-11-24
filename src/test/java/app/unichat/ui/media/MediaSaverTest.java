@@ -3,6 +3,7 @@ package app.unichat.ui.media;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.time.ZoneId;
@@ -11,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MediaSaverTest {
-    private static Message media(MessageType type, String fileName, String mime) {
+    private static Message media(MessageType type, @Nullable String fileName, @Nullable String mime) {
         Message m = new Message("$1", "!c", "@a", "Ana", false, Instant.parse("2026-10-26T15:04:05Z"));
         m.setType(type);
         m.setMediaUrl("mxc://s/abc");

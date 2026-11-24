@@ -10,6 +10,7 @@ import javafx.scene.image.ImageView;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -40,7 +41,7 @@ class ProfileMediaUiTest {
             stage.setOpacity(0);
             stage.setScene(new Scene(p, 360, 900));
             stage.show();
-            p.show(svc.chat(id));
+            p.show(Present.of(svc.chat(id)));
             return p;
         });
         FxWait.until("a photo loaded", () -> pane.lookup(".media-thumb") instanceof ImageView v && v.getImage() != null);
@@ -121,8 +122,8 @@ class ProfileMediaUiTest {
             stage.setOpacity(0);
             stage.setScene(new Scene(p, 360, 900));
             stage.show();
-            p.show(svc.chat(id));
-            audio.toggle(note, svc.chat(id));
+            p.show(Present.of(svc.chat(id)));
+            audio.toggle(note, Present.of(svc.chat(id)));
             return p;
         });
         FxWait.until("the voice note plays (or says it can't)", () -> !toasts.isEmpty() || audio.state() == AudioPlayback.State.PLAYING);

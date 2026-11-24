@@ -5,6 +5,7 @@ import app.unichat.model.Network;
 import app.unichat.service.ChatService;
 import app.unichat.support.I18n;
 import javafx.application.Platform;
+import org.jspecify.annotations.Nullable;
 
 import java.util.HashSet;
 import java.util.List;
@@ -45,8 +46,8 @@ final class Spaces {
     /** Servers keep arriving (Discord brings them in one by one): the list to add is re-checked this often. */
     static long offersRecheckMs = 15_000; // NOPMD: MutableStaticState, a seam tests swap
     private final Set<String> adding = new HashSet<>();
-    private String pendingOpen;
-    private javafx.animation.PauseTransition pendingTimeout;
+    private @Nullable String pendingOpen;
+    private javafx.animation.@Nullable PauseTransition pendingTimeout;
     private Consumer<String> toast = t -> { };
     private Runnable onChanged = () -> { };
 
@@ -121,11 +122,13 @@ final class Spaces {
 
     /** Opens a channel you just joined once the bridge has it ready; call on every list refresh. */
     void checkPending() {
-        if (pendingOpen == null) return;
-        Chat joined = svc.chat(pendingOpen);
+        String id = pendingOpen;
+        if (id == null) return;
+        Chat joined = svc.chat(id);
         if (joined != null && !joined.space()) {
             pendingOpen = null;
-            if (pendingTimeout != null) pendingTimeout.stop();
+            javafx.animation.PauseTransition wait = pendingTimeout;
+            if (wait != null) wait.stop();
             onOpen.accept(joined);
         }
     }
@@ -144,13 +147,15 @@ final class Spaces {
             onChanged.run();
         }));
         // Don't open it by surprise minutes later: after the wait it just shows up in the list.
-        if (pendingTimeout != null) pendingTimeout.stop();
-        pendingTimeout = new javafx.animation.PauseTransition(javafx.util.Duration.millis((double) joinWaitMs));
-        pendingTimeout.setOnFinished(e -> {
+        javafx.animation.PauseTransition was = pendingTimeout;
+        if (was != null) was.stop();
+        javafx.animation.PauseTransition wait = new javafx.animation.PauseTransition(javafx.util.Duration.millis((double) joinWaitMs));
+        pendingTimeout = wait;
+        wait.setOnFinished(e -> {
             if (!id.equals(pendingOpen)) return;
             pendingOpen = null;
             toast.accept(I18n.t("spaces.joined", name));
         });
-        pendingTimeout.play();
+        wait.play();
     }
 }

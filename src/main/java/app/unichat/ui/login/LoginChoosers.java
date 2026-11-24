@@ -25,23 +25,25 @@ import javafx.scene.layout.VBox;
 import java.util.List;
 import java.util.function.Consumer;
 import javafx.scene.Scene;
+import org.jspecify.annotations.Nullable;
 import java.util.function.Supplier;
+import java.util.Objects;
 
 /** The first screen of a bot-chat login: how to get the session (browser, web window, cookies.txt, Discord's page). */
 final class LoginChoosers {
     /** Shows a step of the login sheet. */
     @FunctionalInterface
     interface Views {
-        void show(String heading, Node content, Runnable backAction);
+        void show(String heading, Node content, @Nullable Runnable backAction);
     }
 
     private final ChatMessaging svc;
     private final Consumer<String> toast;
     private final Views views;
     private final Supplier<Scene> scene;
-    private final Supplier<LoginWizard> wizard;
+    private final Supplier<@Nullable LoginWizard> wizard;
 
-    LoginChoosers(ChatMessaging svc, Consumer<String> toast, Views views, Supplier<Scene> scene, Supplier<LoginWizard> wizard) {
+    LoginChoosers(ChatMessaging svc, Consumer<String> toast, Views views, Supplier<Scene> scene, Supplier<@Nullable LoginWizard> wizard) {
         this.svc = svc;
         this.toast = toast;
         this.views = views;
@@ -55,7 +57,7 @@ final class LoginChoosers {
      * deletes that message).
      */
     void showDiscordChoice(Network n, String botChatId, Runnable cancel) {
-        LoginWizard w = wizard.get();
+        LoginWizard w = Objects.requireNonNull(wizard.get(), "AccountsPane shows a chooser right after making its wizard");
         Label heading = new Label(I18n.t("login.discord.connect"));
         heading.getStyleClass().add("wizard-instructions");
         heading.setWrapText(true);
@@ -103,7 +105,7 @@ final class LoginChoosers {
      * Cookies are read only for {@code n}, sent only to the user's own bridge bot, and never logged.
      */
     void showCookieSources(Network n, String botChatId, Runnable cancel) {
-        LoginWizard w = wizard.get();
+        LoginWizard w = Objects.requireNonNull(wizard.get(), "AccountsPane shows a chooser right after making its wizard");
         String net = n.displayName();
         Label searching = Labels.help(I18n.t("login.cookies.searching", net));
         ProgressIndicator spin = new ProgressIndicator();

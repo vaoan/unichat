@@ -3,6 +3,7 @@ package app.unichat.ui.media;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.List;
@@ -10,7 +11,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class ProfileMediaTest {
-    private static Message m(String id, MessageType type, String body, boolean media) {
+    private static Message m(String id, MessageType type, @Nullable String body, boolean media) {
         Message x = new Message(id, "!c", "@a", "Ana", false, Instant.parse("2026-11-10T10:00:00Z"));
         x.setType(type);
         x.setBody(body);

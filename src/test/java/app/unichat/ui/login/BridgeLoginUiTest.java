@@ -18,6 +18,8 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
+import app.unichat.Present;
 
 import java.io.OutputStream;
 import java.net.InetAddress;
@@ -39,7 +41,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 class BridgeLoginUiTest {
     private HttpServer server;
     private final CountDownLatch scanned = new CountDownLatch(1);
-    private volatile String submitted;
+    private volatile @Nullable String submitted;
 
     @BeforeEach
     void fakeBridge() throws Exception {
@@ -97,6 +99,7 @@ class BridgeLoginUiTest {
         });
     }
 
+    @SuppressWarnings("NullAway.Init") // open() sets it, and every test opens first
     private Stage stage;
 
     private Scene open(AtomicBoolean connected) throws InterruptedException {
@@ -121,7 +124,7 @@ class BridgeLoginUiTest {
         assertTrue(text(scene).contains("¿Cómo quieres conectar WhatsApp?"));
         shot(scene, "1-elegir");
         assertTrue(text(scene).indexOf("Escanear un código QR") < text(scene).indexOf("Usar tu número de teléfono"), "QR first");
-        FxWait.onFx(() -> buttonNow(scene, "Escanear un código QR").fire());
+        FxWait.onFx(() -> Present.of(buttonNow(scene, "Escanear un código QR")).fire());
 
         await("the QR", () -> fx0(() -> scene.getRoot().lookupAll("*").stream().anyMatch(n -> n instanceof ImageView)));
         assertTrue(text(scene).contains("Escanea el código con tu teléfono"));
@@ -132,7 +135,7 @@ class BridgeLoginUiTest {
         await("connected", () -> button(scene, "Listo") != null);
         assertTrue(text(scene).contains("WhatsApp está conectado"));
         shot(scene, "3-listo");
-        FxWait.onFx(() -> buttonNow(scene, "Listo").fire());
+        FxWait.onFx(() -> Present.of(buttonNow(scene, "Listo")).fire());
         assertTrue(connected.get());
     }
 
@@ -140,21 +143,21 @@ class BridgeLoginUiTest {
     void phoneFlowValidatesThenShowsTheCode() throws Exception {
         Scene scene = open(new AtomicBoolean());
         await("the choice of methods", () -> button(scene, "Usar tu número de teléfono") != null);
-        FxWait.onFx(() -> buttonNow(scene, "Usar tu número de teléfono").fire());
+        FxWait.onFx(() -> Present.of(buttonNow(scene, "Usar tu número de teléfono")).fire());
         await("the phone field", () -> fx0(() -> field(scene) != null));
         FxWait.onFx(() -> {
-            field(scene).setText("300 123 4567");
-            buttonNow(scene, "Continuar").fire();
+            Present.of(field(scene)).setText("300 123 4567");
+            Present.of(buttonNow(scene, "Continuar")).fire();
         });
         await("the country code asked for", () -> text(scene).contains("código de país"));
         shot(scene, "4-telefono-error");
         assertNull(submitted, "nothing sent while invalid");
         FxWait.onFx(() -> {
-            field(scene).setText("+57 300 123 4567");
-            buttonNow(scene, "Continuar").fire();
+            Present.of(field(scene)).setText("+57 300 123 4567");
+            Present.of(buttonNow(scene, "Continuar")).fire();
         });
         await("the pairing code", () -> text(scene).contains("ABCD-1234"));
-        assertTrue(submitted.contains("\"phone_number\":\"+573001234567\""), submitted);
+        assertTrue(Present.of(submitted).contains("\"phone_number\":\"+573001234567\""), submitted);
         assertTrue(text(scene).contains("Escribe este código en tu teléfono"));
         shot(scene, "5-codigo");
     }
@@ -170,7 +173,7 @@ class BridgeLoginUiTest {
     }
 
     /** From a test thread. */
-    private static Clickable button(Scene s, String startsWith) {
+    private static @Nullable Clickable button(Scene s, String startsWith) {
         try {
             return fx(() -> buttonNow(s, startsWith));
         } catch (Exception e) {
@@ -179,7 +182,7 @@ class BridgeLoginUiTest {
     }
 
     /** A Button or a card announced as a button, by text or screen-reader text. On the FX thread. */
-    private static Clickable buttonNow(Scene s, String startsWith) {
+    private static @Nullable Clickable buttonNow(Scene s, String startsWith) {
         for (Node n : s.getRoot().lookupAll("*")) {
             if (!n.isVisible()) continue;
             if (n instanceof Button b && ((b.getText() != null && b.getText().startsWith(startsWith))
@@ -198,7 +201,7 @@ class BridgeLoginUiTest {
         void fire();
     }
 
-    private static TextField field(Scene s) {
+    private static @Nullable TextField field(Scene s) {
         return s.getRoot().lookupAll("*").stream().filter(n -> n instanceof TextField).map(n -> (TextField) n).findFirst().orElse(null);
     }
 

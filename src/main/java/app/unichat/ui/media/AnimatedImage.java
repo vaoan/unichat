@@ -15,6 +15,7 @@ import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 import javax.imageio.ImageIO;
 import javax.imageio.ImageReader;
@@ -31,6 +32,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Animated stickers/GIFs, decoded here and played by {@link #play}, which stops when the view leaves the screen.
@@ -46,7 +48,7 @@ public final class AnimatedImage {
     public static final java.util.concurrent.ExecutorService DECODER = java.util.concurrent.Executors.newFixedThreadPool(2, Threads.daemon("image-decoder"));
 
     /** Decoded animation: equal-size frames and how long each one stays, in ms. */
-    public record Frames(List<Image> images, List<Integer> durationsMs, Source source) {
+    public record Frames(List<Image> images, List<Integer> durationsMs, @Nullable Source source) {
         public Frames(List<Image> images, List<Integer> durationsMs) {
             this(images, durationsMs, null);
         }
@@ -81,7 +83,7 @@ public final class AnimatedImage {
      * stands still meanwhile, dimmed anyway. Each of its frames made JavaFX draw the card's shadow again over it, and on
      * the Mac stickers behind a sheet flashed black.
      */
-    public static void cover(javafx.scene.Scene scene, javafx.scene.Node over) {
+    public static void cover(javafx.scene.@Nullable Scene scene, javafx.scene.@Nullable Node over) {
         if (scene == null) return;
         if (over == null) scene.getProperties().remove(COVER);
         else scene.getProperties().put(COVER, over);
@@ -141,7 +143,7 @@ public final class AnimatedImage {
     private static long cachedBytes;
 
     /** What's already decoded for this file at this size, or null: shown at once, with no blank moment. */
-    static Frames decoded(Path file, int maxW, int maxH) {
+    static @Nullable Frames decoded(Path file, int maxW, int maxH) {
         return cached(file + "|" + maxW + "x" + maxH);
     }
 
@@ -197,7 +199,7 @@ public final class AnimatedImage {
         return remember(file + "|" + maxW + "x" + maxH, new Frames(List.of(img), List.of(0), new Source(file, maxW, maxH)));
     }
 
-    private static Frames cached(String key) {
+    private static @Nullable Frames cached(String key) {
         synchronized (CACHE) {
             return CACHE.get(key);
         }
@@ -264,7 +266,7 @@ public final class AnimatedImage {
             int i = delays.size();
             delays.add(f.delayMs());
             BufferedImage scaled = i % step[0] == 0 ? scale(f.image(), fit[0], fit[1]) : null;
-            if (i == 0) {
+            if (i == 0 && scaled != null) { // the first frame is always kept
                 double s = shrinkToKeep(count, scaled.getWidth(), scaled.getHeight()); // keep the frames, lose a little sharpness
                 if (s < 1) {
                     fit[0] = (int) Math.round(scaled.getWidth() * s);
@@ -376,7 +378,7 @@ public final class AnimatedImage {
     }
 
     /** Width and height from a WebP's first chunk (VP8X, VP8 or VP8L), or null if it isn't one. */
-    static int[] webpSize(Path file) throws IOException {
+    static int @Nullable [] webpSize(Path file) throws IOException {
         byte[] d;
         try (var in = Files.newInputStream(file)) {
             d = in.readNBytes(30);
@@ -623,19 +625,19 @@ public final class AnimatedImage {
      */
     private static final class Playing {
         private final ImageView view;
-        private final Source source;
+        private final @Nullable Source source;
         private final long bytes;
         private final FxCoalescer recheck;
         private final javafx.beans.value.ChangeListener<javafx.scene.transform.Transform> moved;
-        private Frames frames;
-        private Timeline timeline;
+        private @Nullable Frames frames;
+        private @Nullable Timeline timeline;
         private boolean showing;
         private boolean loading;
         private boolean ended;
         /** Budget taken for frames being read again, not yet moving. */
         private boolean reserved;
         /** Whether it can be seen; cancelled when the view is handed another animation. */
-        private Showing.Watch watch;
+        private Showing.@Nullable Watch watch;
 
         Playing(ImageView view, Frames frames) {
             this.view = view;
@@ -667,45 +669,50 @@ public final class AnimatedImage {
             if (wanted && !running()) {
                 // Its room is taken before its frames are read again: past the budget, every look (a scroll step, a
                 // sheet closing, the window back) read them and threw them away.
-                if (frames == null) {
+                Frames f = frames;
+                if (f == null) {
                     if (!reserved && AnimationBudget.SHARED.take(bytes)) {
                         reserved = true;
                         reload();
                     }
                 } else if (reserved || AnimationBudget.SHARED.take(bytes)) {
                     reserved = false;
-                    timeline().play();
+                    timeline(f).play();
                 } else {
                     letGo();
                 }
             } else if (!wanted) {
                 if (running() || reserved) AnimationBudget.SHARED.release(bytes);
                 reserved = false;
-                if (timeline != null) timeline.stop();
+                Timeline t = timeline;
+                if (t != null) t.stop();
                 letGo();
             }
         }
 
         private boolean running() {
-            return timeline != null && timeline.getStatus() == Animation.Status.RUNNING;
+            Timeline t = timeline;
+            return t != null && t.getStatus() == Animation.Status.RUNNING;
         }
 
-        private Timeline timeline() {
-            if (timeline != null) return timeline;
-            timeline = new Timeline();
+        private Timeline timeline(Frames shown) {
+            Timeline made = timeline;
+            if (made != null) return made;
+            Timeline t = new Timeline();
+            timeline = t;
             double at = 0;
-            for (int i = 0; i < frames.images().size(); i++) {
-                Image img = frames.images().get(i);
-                timeline.getKeyFrames().add(new KeyFrame(Duration.millis(at), e -> {
+            for (int i = 0; i < shown.images().size(); i++) {
+                Image img = shown.images().get(i);
+                t.getKeyFrames().add(new KeyFrame(Duration.millis(at), e -> {
                     // Off screen (scrolled away, hidden tab, window minimized): no new frame, so nothing gets redrawn.
                     // Every running animation used to repaint the window ~60 times a second (a third of a core).
                     if (onScreen(view)) view.setImage(img);
                 }));
-                at += frames.durationsMs().get(i);
+                at += shown.durationsMs().get(i);
             }
-            timeline.getKeyFrames().add(new KeyFrame(Duration.millis(at)));
-            timeline.setCycleCount(Timeline.INDEFINITE);
-            return timeline;
+            t.getKeyFrames().add(new KeyFrame(Duration.millis(at)));
+            t.setCycleCount(Timeline.INDEFINITE);
+            return t;
         }
 
         /** Keeps only the picture on screen; nothing to let go when the frames can't be read again. */
@@ -722,7 +729,7 @@ public final class AnimatedImage {
             DECODER.execute(() -> {
                 Frames again;
                 try {
-                    again = source.decode();
+                    again = Objects.requireNonNull(source, "frames go only when they can be read again").decode();
                 } catch (IOException e) {
                     again = null; // the file went (cache trimmed): it stays still
                 }
@@ -742,7 +749,8 @@ public final class AnimatedImage {
 
         /** Replaced by another animation: stopped, and no longer following the view's window. */
         void end() {
-            if (watch != null) watch.cancel();
+            Showing.Watch w = watch;
+            if (w != null) w.cancel();
             hidden();
             ended = true;
         }

@@ -517,8 +517,8 @@ class AutoSaveTest {
         RuntimeException notThere = new RuntimeException("HTTP 404");
         RuntimeException later = new RuntimeException("HTTP 502");
         app.unichat.service.MediaSource source = new app.unichat.service.MediaSource() {
-            @Override public CompletableFuture<Path> media(String url, int w, int h) {
-                return CompletableFuture.failedFuture(url.endsWith("gone") ? notThere : later);
+            @Override public CompletableFuture<Path> media(@Nullable String url, int w, int h) {
+                return CompletableFuture.failedFuture(url != null && url.endsWith("gone") ? notThere : later);
             }
 
             @Override public boolean gone(Throwable error) {

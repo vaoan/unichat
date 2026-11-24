@@ -10,6 +10,7 @@ import app.unichat.service.ChatReader;
 import app.unichat.support.I18n;
 import javafx.scene.control.Button;
 import javafx.scene.control.ProgressBar;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Consumer;
@@ -28,7 +29,7 @@ public final class ExploreBar extends TaskBar {
     /** Changes come from the saving thread, many per file: one redraw per frame. */
     private final FxCoalescer redraw = new FxCoalescer(this::refresh);
     private final Runnable listener = redraw::request;
-    private String chatId;
+    private @Nullable String chatId;
 
     public ExploreBar(AutoSave save, ChatReader chats, Consumer<String> openChat) {
         this(save::exploringChats, save::exploring, save::stopExploring, save::addExploringListener, save::removeExploringListener,
@@ -47,13 +48,15 @@ public final class ExploreBar extends TaskBar {
         what.setText(I18n.t("exploreBar.title"));
         lead.getChildren().setAll(Icons.icon(Icons.DOWNLOAD, 20));
         where.setOnAction(e -> {
-            if (chatId != null) openChat.accept(chatId);
+            String id = chatId;
+            if (id != null) openChat.accept(id);
         });
         stage.setWrapText(true);
         stop = new Button(I18n.t("chatOptions.pastStop"));
         stop.getStyleClass().add("secondary-button");
         stop.setOnAction(e -> {
-            if (chatId != null) stopOne.accept(chatId);
+            String id = chatId;
+            if (id != null) stopOne.accept(id);
         });
         actions(stop);
         listen.accept(listener);
@@ -72,10 +75,12 @@ public final class ExploreBar extends TaskBar {
             chatId = null;
             return;
         }
-        chatId = now.contains(chatId) ? chatId : now.getFirst();
-        Chat c = chats.chat(chatId);
+        String was = chatId;
+        String id = was != null && now.contains(was) ? was : now.getFirst();
+        chatId = id;
+        Chat c = chats.chat(id);
         where.setText(c == null ? "" : c.title() + (now.size() > 1 ? " " + I18n.t("exploreBar.more", now.size() - 1) : ""));
-        AutoSave.Exploring e = state.apply(chatId);
+        AutoSave.Exploring e = state.apply(id);
         stage.setText(ChatOptions.pastState(e).replace("\n", " · "));
         AutoSave.Now doing = e.now();
         bar.setProgress(doing != null && doing.doing() == AutoSave.Doing.DOWNLOADING && doing.done() >= 0 ? doing.done()

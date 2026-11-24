@@ -20,6 +20,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import app.unichat.Present;
 
 import java.io.InputStream;
 import java.nio.file.Files;
@@ -60,7 +61,7 @@ class AudioUiTest {
         try (InputStream in = AudioUiTest.class.getResourceAsStream("/app/unichat/demo/voice-note.ogg")) {
             Files.copy(in, note);
         }
-        MediaSource source = (url, w, h) -> url.equals("mxc://s/roto")
+        MediaSource source = (url, w, h) -> "mxc://s/roto".equals(url)
                 ? CompletableFuture.failedFuture(new java.io.IOException("no"))
                 : CompletableFuture.completedFuture(note);
         playback = fx(() -> {
@@ -192,7 +193,7 @@ class AudioUiTest {
         FxWait.settled(); // the timeline done drawing, so the button pressed is the one that stays
         FxWait.onFx(() -> ((Button) view.lookup(".timeline .audio-toggle")).fire());
         await(() -> audio.state() == AudioPlayback.State.PLAYING, "plays");
-        assertEquals("!family:demo", fx(() -> audio.chat().id()));
+        assertEquals("!family:demo", fx(() -> Present.of(audio.chat()).id()));
         fx(() -> {
             javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(view.getScene().snapshot(null), null), "png",
                     Path.of(System.getProperty("java.io.tmpdir"), "unichat-audio-window.png").toFile());
@@ -206,7 +207,7 @@ class AudioUiTest {
         FxWait.onFx(() -> view.openChatId("!andres:demo"));
         FxWait.settled(); // the other chat fully shown
         assertEquals(AudioPlayback.State.PAUSED, fx(audio::state), "changing chats doesn't stop it");
-        assertEquals("!family:demo", fx(() -> audio.chat().id()));
+        assertEquals("!family:demo", fx(() -> Present.of(audio.chat()).id()));
         Node bar = fx(() -> view.lookup(".audio-bar"));
         assertTrue(fx(bar::isVisible));
         FxWait.onFx(() -> ((Button) bar.lookup(".audio-toggle")).fire());

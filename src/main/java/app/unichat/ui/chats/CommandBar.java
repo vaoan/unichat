@@ -17,16 +17,18 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.Objects;
 
 /** ⌘K / Ctrl+K palette: jump to any chat (including archived) or run an app command. */
 public final class CommandBar extends VBox {
     public record Command(String label, String hint, Runnable action) {}
 
-    private record Item(String label, String hint, Chat chat, Runnable action) {}
+    private record Item(String label, String hint, @Nullable Chat chat, @Nullable Runnable action) {}
 
     private final ChatReader chats;
     private final TextField field = new TextField();
@@ -54,9 +56,10 @@ public final class CommandBar extends VBox {
                     setGraphic(null);
                     return;
                 }
-                if (it.chat() != null) {
+                Chat chat = it.chat();
+                if (chat != null) {
                     ChatLine line = new ChatLine(media);
-                    line.show(it.chat(), it.hint());
+                    line.show(chat, it.hint());
                     setGraphic(line);
                     return;
                 }
@@ -123,10 +126,11 @@ public final class CommandBar extends VBox {
         if (!items.isEmpty()) list.getSelectionModel().select(0);
     }
 
-    private void run(Item it) {
+    private void run(@Nullable Item it) {
         if (it == null) return;
         close.run();
-        if (it.chat() != null) openChat.accept(it.chat());
-        else it.action().run();
+        Chat chat = it.chat();
+        if (chat != null) openChat.accept(chat);
+        else Objects.requireNonNull(it.action(), "an item without a chat is a command").run();
     }
 }

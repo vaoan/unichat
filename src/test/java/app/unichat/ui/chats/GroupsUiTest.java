@@ -18,6 +18,7 @@ import javafx.stage.Stage;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -31,7 +32,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 /** Servers/groups are rows of the Bandeja whose channels open over the list, like a Telegram group. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class GroupsUiTest {
+    @SuppressWarnings("NullAway.Init") // open() sets it, and every test opens first
     private MockChatService svc;
+    @SuppressWarnings("NullAway.Init") // open() sets it, and every test opens first
     private MainView view;
 
     @BeforeAll
@@ -46,7 +49,7 @@ class GroupsUiTest {
         }
     }
 
-    private Scene open(Network n) throws InterruptedException {
+    private Scene open(@Nullable Network n) throws InterruptedException {
         svc = new MockChatService();
         Scene scene = fx(() -> {
             Stage stage = new Stage();
@@ -225,7 +228,7 @@ class GroupsUiTest {
         svc.stop();
     }
 
-    private static Node favouriteTile(Scene scene) {
+    private static @Nullable Node favouriteTile(Scene scene) {
         return scene.getRoot().lookupAll(".favorites > *").stream()
                 .filter(n -> String.valueOf(n.queryAccessibleAttribute(javafx.scene.AccessibleAttribute.TEXT)).contains("Servidor Unichat"))
                 .findFirst().orElse(null);

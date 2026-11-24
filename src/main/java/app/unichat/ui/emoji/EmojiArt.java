@@ -1,11 +1,11 @@
 package app.unichat.ui.emoji;
 
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.scene.image.Image;
 import javafx.scene.text.Font;
 import javafx.scene.text.Text;
+import org.jspecify.annotations.Nullable;
 
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
@@ -34,34 +34,41 @@ final class EmojiArt {
     /** A joined emoji is as wide as a plain one; its parts side by side are about twice. */
     private static final double SAME_WIDTH = 1.3;
 
-    private static Set<String> pieces;
-    private static CompletableFuture<Map<String, Image>> pictures;
+    private static @Nullable Set<String> pieces;
+    private static @Nullable CompletableFuture<Map<String, Image>> pictures;
     /** Emoji met in messages (skin tones included, not only the list's): their picture, or none when JavaFX draws them whole. */
     private static final Map<String, java.util.Optional<Image>> MET = new HashMap<>();
 
     /** A run of a message's text, or one emoji in it to show as {@code picture}. */
-    record Segment(String text, Image picture) {}
+    record Segment(String text, @Nullable Image picture) {}
 
     private EmojiArt() {}
 
     /** Whether JavaFX draws {@code e} in pieces. On the FX thread. */
-    @SuppressFBWarnings(value = "LI_LAZY_INIT_STATIC", justification = "on the FX thread only (as its NOPMD says)")
     static boolean inPieces(String e) {
-        if (pieces == null) pieces = measure(); // NOPMD: NonThreadSafeSingleton, only on the FX thread
-        return pieces.contains(e);
+        return pieces().contains(e);
+    }
+
+    private static Set<String> pieces() {
+        Set<String> p = pieces;
+        if (p == null) { // the FX thread only: no lock
+            p = measure();
+            pieces = p;
+        }
+        return p;
     }
 
     /** The pictures of those drawn in pieces, for the ones Java2D could join; started on first use. On the FX thread. */
-    @SuppressFBWarnings(value = "LI_LAZY_INIT_STATIC", justification = "on the FX thread only (as its NOPMD says)")
     static CompletableFuture<Map<String, Image>> pictures() {
-        if (pictures == null) { // NOPMD: NonThreadSafeSingleton, only on the FX thread
-            if (pieces == null) pieces = measure(); // NOPMD: NonThreadSafeSingleton, only on the FX thread
-            Set<String> todo = Set.copyOf(pieces);
+        CompletableFuture<Map<String, Image>> p = pictures;
+        if (p == null) { // the FX thread only: no lock
+            Set<String> todo = Set.copyOf(pieces());
             String family = family();
-            pictures = family == null || todo.isEmpty() ? CompletableFuture.completedFuture(Map.of())
+            p = family == null || todo.isEmpty() ? CompletableFuture.completedFuture(Map.of())
                     : CompletableFuture.supplyAsync(() -> draw(todo, family));
+            pictures = p;
         }
-        return pictures;
+        return p;
     }
 
     private static Set<String> measure() {
@@ -92,7 +99,7 @@ final class EmojiArt {
     }
 
     /** {@code e} drawn by Java2D, or null when it can't join it either. Offscreen: any thread. */
-    private static Image drawOne(String e, String family) {
+    private static @Nullable Image drawOne(String e, String family) {
         java.awt.Font font = new java.awt.Font(family, java.awt.Font.PLAIN, PX * 3 / 4);
         FontRenderContext frc = new BufferedImage(1, 1, BufferedImage.TYPE_INT_ARGB).createGraphics().getFontRenderContext();
         TextLayout t = new TextLayout(e, font, frc);
@@ -129,7 +136,7 @@ final class EmojiArt {
     }
 
     /** The picture for one character as a person sees it, if it's an emoji JavaFX would draw in pieces. */
-    private static Image picture(String cluster) {
+    private static @Nullable Image picture(String cluster) {
         if (cluster.codePointCount(0, cluster.length()) < 2 || !Character.isEmoji(cluster.codePointAt(0))) return null;
         return MET.computeIfAbsent(cluster, c -> {
             String family = family();
@@ -140,13 +147,13 @@ final class EmojiArt {
         }).orElse(null);
     }
 
-    private static String family() {
+    private static @Nullable String family() {
         List<String> installed = Font.getFamilies();
         return FONTS.stream().filter(installed::contains).findFirst().orElse(null);
     }
 
     /** Runs {@code then} on the FX thread with the picture of {@code e}, or null when it can't be shown. */
-    static void whenDrawn(String e, java.util.function.Consumer<Image> then) {
+    static void whenDrawn(String e, java.util.function.Consumer<@Nullable Image> then) {
         var _ = pictures().thenAccept(m -> Platform.runLater(() -> then.accept(m.get(e))));
     }
 }

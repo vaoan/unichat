@@ -3,6 +3,7 @@ package app.unichat.ui.media;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import org.junit.jupiter.api.Test;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.List;
@@ -10,7 +11,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class GalleryTest {
-    private static Message msg(String id, MessageType type, String name) {
+    private static Message msg(String id, MessageType type, @Nullable String name) {
         Message m = new Message(id, "!c", "@a", "A", false, Instant.EPOCH);
         m.setType(type);
         m.setMediaUrl("mxc://s/" + id);

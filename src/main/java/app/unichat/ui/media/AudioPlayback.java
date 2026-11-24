@@ -9,6 +9,7 @@ import app.unichat.stt.PlayableAudio;
 import javafx.application.Platform;
 import javafx.scene.media.MediaPlayer;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -32,10 +33,10 @@ public final class AudioPlayback {
     private final MediaSource media;
     private final Consumer<String> toast;
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
-    private Message current;
-    private Chat chat;
-    private State state;
-    private MediaPlayer player;
+    private @Nullable Message current;
+    private @Nullable Chat chat;
+    private @Nullable State state;
+    private @Nullable MediaPlayer player;
     private double volume = 1;
     /** Changes with every start and stop, so a download that finishes late can tell nobody wants it any more. */
     private long generation;
@@ -45,10 +46,10 @@ public final class AudioPlayback {
         this.toast = toast;
     }
 
-    Message current() { return current; }
-    Chat chat() { return chat; }
-    State state() { return state; }
-    boolean isCurrent(Message m) { return current != null && m != null && current.id().equals(m.id()); }
+    @Nullable Message current() { return current; }
+    @Nullable Chat chat() { return chat; }
+    @Nullable State state() { return state; }
+    boolean isCurrent(@Nullable Message m) { return current != null && m != null && current.id().equals(m.id()); }
     int listenerCount() { return listeners.size(); }
     void addListener(Runnable l) { listeners.add(l); }
     void removeListener(Runnable l) { listeners.remove(l); }
@@ -63,7 +64,7 @@ public final class AudioPlayback {
     }
 
     /** Plays {@code m}, or pauses or resumes it if it's the one already here. */
-    public void toggle(Message m, Chat inChat) {
+    public void toggle(Message m, @Nullable Chat inChat) {
         if (isCurrent(m)) {
             togglePlay();
             return;

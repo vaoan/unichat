@@ -39,7 +39,9 @@ class MediaTilesUiTest {
     @TempDir Path dir;
     private final AtomicInteger asked = new AtomicInteger();
     private MediaLibrary library;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private StickerGrid grid;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private Stage stage;
 
     @BeforeAll

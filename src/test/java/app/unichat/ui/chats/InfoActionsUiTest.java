@@ -9,6 +9,7 @@ import javafx.scene.control.Button;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -41,7 +42,7 @@ class InfoActionsUiTest {
             stage.setOpacity(0);
             stage.setScene(new Scene(p, 360, 900));
             stage.show();
-            p.show(svc.chat(id));
+            p.show(Present.of(svc.chat(id)));
             return p;
         });
         FxWait.until("the actions show", () -> !pane.lookupAll(".info-action").isEmpty());
@@ -51,7 +52,7 @@ class InfoActionsUiTest {
         assertTrue(names.contains("Mover a prioridad baja") && names.contains("Opciones del chat"), names.toString());
         Button low = actions.get(names.indexOf("Mover a prioridad baja"));
         FxWait.onFx(low::fire);
-        assertTrue(svc.chat(id).lowPriority());
+        assertTrue(Present.of(svc.chat(id)).lowPriority());
         svc.setLowPriority(id, false).get();
         Button options = actions.get(names.indexOf("Opciones del chat"));
         FxWait.onFx(options::fire);

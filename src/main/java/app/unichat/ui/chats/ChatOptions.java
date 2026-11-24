@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.Objects;
 
 /**
  * A chat's own options, from the gear in its header, in the window's overlay: what of what others send there is saved
@@ -180,7 +181,8 @@ public final class ChatOptions {
         javafx.beans.property.BooleanProperty halting = new javafx.beans.property.SimpleBooleanProperty();
         Runnable redraw = () -> {
             AutoSave.Exploring e = save.exploring(chat.id());
-            boolean stoppingNow = e.running() && e.now() != null && e.now().doing() == AutoSave.Doing.STOPPING;
+            AutoSave.Now now = e.now();
+            boolean stoppingNow = e.running() && now != null && now.doing() == AutoSave.Doing.STOPPING;
             go.setText(I18n.t(stoppingNow ? "chatOptions.pastStopping" : e.running() ? "chatOptions.pastStop"
                     : e.start() ? "chatOptions.pastAgain" : "chatOptions.pastStart"));
             halting.set(stoppingNow);
@@ -213,18 +215,25 @@ public final class ChatOptions {
         String doing;
         if (e.running()) {
             AutoSave.Now now = e.now();
+            java.time.Instant at = now == null ? null : now.at();
             doing = now == null ? I18n.t("chatOptions.pastRunning") : switch (now.doing()) {
-                case LOOKING -> I18n.t("chatOptions.pastLooking", day(now.at()));
-                case DOWNLOADING -> I18n.t("chatOptions.pastDownloading", now.what(), day(now.at()))
+                case LOOKING -> I18n.t("chatOptions.pastLooking", day(Objects.requireNonNull(at, MESSAGE_TIME)));
+                case DOWNLOADING -> I18n.t("chatOptions.pastDownloading", now.what(), day(Objects.requireNonNull(at, MESSAGE_TIME)))
                         + (now.done() < 0 ? "" : " · " + Math.round(now.done() * 100) + " %");
-                case ASKING_OLDER -> now.at() == null ? I18n.t("chatOptions.pastRunning") : I18n.t("chatOptions.pastAsking", day(now.at()));
+                case ASKING_OLDER -> at == null ? I18n.t("chatOptions.pastRunning") : I18n.t("chatOptions.pastAsking", day(at));
                 case STOPPING -> I18n.t("chatOptions.pastStopping");
             };
-        } else if (e.start()) doing = I18n.t("chatOptions.pastAtStart");
-        else if (e.back() != null) doing = I18n.t("chatOptions.pastUntil", day(e.back()));
-        else doing = "";
+        } else if (e.start()) {
+            doing = I18n.t("chatOptions.pastAtStart");
+        } else {
+            java.time.Instant back = e.back();
+            doing = back == null ? "" : I18n.t("chatOptions.pastUntil", day(back));
+        }
         return counts.isEmpty() ? doing : doing.isEmpty() ? counts : doing + "\n" + counts;
     }
+
+    /** Why looking and downloading have a time: PastExplorer always gives the message's. */
+    private static final String MESSAGE_TIME = "looking and downloading always say the message's time";
 
     private static String day(java.time.Instant at) {
         return java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy", I18n.locale())

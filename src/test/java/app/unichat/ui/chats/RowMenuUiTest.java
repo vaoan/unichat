@@ -22,6 +22,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -81,7 +82,7 @@ class RowMenuUiTest {
     @Test
     void aRowsMenuStaysOpenWhileTheListsRefresh() throws Exception {
         String work = svc.createFolder("Trabajo");
-        svc.setInFolder(work, svc.chat(FAMILIA), true);
+        svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
 
         assertMenuSurvivesRefresh(".chat-list");
         fx(() -> {

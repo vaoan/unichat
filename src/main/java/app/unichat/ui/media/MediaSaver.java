@@ -7,6 +7,7 @@ import app.unichat.support.I18n;
 import javafx.application.Platform;
 import javafx.stage.FileChooser;
 import javafx.stage.Window;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.nio.file.Files;
@@ -29,7 +30,7 @@ public final class MediaSaver {
     }
 
     /** Saves the picture at {@code url} (an avatar: no message to name it after) under a name the person picks. */
-    public static void save(Window owner, MediaSource svc, String url, String suggested, Consumer<String> toast) {
+    public static void save(Window owner, MediaSource svc, @Nullable String url, String suggested, Consumer<String> toast) {
         FileChooser fc = new FileChooser();
         fc.setTitle(I18n.t("saver.title"));
         fc.setInitialFileName(suggested);

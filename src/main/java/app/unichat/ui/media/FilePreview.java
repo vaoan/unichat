@@ -1,6 +1,7 @@
 package app.unichat.ui.media;
 
 import app.unichat.model.Message;
+import org.jspecify.annotations.Nullable;
 
 import java.util.Locale;
 
@@ -16,13 +17,15 @@ final class FilePreview {
     }
 
     /** The URL to show in the file's chip, or null for the icon. */
-    static String url(Message m) {
-        if (m.mediaInfo() != null) {
-            String thumb = m.mediaInfo().path("thumbnail_url").asText("");
+    static @Nullable String url(Message m) {
+        com.fasterxml.jackson.databind.JsonNode info = m.mediaInfo();
+        if (info != null) {
+            String thumb = info.path("thumbnail_url").asText("");
             if (thumb.startsWith("mxc://")) return thumb;
         }
-        if (m.mediaUrl() == null || !isPicture(m)) return null;
-        return m.fileSize() > MAX_IMAGE_BYTES ? null : m.mediaUrl();
+        String url = m.mediaUrl();
+        if (url == null || !isPicture(m)) return null;
+        return m.fileSize() > MAX_IMAGE_BYTES ? null : url;
     }
 
     /**
@@ -30,14 +33,17 @@ final class FilePreview {
      * and size (and the attached thumbnail, when there is one).
      */
     static String key(Message m) {
-        return m.fileName() + "|" + m.fileSize() + "|" + (m.mediaInfo() == null ? "" : m.mediaInfo().path("thumbnail_url").asText(""));
+        com.fasterxml.jackson.databind.JsonNode info = m.mediaInfo();
+        return m.fileName() + "|" + m.fileSize() + "|" + (info == null ? "" : info.path("thumbnail_url").asText(""));
     }
 
     /** By the MIME it came with, else by the name: documents often come as application/octet-stream. */
     static boolean isPicture(Message m) {
-        String mime = m.mimeType() == null ? "" : m.mimeType().toLowerCase(Locale.ROOT);
+        String given = m.mimeType();
+        String mime = given == null ? "" : given.toLowerCase(Locale.ROOT);
         if (mime.startsWith("image/")) return !mime.contains("heic") && !mime.contains("heif") && !mime.contains("svg");
-        String name = m.fileName() == null ? "" : m.fileName().toLowerCase(Locale.ROOT);
+        String file = m.fileName();
+        String name = file == null ? "" : file.toLowerCase(Locale.ROOT);
         return name.matches(".*\\.(jpe?g|png|gif|webp|bmp)$");
     }
 }

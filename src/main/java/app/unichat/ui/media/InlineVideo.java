@@ -13,6 +13,7 @@ import javafx.scene.layout.StackPane;
 import javafx.scene.media.MediaPlayer;
 import javafx.scene.media.MediaView;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.util.function.Supplier;
@@ -27,18 +28,18 @@ final class InlineVideo extends StackPane {
     private static final Duration START_DELAY = Duration.millis(250);
 
     private final MediaSource svc;
-    private final String url;
+    private final @Nullable String url;
     private final Supplier<Node> onFailure;
     private final MediaView view = new MediaView();
     private final PauseTransition start = new PauseTransition(START_DELAY);
     private final Timeline visibility = new Timeline(new KeyFrame(Duration.seconds(1), e -> followVisibility()));
     /** Behind a sheet it pauses at once: its frames under the card's shadow made the Mac flash black. */
     private final Runnable coverChanged = this::followVisibility;
-    private MediaPlayer player;
+    private @Nullable MediaPlayer player;
     private long generation;
 
     /** @param onFailure what to show instead when the video can't play (it replaces the video) */
-    InlineVideo(MediaSource svc, String url, double width, double height, Supplier<Node> onFailure) {
+    InlineVideo(MediaSource svc, @Nullable String url, double width, double height, Supplier<Node> onFailure) {
         this.svc = svc;
         this.url = url;
         this.onFailure = onFailure;
@@ -56,7 +57,7 @@ final class InlineVideo extends StackPane {
         Showing.whileShowing(this, start::playFromStart, this::release);
     }
 
-    MediaPlayer player() { return player; }
+    @Nullable MediaPlayer player() { return player; }
 
     private void load() {
         long mine = ++generation;
@@ -69,14 +70,15 @@ final class InlineVideo extends StackPane {
 
     private void play(Path file) {
         long mine = generation;
-        player = MediaPlayers.open(file, () -> {
+        MediaPlayer p = MediaPlayers.open(file, () -> {
             if (mine == generation) failed();
         });
-        if (player == null) return;
-        player.setMute(true);
-        player.setCycleCount(MediaPlayer.INDEFINITE);
-        view.setMediaPlayer(player);
-        player.play();
+        player = p;
+        if (p == null) return;
+        p.setMute(true);
+        p.setCycleCount(MediaPlayer.INDEFINITE);
+        view.setMediaPlayer(p);
+        p.play();
         visibility.playFromStart();
         AnimatedImage.watchCover(coverChanged);
         followVisibility();

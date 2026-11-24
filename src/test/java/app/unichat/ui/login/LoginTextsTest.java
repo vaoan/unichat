@@ -11,6 +11,8 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class LoginTextsTest {
+    private static final app.unichat.login.SessionCookies NO_COOKIES = new app.unichat.login.SessionCookies(Network.INSTAGRAM, java.util.Map.of());
+
     @Test
     void missingMessageNamesCookiesAndNetwork() {
         assertEquals("Al archivo le falta: auth_token, ct0. Exporta las cookies con la sesión de "
@@ -39,8 +41,8 @@ class LoginTextsTest {
     @Test
     void sessionLabelIncludesBrowserAndProfile() {
         assertEquals("Usar tu sesión de Instagram de Firefox (default)",
-                LoginTexts.sessionLabel("Instagram", new BrowserSession("Firefox", "default", null)));
+                LoginTexts.sessionLabel("Instagram", new BrowserSession("Firefox", "default", NO_COOKIES)));
         assertEquals("Usar tu sesión de Instagram de Chrome",
-                LoginTexts.sessionLabel("Instagram", new BrowserSession("Chrome", "", null)));
+                LoginTexts.sessionLabel("Instagram", new BrowserSession("Chrome", "", NO_COOKIES)));
     }
 }

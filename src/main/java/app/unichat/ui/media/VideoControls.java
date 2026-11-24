@@ -29,6 +29,7 @@ import javafx.scene.media.MediaView;
 import javafx.stage.FileChooser;
 import javafx.stage.Stage;
 import javafx.util.Duration;
+import org.jspecify.annotations.Nullable;
 
 import java.io.File;
 import java.util.Locale;
@@ -64,7 +65,7 @@ final class VideoControls extends VBox {
     private boolean ended;
 
     /** @param onSave saves the video (null: no button); {@code openElsewhere} hands it to the system's player */
-    VideoControls(MediaPlayer p, Stage stage, MediaView view, StackPane screen, Runnable onSave, Runnable openElsewhere) {
+    VideoControls(MediaPlayer p, Stage stage, MediaView view, StackPane screen, @Nullable Runnable onSave, Runnable openElsewhere) {
         super(6);
         this.p = p;
         this.stage = stage;
@@ -383,7 +384,7 @@ final class VideoControls extends VBox {
     }
 
     /** "clip.mp4" at 65.4 s → "clip-1m05s.png". */
-    static String frameName(String title, double seconds) {
+    static String frameName(@Nullable String title, double seconds) {
         String base = FileNames.safe(title == null ? "" : title.replaceAll("\\.[A-Za-z0-9]{1,5}$", ""));
         if (base.isEmpty()) base = "video";
         long s = (long) Math.max(0, seconds);

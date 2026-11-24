@@ -34,6 +34,7 @@ class FavoritesRebuildUiTest {
     private static final String SET = "https://t.me/addstickers/FluxAnimation";
     @TempDir Path dir;
     private final List<String> toasts = new CopyOnWriteArrayList<>();
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private Stage stage;
 
     @BeforeAll

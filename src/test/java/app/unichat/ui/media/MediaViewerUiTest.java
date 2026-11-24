@@ -42,6 +42,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class MediaViewerUiTest {
     @TempDir
     Path dir;
+    @SuppressWarnings("NullAway.Init") // open() (@BeforeEach) sets it on the FX thread
     private Stage owner;
     private int saves;
 

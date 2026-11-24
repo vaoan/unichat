@@ -34,6 +34,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -108,7 +110,7 @@ class FoldersUiTest {
     void clickingShowsNamesAndClickingANameGoesIn() throws Exception {
         String work = svc.createFolder("Trabajo");
         svc.createFolder("Casa");
-        svc.setInFolder(work, svc.chat(FAMILIA), true);
+        svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
 
         fire(railButton("Carpetas"));
         assertTrue(fx(pane::foldersOpen));
@@ -156,7 +158,7 @@ class FoldersUiTest {
     @Test
     void openingAChatStaysInTheFolder() throws Exception {
         String work = svc.createFolder("Trabajo");
-        svc.setInFolder(work, svc.chat(FAMILIA), true);
+        svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
 
@@ -170,8 +172,8 @@ class FoldersUiTest {
     void aChatCanBeInTwoFolders() throws Exception {
         String work = svc.createFolder("Trabajo");
         String home = svc.createFolder("Casa");
-        svc.setInFolder(work, svc.chat(FAMILIA), true);
-        svc.setInFolder(home, svc.chat(FAMILIA), true);
+        svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
+        svc.setInFolder(home, Present.of(svc.chat(FAMILIA)), true);
         fire(railButton("Carpetas"));
 
         clickCell(".folder-list", "Trabajo");
@@ -185,7 +187,7 @@ class FoldersUiTest {
     void deletingTheOpenFolderGoesBackToTheNames() throws Exception {
         String work = svc.createFolder("Trabajo");
         svc.createFolder("Casa");
-        svc.setInFolder(work, svc.chat(FAMILIA), true);
+        svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
 
@@ -199,8 +201,8 @@ class FoldersUiTest {
     @Test
     void leavingAChatInsideAFolderJustHidesIt() throws Exception {
         String work = svc.createFolder("Trabajo");
-        String key = svc.chat(FAMILIA).prefKey();
-        svc.setInFolder(work, svc.chat(FAMILIA), true);
+        String key = Present.of(svc.chat(FAMILIA)).prefKey();
+        svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
 
@@ -213,7 +215,7 @@ class FoldersUiTest {
     @Test
     void searchingLeavesTheFolder() throws Exception {
         String work = svc.createFolder("Trabajo");
-        svc.setInFolder(work, svc.chat(FAMILIA), true);
+        svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
 
@@ -247,7 +249,7 @@ class FoldersUiTest {
     @Test
     void aNetworkFilterDoesNotHideChatsFromFolders() throws Exception {
         String work = svc.createFolder("Trabajo");
-        svc.setInFolder(work, svc.chat(SERVER), true);
+        svc.setInFolder(work, Present.of(svc.chat(SERVER)), true);
         fx(() -> {
             pane.goTo(pane.filterProperty().get().switchTo(app.unichat.model.Network.TELEGRAM, null));
             return null;
@@ -263,9 +265,9 @@ class FoldersUiTest {
     void menuTogglesMembership() throws Exception {
         String work = svc.createFolder("Trabajo");
         String home = svc.createFolder("Casa");
-        svc.setInFolder(home, svc.chat(FAMILIA), true);
+        svc.setInFolder(home, Present.of(svc.chat(FAMILIA)), true);
 
-        Menu menu = fx(() -> foldersMenu(chatMenu(svc.chat(FAMILIA))));
+        Menu menu = fx(() -> foldersMenu(chatMenu(Present.of(svc.chat(FAMILIA)))));
         assertFalse(fx(() -> check(menu, "Trabajo").isSelected()));
         assertTrue(fx(() -> check(menu, "Casa").isSelected()));
         assertTrue(fx(() -> menu.getItems().stream().anyMatch(i -> "Nueva carpeta…".equals(i.getText()))));
@@ -276,7 +278,7 @@ class FoldersUiTest {
             item.fire();
             return null;
         });
-        String key = svc.chat(FAMILIA).prefKey();
+        String key = Present.of(svc.chat(FAMILIA)).prefKey();
         assertTrue(folder(work).chatKeys().contains(key));
 
         fx(() -> {
@@ -287,7 +289,7 @@ class FoldersUiTest {
         });
         assertFalse(folder(home).chatKeys().contains(key));
 
-        assertNotNull(fx(() -> foldersMenu(pane.menuFor(svc.chat(SERVER)))), "a server can be in a folder");
+        assertNotNull(fx(() -> foldersMenu(pane.menuFor(Present.of(svc.chat(SERVER))))), "a server can be in a folder");
 
         Chat bot = new Chat("!bot:demo");
         bot.setBridgeBot(true);
@@ -307,12 +309,12 @@ class FoldersUiTest {
     @Test
     void aServerOverTheFolderLeavesItAloneUntilComingBack() throws Exception {
         String work = svc.createFolder("Trabajo");
-        svc.setInFolder(work, svc.chat(SERVER), true);
+        svc.setInFolder(work, Present.of(svc.chat(SERVER)), true);
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
         clickCell(".folder-chats", title(SERVER));
 
-        svc.setInFolder(work, svc.chat(FAMILIA), true);
+        svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
         FxWait.onFx(pane::refresh);
         assertEquals(1, fx(() -> folderChats().getItems().size()), "hidden: nothing to draw");
 
@@ -323,13 +325,13 @@ class FoldersUiTest {
     @Test
     void insideAFolderTheMenuCanTakeTheChatOut() throws Exception {
         String work = svc.createFolder("Trabajo");
-        svc.setInFolder(work, svc.chat(FAMILIA), true);
-        assertNull(fx(() -> itemNamed(pane.menuFor(svc.chat(FAMILIA)), "Quitar de esta carpeta")), "outside a folder");
+        svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
+        assertNull(fx(() -> itemNamed(pane.menuFor(Present.of(svc.chat(FAMILIA))), "Quitar de esta carpeta")), "outside a folder");
 
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
         fx(() -> {
-            itemNamed(pane.menuFor(svc.chat(FAMILIA)), "Quitar de esta carpeta").fire();
+            Present.of(itemNamed(pane.menuFor(Present.of(svc.chat(FAMILIA))), "Quitar de esta carpeta")).fire();
             return null;
         });
         assertTrue(folder(work).chatKeys().isEmpty());
@@ -357,20 +359,20 @@ class FoldersUiTest {
     @Test
     void theChatMenuCreatesAFolderWithTheChatInside() throws Exception {
         fx(() -> {
-            MenuItem create = foldersMenu(chatMenu(svc.chat(FAMILIA))).getItems().stream()
+            MenuItem create = Present.of(foldersMenu(chatMenu(Present.of(svc.chat(FAMILIA))))).getItems().stream()
                     .filter(i -> "Nueva carpeta…".equals(i.getText())).findFirst().orElseThrow();
             create.fire();
             nameField().setText("Amigos");
             return null;
         });
         fire(fx(() -> buttons("Crear").get(0)));
-        assertEquals(List.of(svc.chat(FAMILIA).prefKey()), svc.folders().get(0).chatKeys());
+        assertEquals(List.of(Present.of(svc.chat(FAMILIA)).prefKey()), svc.folders().get(0).chatKeys());
     }
 
     @Test
     void renameAndDeleteFromTheNames() throws Exception {
         String work = svc.createFolder("Trabajo");
-        svc.setInFolder(work, svc.chat(FAMILIA), true);
+        svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
         fire(railButton("Carpetas"));
         fx(() -> {
             folderList().getSelectionModel().select(0);
@@ -408,7 +410,7 @@ class FoldersUiTest {
     @Test
     void aRefreshKeepsTheSelection() throws Exception {
         String work = svc.createFolder("Trabajo");
-        svc.setInFolder(work, svc.chat(FAMILIA), true);
+        svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
         clickCell(".folder-chats", title(FAMILIA));
@@ -427,7 +429,7 @@ class FoldersUiTest {
     @Test
     void aServerInAFolderOpensItsChannelsAndComesBackToTheFolder() throws Exception {
         String work = svc.createFolder("Trabajo");
-        svc.setInFolder(work, svc.chat(SERVER), true);
+        svc.setInFolder(work, Present.of(svc.chat(SERVER)), true);
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
 
@@ -443,7 +445,7 @@ class FoldersUiTest {
     @Test
     void altArrowsStayInsideTheFolder() throws Exception {
         String work = svc.createFolder("Trabajo");
-        svc.setInFolder(work, svc.chat(FAMILIA), true);
+        svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
         fire(railButton("Carpetas"));
         fx(() -> {
             pane.move(1, false);
@@ -462,8 +464,8 @@ class FoldersUiTest {
     @Test
     void theMenuKeyOpensTheSelectedRowsMenuOnEveryList() throws Exception {
         String work = svc.createFolder("Trabajo");
-        svc.setInFolder(work, svc.chat(SERVER), true);
-        svc.setInFolder(work, svc.chat(FAMILIA), true);
+        svc.setInFolder(work, Present.of(svc.chat(SERVER)), true);
+        svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
 
         assertTrue(menuKeyOn(inboxListNow(), SERVER).contains("Carpetas"), "the inbox, on a server: never opens in the thread");
 
@@ -489,7 +491,7 @@ class FoldersUiTest {
     @Test
     void anArchivedChatInAFolderDoesNotSendTheHiddenFilterToTheArchive() throws Exception {
         String work = svc.createFolder("Trabajo");
-        svc.setInFolder(work, svc.chat(FAMILIA), true);
+        svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
         svc.setArchived(FAMILIA, true).get();
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
@@ -548,8 +550,8 @@ class FoldersUiTest {
     @Test
     void backFromAServerReselectsItEvenAfterOpeningAChannel() throws Exception {
         String work = svc.createFolder("Trabajo");
-        svc.setInFolder(work, svc.chat(FAMILIA), true);
-        svc.setInFolder(work, svc.chat(SERVER), true);
+        svc.setInFolder(work, Present.of(svc.chat(FAMILIA)), true);
+        svc.setInFolder(work, Present.of(svc.chat(SERVER)), true);
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
         clickCell(".folder-chats", title(SERVER));
@@ -623,12 +625,12 @@ class FoldersUiTest {
         return pane.menuFor(c);
     }
 
-    private static Menu foldersMenu(ContextMenu menu) {
+    private static @Nullable Menu foldersMenu(ContextMenu menu) {
         return (Menu) menu.getItems().stream().filter(i -> i instanceof Menu && "Carpetas".equals(i.getText()))
                 .findFirst().orElse(null);
     }
 
-    private static MenuItem itemNamed(ContextMenu menu, String text) {
+    private static @Nullable MenuItem itemNamed(ContextMenu menu, String text) {
         return menu.getItems().stream().filter(i -> text.equals(i.getText())).findFirst().orElse(null);
     }
 
@@ -642,7 +644,7 @@ class FoldersUiTest {
     }
 
     private String title(String chatId) {
-        return svc.chat(chatId).title();
+        return Present.of(svc.chat(chatId)).title();
     }
 
     private int railIndex(String text) throws InterruptedException {

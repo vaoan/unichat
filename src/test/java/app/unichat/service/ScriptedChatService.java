@@ -4,6 +4,7 @@ import app.unichat.Present;
 import app.unichat.model.Chat;
 import app.unichat.model.Member;
 import app.unichat.model.Message;
+import org.jspecify.annotations.Nullable;
 
 import java.nio.file.Path;
 import java.time.Instant;
@@ -76,13 +77,13 @@ public class ScriptedChatService extends MockChatService {
     }
 
     @Override
-    public CompletableFuture<Path> media(String url, int width, int height, java.util.function.DoubleConsumer listener) {
+    public CompletableFuture<Path> media(@Nullable String url, int width, int height, java.util.function.DoubleConsumer listener) {
         if (!downloads.isDone()) progress.add(listener);
         return media(url, width, height);
     }
 
     @Override
-    public CompletableFuture<Path> media(String url, int width, int height) {
+    public CompletableFuture<Path> media(@Nullable String url, int width, int height) {
         CompletableFuture<Void> gate = downloads;
         return gate.isDone() && !gate.isCompletedExceptionally() ? super.media(url, width, height)
                 : gate.thenCompose(x -> super.media(url, width, height));

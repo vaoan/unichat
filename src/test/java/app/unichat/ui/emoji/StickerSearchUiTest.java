@@ -27,6 +27,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.io.TempDir;
+import app.unichat.Present;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -59,7 +60,9 @@ class StickerSearchUiTest {
     private final AtomicInteger fetched = new AtomicInteger();
     private final List<MediaLibrary.Item> sent = new CopyOnWriteArrayList<>();
     private MediaLibrary library;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private StickerGrid grid;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private Stage stage;
 
     @BeforeAll
@@ -97,7 +100,7 @@ class StickerSearchUiTest {
                             new StickerPack.Ref("Gatitos felices", GATITOS), new StickerPack.Ref("Perros", PERROS)));
                     case "stickerPack" -> {
                         fetched.incrementAndGet();
-                        yield answers.get((String) args[0]).get();
+                        yield Present.of(answers.get((String) args[0])).get();
                     }
                     case "sendSticker" -> {
                         sent.add((MediaLibrary.Item) args[1]);
@@ -190,7 +193,7 @@ class StickerSearchUiTest {
     @Test
     void setsAreBroughtOneAfterAnother() throws Exception {
         CompletableFuture<StickerPack> slow = new CompletableFuture<>();
-        StickerPack gatitos = answers.get(GATITOS).get().get();
+        StickerPack gatitos = Present.of(answers.get(GATITOS)).get().get();
         answers.put(GATITOS, () -> slow);
         type("🐶"); // not "perro", which names the set "Perros" too
         FxWait.until("the first asked", () -> fetched.get() == 1);
@@ -202,7 +205,7 @@ class StickerSearchUiTest {
 
     @Test
     void aSetThatFailedIsAskedAgainAfterAWhile() throws Exception {
-        StickerPack gatitos = answers.get(GATITOS).get().get();
+        StickerPack gatitos = Present.of(answers.get(GATITOS)).get().get();
         answers.put(GATITOS, () -> CompletableFuture.failedFuture(new IllegalStateException("the bridge isn't ready")));
         long[] now = {1_000_000};
         FxWait.onFx(() -> grid.sets.clock = () -> now[0]);

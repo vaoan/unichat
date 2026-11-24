@@ -22,6 +22,7 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.StackPane;
 import javafx.stage.Stage;
 import javafx.stage.Window;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -42,7 +43,7 @@ public final class MediaViewer {
     record Item(String title, java.util.function.Supplier<CompletableFuture<Path>> file, Runnable onSave) {}
 
     /** {@code onSave}: the "Guardar como…" button. */
-    public static void show(Window owner, CompletableFuture<Path> file, String title, Runnable onSave) {
+    public static void show(Window owner, CompletableFuture<Path> file, @Nullable String title, Runnable onSave) {
         show(owner, java.util.List.of(new Item(title == null ? I18n.t("media.image") : title, () -> file, onSave)), 0);
     }
 

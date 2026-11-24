@@ -163,7 +163,7 @@ public final class AutoSave implements ChatService.Listener {
     }
 
     /** A chat's own folder (null: under the base again), taking along what it saved where it was. */
-    public java.util.concurrent.CompletableFuture<Integer> setOwn(Chat chat, Path folder) {
+    public java.util.concurrent.CompletableFuture<Integer> setOwn(Chat chat, @Nullable Path folder) {
         return onWorker(() -> SavedMove.toOwn(chat, folder));
     }
 

@@ -10,6 +10,7 @@ import javafx.scene.control.ProgressBar;
 import javafx.stage.Stage;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -43,8 +44,8 @@ class ExploreBarUiTest {
         Runnable changed = () -> listeners.forEach(Runnable::run);
         Stage[] stage = new Stage[1];
         ExploreBar bar = FxWait.fx(() -> {
-            ExploreBar b = new ExploreBar(() -> states.keySet().stream().filter(k -> states.get(k).running()).sorted().toList(),
-                    states::get, stopped::add, listeners::add, listeners::remove, svc, id -> { });
+            ExploreBar b = new ExploreBar(() -> states.keySet().stream().filter(k -> Present.of(states.get(k)).running()).sorted().toList(),
+                    k -> Present.of(states.get(k)), stopped::add, listeners::add, listeners::remove, svc, id -> { });
             stage[0] = new Stage();
             stage[0].setOpacity(0);
             stage[0].setScene(new Scene(b, 800, 120));

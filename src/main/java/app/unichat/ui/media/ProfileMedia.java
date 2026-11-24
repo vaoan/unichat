@@ -11,7 +11,6 @@ import app.unichat.model.MessageType;
 import app.unichat.service.ChatService;
 import app.unichat.support.I18n;
 import app.unichat.support.Urls;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.application.Platform;
 import javafx.scene.Node;
 import javafx.scene.control.Button;
@@ -25,6 +24,7 @@ import javafx.scene.layout.FlowPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.stage.Window;
+import org.jspecify.annotations.Nullable;
 
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
@@ -94,16 +94,16 @@ public final class ProfileMedia {
     private static final int TILE = 84;
 
     private final ChatService svc;
-    private final Supplier<Window> window;
+    private final Supplier<@Nullable Window> window;
     private final Consumer<String> toast;
     /** The tab open, kept while the profile is drawn again (it is on every message). */
     private Shelf open = Shelf.PHOTOS;
     private Consumer<Message> jump = m -> { };
     /** The window's player (one at a time); null until given: an audio then opens like a file. */
-    private AudioPlayback audio;
-    private Chat shownChat;
+    private @Nullable AudioPlayback audio;
+    private @Nullable Chat shownChat;
 
-    public ProfileMedia(ChatService svc, Supplier<Window> window, Consumer<String> toast) {
+    public ProfileMedia(ChatService svc, Supplier<@Nullable Window> window, Consumer<String> toast) {
         this.svc = svc;
         this.window = window;
         this.toast = toast;
@@ -217,7 +217,8 @@ public final class ProfileMedia {
         v.getStyleClass().add("media-thumb");
         load(v, m.mediaUrl());
         return goesToItsMessage(MediaTile.of(v, TILE, TILE, "media-thumb-tile", I18n.t("media.imageOpen"), true, () -> {
-            if (window.get() != null) Gallery.open(window.get(), svc, m, toast);
+            Window owner = window.get();
+            if (owner != null) Gallery.open(owner, svc, m, toast);
         }), m);
     }
 
@@ -248,10 +249,12 @@ public final class ProfileMedia {
     private Node video(Message m) {
         ImageView v = new ImageView();
         v.getStyleClass().add("media-thumb");
-        String thumb = m.mediaInfo() == null ? "" : m.mediaInfo().path("thumbnail_url").asText("");
+        com.fasterxml.jackson.databind.JsonNode info = m.mediaInfo();
+        String thumb = info == null ? "" : info.path("thumbnail_url").asText("");
         if (!thumb.isEmpty()) load(v, thumb);
         javafx.scene.layout.StackPane tile = MediaTile.of(v, TILE, TILE, "media-thumb-tile", I18n.t("media.videoOpen"), true, () -> {
-            if (window.get() != null) MediaOpening.video(window.get(), svc, m, I18n.t("video.title"), audio, toast);
+            Window owner = window.get();
+            if (owner != null) MediaOpening.video(owner, svc, m, I18n.t("video.title"), audio, toast);
         });
         tile.getChildren().add(Icons.icon(Icons.PLAY, 22));
         return goesToItsMessage(tile, m);
@@ -272,15 +275,17 @@ public final class ProfileMedia {
     }
 
     /** Who and when (and the name, for music), over its own player. */
-    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "the player is optional (setAudio): this method tests it for null before building the controls whose lambda uses it, and it's never set back to null")
     private Node audio(Message m) {
-        if (audio == null || shownChat == null) return file(m);
-        boolean voiceNote = m.mimeType() != null && m.mimeType().startsWith("audio/ogg");
-        String what = voiceNote || m.fileName() == null ? I18n.t("info.voiceNote") : m.fileName();
+        AudioPlayback player = audio;
+        Chat chat = shownChat;
+        if (player == null || chat == null) return file(m);
+        String mime = m.mimeType();
+        boolean voiceNote = mime != null && mime.startsWith("audio/ogg");
+        String file = m.fileName();
+        String what = voiceNote || file == null ? I18n.t("info.voiceNote") : file;
         Label meta = new Label(what + " · " + byWhom(m));
         meta.getStyleClass().add("settings-help");
-        Chat chat = shownChat;
-        AudioControls controls = new AudioControls(audio, () -> m, () -> audio.toggle(m, chat));
+        AudioControls controls = new AudioControls(player, () -> m, () -> player.toggle(m, chat));
         controls.setMaxWidth(Double.MAX_VALUE);
         VBox row = new VBox(2, meta, controls);
         row.getStyleClass().add("profile-audio");
@@ -289,7 +294,8 @@ public final class ProfileMedia {
 
     /** Name, size, who and when; opens with the system's app. */
     private Node file(Message m) {
-        String name = m.fileName() == null || m.fileName().isBlank() ? MediaSaver.suggestedName(m, ZoneId.systemDefault()) : m.fileName();
+        String given = m.fileName();
+        String name = given == null || given.isBlank() ? MediaSaver.suggestedName(m, ZoneId.systemDefault()) : given;
         Label meta = new Label((m.fileSize() > 0 ? Formats.fileSize(m.fileSize()) + " · " : "") + byWhom(m));
         meta.getStyleClass().add("settings-help");
         Label title = new Label(name);
@@ -308,7 +314,7 @@ public final class ProfileMedia {
         return m.timestamp() == null ? who : who + " · " + DAY.withLocale(I18n.locale()).format(m.timestamp().atZone(ZoneId.systemDefault()));
     }
 
-    private void load(ImageView v, String url) {
+    private void load(ImageView v, @Nullable String url) {
         var _ = svc.media(url, TILE * 2, TILE * 2).thenAcceptAsync(p -> {
             try {
                 Image img = AnimatedImage.still(p, TILE * 2, TILE * 2);

@@ -4,6 +4,7 @@ import app.unichat.settings.Settings;
 import app.unichat.support.BackgroundWriter;
 import app.unichat.support.BoundedMap;
 import app.unichat.support.SafeFile;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -18,7 +19,7 @@ import java.util.Map;
  */
 public final class PictureShapes {
     static final int KEPT = 4000;
-    private static PictureShapes shared;
+    private static @Nullable PictureShapes shared;
 
     private final Path file;
     private final Map<String, Double> shapes = BoundedMap.byUse(KEPT);
@@ -40,8 +41,12 @@ public final class PictureShapes {
     }
 
     public static synchronized PictureShapes get() {
-        if (shared == null) shared = new PictureShapes(Settings.get().cacheDir().resolve("picture-shapes.tsv"));
-        return shared;
+        PictureShapes s = shared;
+        if (s == null) {
+            s = new PictureShapes(Settings.get().cacheDir().resolve("picture-shapes.tsv"));
+            shared = s;
+        }
+        return s;
     }
 
     /** What {@code url}'s picture looked like last time, else {@code unknown}. */

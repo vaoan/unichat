@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
@@ -162,7 +163,7 @@ class EmojiPickerUiTest {
         FxWait.onFx(() -> grid.getScene().getWindow().hide());
     }
 
-    private static Button button(Node in, String e) {
+    private static @Nullable Button button(Node in, String e) {
         return in.lookupAll(".emoji-button").stream().map(n -> (Button) n)
                 .filter(b -> b.isVisible() && e.equals(b.getProperties().get("emoji"))).findFirst().orElse(null);
     }

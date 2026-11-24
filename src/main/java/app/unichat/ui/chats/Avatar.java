@@ -12,6 +12,7 @@ import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
 import javafx.scene.layout.StackPane;
 import javafx.scene.shape.Circle;
+import org.jspecify.annotations.Nullable;
 
 /** Round avatar: image if available, otherwise colored initials; optional network badge bottom-right. */
 public final class Avatar extends StackPane {
@@ -23,9 +24,9 @@ public final class Avatar extends StackPane {
     private final Label initials = new Label();
     private final ImageView image = new ImageView();
     private final Label badge = new Label();
-    private Network shownNetwork;
+    private @Nullable Network shownNetwork;
     private final java.util.Map<Network, javafx.scene.Node> glyphs = new java.util.EnumMap<>(Network.class);
-    private String loadedUrl;
+    private @Nullable String loadedUrl;
 
     public Avatar(double size) {
         this.size = size;
@@ -62,7 +63,7 @@ public final class Avatar extends StackPane {
     }
 
     /** Shows {@code name}'s initials and loads {@code url} through the service (may be null). */
-    public void set(String name, String key, String url, MediaSource service) {
+    public void set(String name, @Nullable String key, @Nullable String url, MediaSource service) {
         initials.setText(Formats.initials(name));
         String color = COLORS[Math.floorMod((key == null ? name : key).hashCode(), COLORS.length)];
         initials.setStyle("-fx-font-size: " + Math.round(size * 0.38) + "px; -fx-background-color: " + color + ";");
@@ -92,7 +93,7 @@ public final class Avatar extends StackPane {
         });
     }
 
-    public void setNetwork(Network network, boolean visible) {
+    public void setNetwork(@Nullable Network network, boolean visible) {
         if (network == null || !visible) {
             badge.setVisible(false);
             return;

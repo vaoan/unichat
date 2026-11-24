@@ -1,6 +1,7 @@
 package app.unichat.ui.desktop;
 
 import app.unichat.support.ScreenAway;
+import org.jspecify.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -33,7 +34,7 @@ public final class WindowsScreen implements ScreenAway {
     private final MessageWindow window;
     private final Consumer<String> log;
     private final CompletableFuture<Boolean> registered = new CompletableFuture<>();
-    private volatile Thread thread;
+    private volatile @Nullable Thread thread;
 
     public WindowsScreen() {
         this(new WindowsScreenWindow(), System.err::println);
@@ -89,7 +90,7 @@ public final class WindowsScreen implements ScreenAway {
         return registered;
     }
 
-    Thread thread() {
+    @Nullable Thread thread() {
         return thread;
     }
 

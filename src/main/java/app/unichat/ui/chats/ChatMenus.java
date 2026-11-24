@@ -11,6 +11,7 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.Menu;
 import javafx.scene.control.MenuItem;
 import javafx.scene.control.SeparatorMenuItem;
+import org.jspecify.annotations.Nullable;
 
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -27,7 +28,7 @@ public final class ChatMenus {
 
     private ChatMenus() {}
 
-    public static ContextMenu forChat(Chat c, ChatPreferences svc, FolderDialogs folders, Runnable afterLeave) {
+    public static ContextMenu forChat(Chat c, ChatPreferences svc, FolderDialogs folders, @Nullable Runnable afterLeave) {
         String id = c.id();
         ContextMenu menu = new ContextMenu();
         menu.getItems().addAll(
@@ -87,7 +88,7 @@ public final class ChatMenus {
     }
 
     /** The menu key lands on the list, not on a row: it opens the selected row's menu ({@code menu} may give none). */
-    static <T> void onMenuKey(ListView<T> list, Function<T, ContextMenu> menu) {
+    static <T> void onMenuKey(ListView<T> list, Function<T, @Nullable ContextMenu> menu) {
         list.setOnContextMenuRequested(e -> {
             T row = list.getSelectionModel().getSelectedItem();
             ContextMenu m = row != null && e.isKeyboardTrigger() ? menu.apply(row) : null;

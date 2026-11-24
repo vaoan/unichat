@@ -77,8 +77,8 @@ public final class LoginView extends StackPane {
         Label localStatus = new Label(I18n.t("login.localInfo"));
         localStatus.getStyleClass().add("login-subtitle");
         localStatus.setWrapText(true);
-        useLocal.setOnAction(e -> startLocalServer(local, useLocal, login, localStatus, error, onLoggedIn));
-        if (local != null) {
+        if (local != null) { // without it the button isn't shown
+            useLocal.setOnAction(e -> startLocalServer(local, useLocal, login, localStatus, error, onLoggedIn));
             login.getStyleClass().setAll("button", "secondary-button");
             login.setDefaultButton(false);
             useLocal.setDefaultButton(true);

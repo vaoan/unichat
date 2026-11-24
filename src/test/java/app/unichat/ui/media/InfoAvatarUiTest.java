@@ -17,6 +17,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
+import app.unichat.Present;
 
 import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 /** The info panel's photo opens large in the chat's photo viewer; initials alone open nothing. */
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class InfoAvatarUiTest {
+    @SuppressWarnings("NullAway.Init") // each test opens its panel first, which sets it
     private Stage stage;
 
     @BeforeAll
@@ -75,7 +77,7 @@ class InfoAvatarUiTest {
     @Test
     void thePhotoOpensLargeInThePhotoViewer() throws Exception {
         MockChatService svc = new MockChatService();
-        Chat mama = svc.chat("!mom:demo");
+        Chat mama = Present.of(svc.chat("!mom:demo"));
         mama.setAvatarUrl("mxc://demo/mama.png");
         InfoPane info = panel(svc, mama);
         Node avatar = FxWait.fx(() -> info.lookup(".avatar-enlargeable"));
@@ -106,7 +108,7 @@ class InfoAvatarUiTest {
     @Test
     void initialsAloneOpenNothing() throws Exception {
         MockChatService svc = new MockChatService();
-        Chat mama = svc.chat("!mom:demo");
+        Chat mama = Present.of(svc.chat("!mom:demo"));
         mama.setAvatarUrl(null);
         InfoPane info = panel(svc, mama);
         assertNull(FxWait.fx(() -> info.lookup(".avatar-enlargeable")), "no photo: nothing to enlarge");

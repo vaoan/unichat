@@ -3,6 +3,7 @@ package app.unichat.ui.chats;
 import app.unichat.service.Folder;
 import app.unichat.model.Chat;
 import app.unichat.model.Network;
+import org.jspecify.annotations.Nullable;
 
 import java.time.Instant;
 import java.util.EnumMap;
@@ -58,7 +59,7 @@ final class FolderRows {
     }
 
     /** The chat in it with the most recent activity, for the folder's row (its time and last message); null if empty. */
-    static Chat latest(List<Chat> in) {
+    static @Nullable Chat latest(List<Chat> in) {
         Chat best = null;
         for (Chat c : in) {
             if (c.lastActivity() == null) continue;

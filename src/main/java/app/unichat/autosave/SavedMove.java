@@ -2,6 +2,7 @@ package app.unichat.autosave;
 
 import app.unichat.model.Chat;
 import app.unichat.support.PathParts;
+import org.jspecify.annotations.Nullable;
 
 import java.io.IOException;
 import java.nio.file.DirectoryStream;
@@ -35,7 +36,7 @@ final class SavedMove {
     }
 
     /** A chat's own folder (null: under the base again), taking along what it saved where it was. */
-    static int toOwn(Chat chat, Path folder) throws IOException {
+    static int toOwn(Chat chat, @Nullable Path folder) throws IOException {
         Path before = SaveFolders.of(chat);
         SaveFolders.setOwn(chat.id(), folder);
         return move(before, SaveFolders.of(chat));

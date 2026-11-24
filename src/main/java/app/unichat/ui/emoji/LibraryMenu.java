@@ -9,6 +9,7 @@ import app.unichat.support.I18n;
 import javafx.scene.Node;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.SeparatorMenuItem;
+import org.jspecify.annotations.Nullable;
 
 import java.util.function.Consumer;
 
@@ -23,21 +24,25 @@ public final class LibraryMenu {
      * {@code use}: sends the sticker/GIF or inserts the emoji; null when it can't be used here. {@code svc}: where the
      * sticker or GIF comes from, for "see it big".
      */
-    static void attach(Node tile, MediaLibrary library, MediaLibrary.Item item, Runnable use, Consumer<String> toast,
-                       app.unichat.service.MediaSource svc) {
+    static void attach(Node tile, MediaLibrary library, MediaLibrary.Item item, @Nullable Runnable use, Consumer<String> toast,
+                       app.unichat.service.@Nullable MediaSource svc) {
         attach(tile, library, item, use, toast, svc, null);
     }
 
     /** {@code showSet}: opens a sticker's set (Telegram's), when it has one; null where there's nowhere to show it. */
-    static void attach(Node tile, MediaLibrary library, MediaLibrary.Item item, Runnable use, Consumer<String> toast,
-                       app.unichat.service.MediaSource svc, Consumer<String> showSet) {
+    static void attach(Node tile, MediaLibrary library, MediaLibrary.Item item, @Nullable Runnable use, Consumer<String> toast,
+                       app.unichat.service.@Nullable MediaSource svc, @Nullable Consumer<String> showSet) {
         tile.setOnContextMenuRequested(e -> {
             ContextMenu menu = menu(library, item, use, toast);
-            if (item.kind() != MediaLibrary.Kind.EMOJI && item.url() != null) {
-                menu.getItems().add(use == null ? 0 : 1, ChatMenus.item(I18n.t("library.enlarge"), () -> enlarge(tile, svc, item, toast)));
+            if (item.kind() != MediaLibrary.Kind.EMOJI && item.url() != null && svc != null) { // only an emoji comes without where it's from
+                app.unichat.service.MediaSource from = svc;
+                menu.getItems().add(use == null ? 0 : 1, ChatMenus.item(I18n.t("library.enlarge"), () -> enlarge(tile, from, item, toast)));
             }
             String set = showSet == null ? null : app.unichat.model.StickerPack.urlOf(item.info());
-            if (set != null) menu.getItems().add(use == null ? 1 : 2, ChatMenus.item(I18n.t("sticker.showSet"), () -> showSet.accept(set)));
+            if (set != null && showSet != null) {
+                Consumer<String> show = showSet;
+                menu.getItems().add(use == null ? 1 : 2, ChatMenus.item(I18n.t("sticker.showSet"), () -> show.accept(set)));
+            }
             // Owned by the window, not the tile: a menu takes its owner's styles, and an emoji's (1.45 em, the emoji
             // font) made it huge, with the emoji font's wide spaces between words.
             menu.show(tile.getScene().getRoot(), e.getScreenX(), e.getScreenY());
@@ -54,14 +59,15 @@ public final class LibraryMenu {
     public static void enlarge(javafx.stage.Window owner, app.unichat.service.MediaSource svc, MediaLibrary.Item item, Consumer<String> toast) {
         app.unichat.model.Message m = MediaItems.message(item);
         String title = I18n.t(item.kind() == MediaLibrary.Kind.STICKER ? "library.kind.sticker" : "library.kind.gif");
-        if (item.mime() != null && item.mime().startsWith("video/")) {
+        String mime = item.mime();
+        if (mime != null && mime.startsWith("video/")) {
             MediaOpening.video(owner, svc, m, title, null, toast); // a sticker or GIF: silent, nothing to pause
         } else {
             MediaViewer.show(owner, svc.media(item.url(), 0, 0), title, () -> MediaSaver.save(owner, svc, m, toast));
         }
     }
 
-    static ContextMenu menu(MediaLibrary library, MediaLibrary.Item item, Runnable use, Consumer<String> toast) {
+    static ContextMenu menu(MediaLibrary library, MediaLibrary.Item item, @Nullable Runnable use, Consumer<String> toast) {
         ContextMenu menu = new ContextMenu();
         String what = switch (item.kind()) {
             case EMOJI -> I18n.t("library.kind.emoji");

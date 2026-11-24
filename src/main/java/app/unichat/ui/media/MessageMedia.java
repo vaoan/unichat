@@ -33,7 +33,9 @@ import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
 import javafx.scene.Scene;
+import org.jspecify.annotations.Nullable;
 import java.util.function.Supplier;
+import java.util.Objects;
 
 /** What a message shows for its media: images and stickers, file chips, voice note transcripts. */
 public final class MessageMedia {
@@ -71,10 +73,11 @@ public final class MessageMedia {
         view.setFitHeight(dh);
         view.setPreserveRatio(sticker);
         box.getChildren().add(view);
-        if (m.mediaUrl() != null) {
+        String url = m.mediaUrl();
+        if (url != null) {
             MediaLoading.track(box, progress -> loadMedia(svc, view, m, (int) (dw * 2), (int) (dh * 2), progress));
             // A link's GIF is on the web, not on the server: nothing the library could send again.
-        if (MessageActions.isStickerOrGif(m) && m.mediaUrl().startsWith(Mxc.SCHEME)) library.rememberSeen(MediaItems.of(m));
+        if (MessageActions.isStickerOrGif(m) && url.startsWith(Mxc.SCHEME)) library.rememberSeen(MediaItems.of(m));
             if (m.isReelLink()) {
                 box.getChildren().add(playBadge());
                 clickable(box, I18n.t("media.reelOpen"), () -> openReel(m));
@@ -83,7 +86,7 @@ public final class MessageMedia {
             clickable(box, sticker ? I18n.t("media.stickerOpen")
                     : m.fileName() == null ? I18n.t("media.imageOpen") : I18n.t("media.imageFileOpen", m.fileName()), () -> {
                 Window owner = scene.get().getWindow();
-                if (sticker) MediaViewer.show(owner, svc.media(m.mediaUrl(), 0, 0), I18n.t("media.sticker"), () -> MediaSaver.save(owner, svc, m, toast));
+                if (sticker) MediaViewer.show(owner, svc.media(url, 0, 0), I18n.t("media.sticker"), () -> MediaSaver.save(owner, svc, m, toast));
                 else Gallery.open(owner, svc, m, toast);
             });
         }
@@ -193,13 +196,15 @@ public final class MessageMedia {
         if (isWebm(m)) showAnimated(box, m, dw, dh);
         else box.getChildren().add(new InlineVideo(svc, m.mediaUrl(), dw, dh, () -> fileNode(m)));
         // A link's GIF is on the web, not on the server: nothing the library could send again.
-        if (MessageActions.isStickerOrGif(m) && m.mediaUrl().startsWith(Mxc.SCHEME)) library.rememberSeen(MediaItems.of(m));
+        String url = m.mediaUrl(); // there: it plays inline
+        if (MessageActions.isStickerOrGif(m) && url != null && url.startsWith(Mxc.SCHEME)) library.rememberSeen(MediaItems.of(m));
         clickable(box, I18n.t(sticker ? "media.stickerOpen" : "media.videoOpen"), () -> openVideo(m));
         return box;
     }
 
     private static boolean isWebm(Message m) {
-        return m.mimeType() != null && m.mimeType().startsWith("video/webm");
+        String mime = m.mimeType();
+        return mime != null && mime.startsWith("video/webm");
     }
 
     /**
@@ -278,7 +283,8 @@ public final class MessageMedia {
 
     /** A reel that came only as its picture: its video in the player, fetched from its page; the page if that fails. */
     private void openReel(Message m) {
-        MediaOpening.reel(scene.get().getWindow(), m.externalUrl(), audio, openLink);
+        MediaOpening.reel(scene.get().getWindow(), Objects.requireNonNull(m.externalUrl(), "a reel link has its page (Message.isReelLink)"),
+                audio, openLink);
     }
 
     private void openVideo(Message m) {
@@ -355,7 +361,8 @@ public final class MessageMedia {
      * Decodes {@code p} as a still picture (off the FX thread) and shows it; {@code ifEmpty}: only if nothing's shown.
      * {@code shown}, when given, hears how it went.
      */
-    private static void showStill(ImageView view, String url, Path p, int pxW, int pxH, boolean ifEmpty, CompletableFuture<Void> shown) {
+    private static void showStill(ImageView view, @Nullable String url, Path p, int pxW, int pxH, boolean ifEmpty,
+                                  @Nullable CompletableFuture<Void> shown) {
         try {
             Image img = AnimatedImage.still(p, pxW, pxH);
             Stills.put(url, pxW, pxH, img);
@@ -446,7 +453,8 @@ public final class MessageMedia {
     }
 
     public void transcribe(Message m) {
-        Transcripts.get().request(m.mediaUrl(), () -> svc.media(m.mediaUrl(), 0, 0));
+        String url = Objects.requireNonNull(m.mediaUrl(), "transcribing is offered only for audio with its address (MessageActions)");
+        Transcripts.get().request(url, () -> svc.media(url, 0, 0));
     }
 
     /** The player inside the message; music and such keep their name, a voice note needs none. */
@@ -454,9 +462,11 @@ public final class MessageMedia {
         AudioControls controls = new AudioControls(audio, () -> m, () -> audio.toggle(m, chat));
         controls.leaveTabOrder();
         controls.setPrefWidth(AUDIO_WIDTH);
-        boolean voiceNote = m.mimeType() != null && m.mimeType().startsWith("audio/ogg");
-        if (voiceNote || m.fileName() == null) return controls;
-        Label name = new Label(m.fileName());
+        String mime = m.mimeType();
+        boolean voiceNote = mime != null && mime.startsWith("audio/ogg");
+        String file = m.fileName();
+        if (voiceNote || file == null) return controls;
+        Label name = new Label(file);
         name.getStyleClass().add("file-name");
         return new VBox(2, name, controls);
     }
