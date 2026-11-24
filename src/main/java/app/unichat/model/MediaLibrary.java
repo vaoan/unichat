@@ -201,12 +201,14 @@ public final class MediaLibrary {
 
     /** The bridge's own id of the sticker ({@code fi.mau.bridged_sticker}), null when it has none. */
     public static @Nullable String bridgeId(Item i) {
-        JsonNode sticker = i.info() == null ? null : i.info().get("fi.mau.bridged_sticker");
+        JsonNode info = i.info();
+        JsonNode sticker = info == null ? null : info.get("fi.mau.bridged_sticker");
         return sticker == null ? null : sticker.path("id").asText(null);
     }
 
     private static long size(Item i) {
-        return i.info() == null ? 0 : i.info().path("size").asLong(0);
+        JsonNode info = i.info();
+        return info == null ? 0 : info.path("size").asLong(0);
     }
 
     /** An item of a kind this version doesn't know (written by a newer Unichat) is skipped, not the whole file. */
@@ -246,7 +248,8 @@ public final class MediaLibrary {
 
     /** The item {@code sent} was converted from, when its info names one with a media address; else {@code sent}. */
     public static Item original(Item sent) {
-        JsonNode o = sent.info() == null ? null : sent.info().get(ORIGINAL);
+        JsonNode info = sent.info();
+        JsonNode o = info == null ? null : info.get(ORIGINAL);
         if (o == null || !o.isObject() || !known(o) || Mxc.parse(o.path("url").asText()) == null) return sent;
         Item i = item(o);
         return i.kind() == sent.kind() ? i : sent;
@@ -260,7 +263,8 @@ public final class MediaLibrary {
     private static ObjectNode node(Item i) {
         ObjectNode n = JSON.createObjectNode().put("kind", i.kind().name()).put("url", i.url()).put("mime", i.mime())
                 .put("width", i.width()).put("height", i.height());
-        if (i.info() != null) n.set("info", i.info().deepCopy());
+        JsonNode info = i.info();
+        if (info != null) n.set("info", info.deepCopy());
         return n;
     }
 }

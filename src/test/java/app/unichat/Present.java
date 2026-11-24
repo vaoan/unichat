@@ -3,6 +3,7 @@ package app.unichat;
 import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /**
  * A value a test goes on with: the test fails when it's null, else it's given back as not null. For a call that may
@@ -13,6 +14,12 @@ public final class Present {
 
     public static <T> T of(@Nullable T value) {
         assertNotNull(value, "expected a value, got null");
+        return value;
+    }
+
+    /** A tool this computer may lack ({@code Ffmpeg.find()}): the test is skipped, saying {@code why}, when it's null. */
+    public static <T> T orSkip(@Nullable T value, String why) {
+        assumeTrue(value != null, why);
         return value;
     }
 

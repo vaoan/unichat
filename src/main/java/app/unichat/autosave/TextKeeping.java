@@ -19,6 +19,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Keeping what chats say ({@link SaveKind#TEXTS}), to read later what was deleted. What a chat says is taken the moment
@@ -103,7 +104,7 @@ final class TextKeeping {
     }
 
     /** The first written text waiting for {@code m} (mine, new since it was written, saying what went); taken. */
-    private Written takeWritten(Message m) {
+    private @Nullable Written takeWritten(Message m) {
         synchronized (wrote) {
             for (java.util.Iterator<Written> it = wrote.iterator(); it.hasNext(); ) {
                 Written w = it.next();

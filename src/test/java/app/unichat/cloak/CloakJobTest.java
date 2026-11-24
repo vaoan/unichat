@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.DoubleConsumer;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -174,7 +175,7 @@ class CloakJobTest {
      * Installs at once and protects in a few steps; or, with {@code going}, reports half and blocks until stopped,
      * counting {@code stopped} down when it is.
      */
-    private static CloakJob.Runner fake(CountDownLatch going, CountDownLatch stopped, IOException failure) {
+    private static CloakJob.Runner fake(@Nullable CountDownLatch going, @Nullable CountDownLatch stopped, @Nullable IOException failure) {
         return new CloakJob.Runner() {
             @Override
             public void install(CloakTool.Progress progress) {
@@ -191,7 +192,7 @@ class CloakJobTest {
                     try {
                         new CountDownLatch(1).await();
                     } finally {
-                        stopped.countDown();
+                        if (stopped != null) stopped.countDown();
                     }
                 }
                 progress.accept(1);

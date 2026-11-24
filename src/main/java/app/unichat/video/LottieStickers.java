@@ -21,6 +21,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.function.DoubleConsumer;
 import java.util.zip.GZIPInputStream;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Lottie stickers (Telegram's animated ones: a .tgs is gzipped Lottie JSON; Discord's and WhatsApp's own come as the
@@ -50,7 +51,7 @@ public final class LottieStickers {
     private LottieStickers() {}
 
     /** {@code -Dunichat.lottieconverter} (development), the copy inside the app, or one on the PATH; null when there's none. */
-    public static Path tool() {
+    public static @Nullable Path tool() {
         return BundledTools.find("unichat.lottieconverter", null, "lottieconverter");
     }
 
@@ -213,7 +214,7 @@ public final class LottieStickers {
     }
 
     /** A PAM file (RGB_ALPHA, 8 bits per sample), which img2webp reads without a PNG library. */
-    static void writePam(BufferedImage img, Path to) throws IOException {
+    static void writePam(@Nullable BufferedImage img, Path to) throws IOException {
         if (img == null) throw new IOException(I18n.t("video.webpFailed"));
         int w = img.getWidth();
         int h = img.getHeight();

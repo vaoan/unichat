@@ -1,5 +1,6 @@
 package app.unichat.login;
 
+import app.unichat.Present;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.StickerPack;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -78,7 +79,7 @@ class BridgeStickerPacksTest {
         assertEquals(MediaLibrary.Kind.STICKER, first.kind());
         assertEquals("image/webp", first.mime());
         assertEquals(512, first.width());
-        assertEquals("11", first.info().path("fi.mau.bridged_sticker").path("id").asText(), "kept, so Telegram gets its own sticker");
+        assertEquals("11", Present.of(first.info()).path("fi.mau.bridged_sticker").path("id").asText(), "kept, so Telegram gets its own sticker");
     }
 
     @Test

@@ -5,6 +5,7 @@ import app.unichat.model.VoiceNote;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.jspecify.annotations.Nullable;
 
 /** One recording: reads and encodes on its own thread until it's stopped, cancelled or reaches its limit. */
 public final class VoiceRecorder {
@@ -21,7 +22,7 @@ public final class VoiceRecorder {
     private volatile double level;
     private volatile boolean anySound;
     private volatile boolean stopping;
-    private volatile IOException failure;
+    private volatile @Nullable IOException failure;
     private final Path raw;
     private final java.io.OutputStream rawOut;
 

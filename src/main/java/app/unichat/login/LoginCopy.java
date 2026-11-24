@@ -7,7 +7,9 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The human side of a bridge's login: which of the bridge's flows to offer and in what order, and translated copy for
@@ -69,14 +71,16 @@ public final class LoginCopy {
             else out.add(new Choice(f, f.name().isBlank() ? f.id() : f.name(), f.description(), true));
         }
         out.sort(Comparator.comparing(Choice::advanced)
-                .thenComparingInt(c -> c.advanced() ? 0 : known.get(c.flow().id()).order()));
+                // A choice that isn't advanced was made from a known flow above.
+                .thenComparingInt(c -> c.advanced() ? 0 : Objects.requireNonNull(known.get(c.flow().id())).order()));
         return out;
     }
 
     /** Translated title and steps for a step we know; otherwise the bridge's instructions. */
     public static StepText step(Network n, BridgeLogin.Step s) {
         String net = n.displayName();
-        StepText shown = s.display() == null ? null : shown(n, s.display().type());
+        BridgeLogin.Display display = s.display();
+        StepText shown = display == null ? null : shown(n, display.type());
         if (shown != null) return shown;
         String id = s.stepId() == null ? "" : s.stepId();
         for (Asked a : ASKED) {
@@ -88,7 +92,7 @@ public final class LoginCopy {
     }
 
     /** What to do with what the bridge shows: a QR code to scan, a code or emoji to match on the phone. */
-    private static StepText shown(Network n, String type) {
+    private static @Nullable StepText shown(Network n, @Nullable String type) {
         String net = n.displayName();
         return switch (type == null ? "" : type) {
             case "qr" -> new StepText(I18n.t("login.step.qr.title"),
@@ -153,7 +157,7 @@ public final class LoginCopy {
     }
 
     /** The digits a pattern like {@code ^[0-9]{6}$} asks for; 0 when it doesn't say. */
-    public static int digits(String pattern) {
+    public static int digits(@Nullable String pattern) {
         java.util.regex.Matcher m = pattern == null ? null : java.util.regex.Pattern.compile("\\{(\\d{1,2})}").matcher(pattern);
         return m != null && m.find() ? Integer.parseInt(m.group(1)) : 0;
     }

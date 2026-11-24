@@ -16,6 +16,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * What protecting a picture needs, installed on first use into {@code <data>/tools/cloak/}: uv (pinned), which brings
@@ -167,7 +168,7 @@ public final class CloakTool {
         return target;
     }
 
-    private static Pinned uvBuild() {
+    private static @Nullable Pinned uvBuild() {
         return Os.pick(UV_MAC_ARM64, null, UV_WINDOWS_AMD64); // PyTorch has no Intel Mac build
     }
 }

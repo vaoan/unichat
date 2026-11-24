@@ -1,5 +1,6 @@
 package app.unichat.assist;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import org.junit.jupiter.api.Test;
@@ -164,7 +165,7 @@ class StyleLearnerTest {
         s.save("- viejo");
         s.addCorrection("jajaja", "hahaha");
         new StyleLearner(s, p -> "- viejo\n- ríe con hahaha").learn("!c", CHAT);
-        assertEquals(List.of("ríe con hahaha"), s.lastLearned().changes().added());
+        assertEquals(List.of("ríe con hahaha"), Present.of(s.lastLearned()).changes().added());
     }
 
     @Test

@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.function.Function;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Reading a browser's cookie database from a copy: the browser keeps the original locked while it runs, and recent
@@ -14,7 +15,7 @@ final class CookieDbCopy {
     private CookieDbCopy() {}
 
     /** What {@code reader} makes of a copy of {@code db}; null when it couldn't be copied or read. The copy is deleted. */
-    static <T> T read(Path db, Function<Path, T> reader) {
+    static <T> @Nullable T read(Path db, Function<Path, @Nullable T> reader) {
         Path tmp = null;
         Path wal = null;
         try {
@@ -41,7 +42,7 @@ final class CookieDbCopy {
     }
 
     /** Removes the copy and the files SQLite left beside it. */
-    private static void delete(Path tmp, Path wal) {
+    private static void delete(@Nullable Path tmp, @Nullable Path wal) {
         deleteQuietly(wal);
         if (tmp != null) {
             deleteQuietly(tmp);
@@ -50,7 +51,7 @@ final class CookieDbCopy {
         }
     }
 
-    private static void deleteQuietly(Path p) {
+    private static void deleteQuietly(@Nullable Path p) {
         if (p == null) return;
         try {
             Files.deleteIfExists(p);

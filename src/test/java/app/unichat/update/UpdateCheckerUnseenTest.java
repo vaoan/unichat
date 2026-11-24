@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -19,7 +20,7 @@ class UpdateCheckerUnseenTest {
 
     private final AtomicLong clock = new AtomicLong(1_900_000_000_000L);
     private final AtomicInteger calls = new AtomicInteger();
-    private Consumer<Boolean> listener;
+    private @Nullable Consumer<Boolean> listener;
 
     private UpdateChecker checker() {
         return new UpdateChecker(clock::get, () -> {

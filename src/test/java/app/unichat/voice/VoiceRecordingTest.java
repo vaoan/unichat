@@ -1,5 +1,6 @@
 package app.unichat.voice;
 
+import app.unichat.Present;
 import app.unichat.model.VoiceNote;
 import app.unichat.stt.OggOpus;
 import java.io.IOException;
@@ -19,7 +20,6 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class VoiceRecordingTest {
     @TempDir Path dir;
@@ -111,8 +111,7 @@ class VoiceRecordingTest {
     @Test
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void ffmpegAcceptsTheFileWithoutComplaint() throws Exception {
-        Path ffmpeg = app.unichat.video.Ffmpeg.find();
-        assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path ffmpeg = Present.orSkip(app.unichat.video.Ffmpeg.find(), "no ffmpeg");
         VoiceNote note = record(new Tone(48_000, 440, 1));
         Process p = new ProcessBuilder(ffmpeg.toString(), "-v", "error", "-i", note.file().toString(), "-f", "null", "-").redirectErrorStream(true).start();
         String complaints = new String(p.getInputStream().readAllBytes(), UTF_8);

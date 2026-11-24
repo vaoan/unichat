@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 import static app.unichat.support.Urls.enc;
 
@@ -27,7 +28,7 @@ public final class BridgeContacts {
     private final LoginApi api;
 
     /** @param base e.g. {@code http://127.0.0.1:29318/_matrix/provision} */
-    public BridgeContacts(String base, String accessToken, String userId, String loginId) {
+    public BridgeContacts(String base, String accessToken, String userId, @Nullable String loginId) {
         this.api = new LoginApi(base, accessToken, userId, loginId);
     }
 
@@ -42,7 +43,7 @@ public final class BridgeContacts {
     }
 
     /** A phone number, @username… as the network knows it; null when nobody matches. */
-    public Contact resolve(String identifier) throws IOException, InterruptedException {
+    public @Nullable Contact resolve(String identifier) throws IOException, InterruptedException {
         try {
             JsonNode j = call("GET", "/v3/resolve_identifier/" + enc(identifier), null);
             return j == null || j.path("id").asText("").isEmpty() ? null : contact(j);
@@ -74,12 +75,12 @@ public final class BridgeContacts {
                 blank(n.path("dm_room_mxid").asText("")));
     }
 
-    private static String blank(String s) {
+    private static @Nullable String blank(String s) {
         return s.isEmpty() ? null : s;
     }
 
     /** The response, or null when the bridge doesn't have this endpoint. */
-    private JsonNode call(String method, String path, JsonNode body) throws IOException, InterruptedException {
+    private @Nullable JsonNode call(String method, String path, @Nullable JsonNode body) throws IOException, InterruptedException {
         return api.call(HTTP, method, path, "", body, TIMEOUT);
     }
 }

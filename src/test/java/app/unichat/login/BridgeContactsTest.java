@@ -1,5 +1,6 @@
 package app.unichat.login;
 
+import app.unichat.Present;
 import app.unichat.model.Contact;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
@@ -99,7 +100,7 @@ class BridgeContactsTest {
 
     @Test
     void resolveFindsOrReturnsNull() throws Exception {
-        assertEquals("Carla", client("L1").resolve("+573009998877").name());
+        assertEquals("Carla", Present.of(client("L1").resolve("+573009998877")).name());
         assertNull(client("L1").resolve("nadie"));
         assertTrue(uris.get(0).contains("/v3/resolve_identifier/%2B573009998877"), uris.get(0));
     }

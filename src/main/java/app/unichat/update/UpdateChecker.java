@@ -19,6 +19,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.LongSupplier;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Asks GitHub for Unichat's latest release (Ajustes → Privacidad, {@code app.checkUpdates}): a little after start, then
@@ -31,7 +32,7 @@ public final class UpdateChecker {
     public enum Outcome { UP_TO_DATE, NEWER, FAILED }
 
     /** What a check found: {@code release} is the latest (null when it {@link Outcome#FAILED}). */
-    public record Result(Outcome outcome, Release release) {}
+    public record Result(Outcome outcome, @Nullable Release release) {}
 
     static final String LAST_CHECK = "app.update.lastCheck";
     static final String LATEST = "app.update.latest";
@@ -51,7 +52,7 @@ public final class UpdateChecker {
         t.setDaemon(true);
         return t;
     });
-    private final List<Consumer<Release>> listeners = new CopyOnWriteArrayList<>();
+    private final List<Consumer<@Nullable Release>> listeners = new CopyOnWriteArrayList<>();
     /** Set under the lock in start(); settingChanged() reads it on the worker. */
     private volatile boolean started;
 
@@ -95,17 +96,17 @@ public final class UpdateChecker {
     CompletableFuture<Void> idle() { return CompletableFuture.runAsync(() -> { }, worker); }
 
     /** Hears the release to tell the person about, or null when there's none any more; on the worker's thread. */
-    public void addListener(Consumer<Release> l) { listeners.add(l); }
+    public void addListener(Consumer<@Nullable Release> l) { listeners.add(l); }
 
-    public void removeListener(Consumer<Release> l) { listeners.remove(l); }
+    public void removeListener(Consumer<@Nullable Release> l) { listeners.remove(l); }
 
     /** The newer version last heard of, unless dismissed or checks are off; null otherwise. */
-    public Release pending() {
+    public @Nullable Release pending() {
         Settings s = Settings.get();
         if (!s.checkUpdates()) return null;
-        String tag = s.getString(LATEST, null);
+        String tag = s.getString(LATEST);
         Release known = tag == null ? null : new Release(tag, s.getString(LATEST_URL, UpdatePolicy.RELEASES));
-        return UpdatePolicy.shouldShow(known, AppVersion.current(), s.getString(DISMISSED, null)) ? known : null;
+        return UpdatePolicy.shouldShow(known, AppVersion.current(), s.getString(DISMISSED)) ? known : null;
     }
 
     /** "Not now" for {@code r}: it isn't offered again, a later version will be. */
@@ -161,7 +162,7 @@ public final class UpdateChecker {
 
     private void tell() {
         Release p = pending();
-        for (Consumer<Release> l : listeners) l.accept(p);
+        for (Consumer<@Nullable Release> l : listeners) l.accept(p);
     }
 
     private static String fetch() throws IOException, InterruptedException {

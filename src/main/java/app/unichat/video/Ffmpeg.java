@@ -11,6 +11,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.function.DoubleConsumer;
+import org.jspecify.annotations.Nullable;
 
 /**
  * ffmpeg, too big to ship: the person's own if there is one, otherwise a pinned build downloaded on first use into
@@ -29,7 +30,7 @@ public final class Ffmpeg {
     /** Where an ffmpeg comes from when one is needed: null when there's none to use. */
     @FunctionalInterface
     public interface Source {
-        Path get() throws IOException, InterruptedException;
+        @Nullable Path get() throws IOException, InterruptedException;
     }
 
     /** The person's own, or the pinned one downloaded if the setting allows. */
@@ -42,7 +43,7 @@ public final class Ffmpeg {
     public static void setAutoInstall(boolean on) { Settings.get().setBool(AUTO_KEY, on); }
 
     /** The ffmpeg to use now, or null. {@code -Dunichat.ffmpeg} is the only one considered when set. */
-    public static Path find() {
+    public static @Nullable Path find() {
         Path own = BundledTools.find("unichat.ffmpeg", null, "ffmpeg");
         if (own != null || System.getProperty("unichat.ffmpeg") != null) return own;
         Path installed = installedPath();
@@ -95,7 +96,7 @@ public final class Ffmpeg {
      * Runs one ffmpeg command, giving up after {@code timeoutSeconds}; whether it worked.
      * @param folder where it runs; null: wherever Unichat does
      */
-    public static boolean run(List<String> command, long timeoutSeconds, Path folder) throws IOException, InterruptedException {
+    public static boolean run(List<String> command, long timeoutSeconds, @Nullable Path folder) throws IOException, InterruptedException {
         return Processes.quiet(command, folder, timeoutSeconds).ok();
     }
 
@@ -109,13 +110,13 @@ public final class Ffmpeg {
     }
 
     /** ffmpeg, downloading it when missing and allowed by the setting; null when there's none to use. Blocking. */
-    public static Path whenNeeded(DoubleConsumer progress) throws IOException, InterruptedException {
+    public static @Nullable Path whenNeeded(DoubleConsumer progress) throws IOException, InterruptedException {
         Path found = find();
         return found != null || !autoInstall() ? found : install(progress);
     }
 
     /** Downloads the pinned build (the "Instalar" button). Blocking; one at a time. Null when none exists for this computer. */
-    public static synchronized Path install(DoubleConsumer progress) throws IOException, InterruptedException {
+    public static synchronized @Nullable Path install(DoubleConsumer progress) throws IOException, InterruptedException {
         Path found = find();
         if (found != null) return found;
         PinnedTool b = build();
@@ -127,12 +128,12 @@ public final class Ffmpeg {
         return b.install(target, I18n.t("download.what.videoConverter"), "-version", progress);
     }
 
-    private static PinnedTool build() {
+    private static @Nullable PinnedTool build() {
         return Os.pick(MAC_ARM64, null, WINDOWS_AMD64);
     }
 
     /** Whether {@code found} is the one Unichat downloaded (rather than the person's own). */
-    public static boolean downloadedByUnichat(Path found) {
+    public static boolean downloadedByUnichat(@Nullable Path found) {
         return found != null && found.equals(installedPath());
     }
 

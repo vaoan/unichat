@@ -9,6 +9,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import org.jspecify.annotations.Nullable;
 
 /** One call to a bridge's provisioning API. */
 final class Provisioning {
@@ -24,7 +25,7 @@ final class Provisioning {
         }
     }
 
-    static Answer call(HttpClient http, String method, String url, String accessToken, JsonNode body, Duration timeout)
+    static Answer call(HttpClient http, String method, String url, String accessToken, @Nullable JsonNode body, Duration timeout)
             throws IOException, InterruptedException {
         HttpRequest.Builder b = HttpRequest.newBuilder(URI.create(url))
                 .timeout(timeout)

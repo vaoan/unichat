@@ -17,6 +17,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The versions of {@code writing-style.md} that learning replaced ({@code writing-style-history/}, one timestamped file
@@ -73,7 +74,7 @@ final class StyleHistory {
     }
 
     /** The newest version learning replaced (not one undone), or null. */
-    Version lastLearned() {
+    @Nullable Version lastLearned() {
         List<Version> all = versions();
         for (int i = all.size() - 1; i >= 0; i--) if (!all.get(i).undone()) return all.get(i);
         return null;
@@ -89,7 +90,7 @@ final class StyleHistory {
 
     void clear() { versions().forEach(this::remove); }
 
-    private void keep(String text, String suffix) {
+    private void keep(@Nullable String text, String suffix) {
         Instant when = clock.instant();
         // Two in the same millisecond (or a clock gone back) still get their own name, after the newest.
         List<Version> all = versions();
@@ -104,7 +105,7 @@ final class StyleHistory {
         for (int i = 0; i < now.size() - KEEP; i++) remove(now.get(i));
     }
 
-    private static Version parse(Path f) {
+    private static @Nullable Version parse(Path f) {
         String name = PathParts.name(f);
         if (!name.startsWith("writing-style-") || !name.endsWith(LEARNED)) return null;
         boolean undone = name.endsWith(UNDONE);

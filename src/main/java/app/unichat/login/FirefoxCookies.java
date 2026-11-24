@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Reads the user's own Firefox session cookies. Only runs on an explicit user action and only
@@ -101,7 +102,7 @@ public final class FirefoxCookies {
     }
 
     /** The folders set in {@link #ROOTS_PROPERTY}, or null when it isn't set. */
-    static List<Path> rootsOverride() {
+    static @Nullable List<Path> rootsOverride() {
         String override = System.getProperty(ROOTS_PROPERTY);
         if (override == null || override.isBlank()) return null;
         List<Path> out = new ArrayList<>();

@@ -1,11 +1,13 @@
 package app.unichat.login;
 
+import app.unichat.Present;
 import app.unichat.model.Network;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -13,7 +15,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class BridgeCookiesTest {
-    private static BridgeLogin.CookieField cookie(String id, String name, String domain, boolean required) {
+    private static BridgeLogin.CookieField cookie(String id, String name, @Nullable String domain, boolean required) {
         return new BridgeLogin.CookieField(id, required, List.of(new BridgeLogin.Source("cookie", name, domain)));
     }
 
@@ -71,10 +73,10 @@ class BridgeCookiesTest {
     @Test
     void itsDoneOnlyWithEverythingAndAtTheEnd() {
         String feed = "https://www.linkedin.com/feed/";
-        Map<String, String> v = BridgeCookies.captured(linkedin(), feed, SESSION, SENT);
+        Map<String, String> v = Present.of(BridgeCookies.captured(linkedin(), feed, SESSION, SENT));
         assertEquals("JSESSIONID=ajax; li_at=abc", v.get("cookie_header"));
         assertEquals("urn:li:page:feed", v.get("page"));
-        assertTrue(v.get("track").contains("clientVersion"));
+        assertTrue(Present.of(v.get("track")).contains("clientVersion"));
         assertNull(BridgeCookies.captured(linkedin(), "https://www.linkedin.com/checkpoint/2fa", SESSION, SENT), "still in 2FA");
         assertNull(BridgeCookies.captured(linkedin(), feed, SESSION, Map.of()), "no request seen yet");
         assertNull(BridgeCookies.captured(linkedin(), feed, Map.of("li_at", "abc"), SENT), "the shape the bridge wants");
@@ -109,9 +111,9 @@ class BridgeCookiesTest {
         Map<String, String> fallbacks = BridgeCookies.headerFallbacks(Network.LINKEDIN, linkedin());
         String feed = "https://www.linkedin.com/feed/";
         assertNull(BridgeCookies.captured(linkedin(), feed, SESSION, Map.of()), "real ones first");
-        Map<String, String> v = BridgeCookies.captured(linkedin(), feed, SESSION, Map.of(), fallbacks);
-        assertTrue(v.get("track").contains("clientVersion"));
-        Map<String, String> seen = BridgeCookies.captured(linkedin(), feed, SESSION, SENT, fallbacks);
+        Map<String, String> v = Present.of(BridgeCookies.captured(linkedin(), feed, SESSION, Map.of(), fallbacks));
+        assertTrue(Present.of(v.get("track")).contains("clientVersion"));
+        Map<String, String> seen = Present.of(BridgeCookies.captured(linkedin(), feed, SESSION, SENT, fallbacks));
         assertEquals("urn:li:page:feed", seen.get("page"), "what the page really sent wins");
         assertNull(BridgeCookies.captured(linkedin(), "https://www.linkedin.com/login", SESSION, Map.of(), fallbacks), "not before the end");
         assertNull(BridgeCookies.captured(linkedin(), feed, Map.of(), Map.of(), fallbacks), "never without the session");

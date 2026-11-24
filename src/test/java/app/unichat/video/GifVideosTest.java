@@ -1,5 +1,6 @@
 package app.unichat.video;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -118,8 +119,7 @@ class GifVideosTest {
 
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     private Path mp4(String name, String size, boolean sound) throws IOException, InterruptedException {
-        Path ffmpeg = Ffmpeg.find();
-        Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "no ffmpeg");
         Assumptions.assumeTrue(AnimatedWebp.img2webp() != null, "no img2webp");
         Path mp4 = dir.resolve(name);
         List<String> c = new java.util.ArrayList<>(List.of(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i",

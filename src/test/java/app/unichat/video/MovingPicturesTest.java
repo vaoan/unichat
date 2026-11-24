@@ -1,5 +1,6 @@
 package app.unichat.video;
 
+import app.unichat.Present;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -21,8 +22,7 @@ class MovingPicturesTest {
     /** A video made by ffmpeg's own test source: {@code extra} adds sound or changes the format. */
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     private Path video(String name, double seconds, String... extra) throws IOException, InterruptedException {
-        Path ffmpeg = Ffmpeg.find();
-        assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "no ffmpeg");
         assumeTrue(AnimatedWebp.img2webp() != null, "no img2webp");
         Path out = dir.resolve(name);
         java.util.List<String> c = new java.util.ArrayList<>(java.util.List.of(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi",
@@ -67,7 +67,7 @@ class MovingPicturesTest {
     void aVideoLongerThanAMovingPictureIsRefusedSayingSo() throws Exception {
         Path mp4 = video("long.mp4", MovingPictures.MAX_SECONDS + 2, "-pix_fmt", "yuv420p");
         IOException e = assertThrows(IOException.class, () -> MovingPictures.toWebp(mp4, dir.resolve("long.webp"), p -> { }));
-        assertTrue(e.getMessage().contains(Integer.toString(MovingPictures.MAX_SECONDS)), e.getMessage());
+        assertTrue(Present.of(e.getMessage()).contains(Integer.toString(MovingPictures.MAX_SECONDS)), e.getMessage());
     }
 
     @Test

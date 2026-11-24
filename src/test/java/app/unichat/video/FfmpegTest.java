@@ -1,5 +1,6 @@
 package app.unichat.video;
 
+import app.unichat.Present;
 import app.unichat.support.Downloads;
 import app.unichat.support.PathParts;
 import com.sun.net.httpserver.HttpServer;
@@ -36,7 +37,7 @@ class FfmpegTest {
     @TempDir Path dir;
     private HttpServer server;
     @SuppressFBWarnings(value = "VO_VOLATILE_REFERENCE_TO_ARRAY", justification = "the array is replaced whole, never changed: the volatile hands the new one to the fake server's thread")
-    private volatile byte[] served;
+    private volatile byte[] served = new byte[0];
 
     @BeforeEach
     void serve() throws Exception {
@@ -100,7 +101,7 @@ class FfmpegTest {
         Path target = dir.resolve("tools/ffmpeg");
         assertThrows(IOException.class, () -> Ffmpeg.install(build(zip("../../malo", "x"), "/bin/ffmpeg"), target, p -> { }));
         assertFalse(Files.exists(target));
-        assertFalse(Files.exists(dir.getParent().resolve("malo")));
+        assertFalse(Files.exists(Present.of(dir.getParent()).resolve("malo")));
     }
 
     @Test

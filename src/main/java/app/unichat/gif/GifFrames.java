@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The frames of an animated GIF as whole pictures: GIF frames are patches drawn over the previous one (with a
@@ -63,7 +64,8 @@ public final class GifFrames {
                 int count = r.getNumImages(true);
                 int w = 0;
                 int h = 0;
-                Node screen = child(r.getStreamMetadata() == null ? null : tree(r.getStreamMetadata()), "LogicalScreenDescriptor");
+                IIOMetadata stream = r.getStreamMetadata();
+                Node screen = child(stream == null ? null : tree(stream), "LogicalScreenDescriptor");
                 if (screen != null) {
                     w = intAttr(screen, "logicalScreenWidth", 0);
                     h = intAttr(screen, "logicalScreenHeight", 0);
@@ -117,7 +119,7 @@ public final class GifFrames {
         return m.getAsTree(m.getNativeMetadataFormatName());
     }
 
-    private static Node child(Node parent, String name) {
+    private static @Nullable Node child(@Nullable Node parent, String name) {
         if (parent == null) return null;
         for (Node n = parent.getFirstChild(); n != null; n = n.getNextSibling()) {
             if (name.equals(n.getNodeName())) return n;
@@ -126,7 +128,8 @@ public final class GifFrames {
     }
 
     private static String attr(Node n, String name, String fallback) {
-        Node a = n.getAttributes() == null ? null : n.getAttributes().getNamedItem(name);
+        org.w3c.dom.NamedNodeMap all = n.getAttributes();
+        Node a = all == null ? null : all.getNamedItem(name);
         return a == null ? fallback : a.getNodeValue();
     }
 

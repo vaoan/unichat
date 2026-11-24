@@ -19,6 +19,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The video behind a link the bridge gave only as its picture (an Instagram reel): fetched by the same engine that saves
@@ -29,7 +30,7 @@ public final class LinkVideo {
     /** What fetches {@code url} into {@code dir}: null when done, else why not. */
     @FunctionalInterface
     interface Fetch {
-        Failure save(String url, Path dir) throws IOException, InterruptedException;
+        @Nullable Failure save(String url, Path dir) throws IOException, InterruptedException;
     }
 
     private static final ExecutorService IO = Executors.newSingleThreadExecutor(Threads.daemon("link-video"));

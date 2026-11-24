@@ -10,12 +10,13 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.function.DoubleConsumer;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A program downloaded on first use, pinned by its checksum.
  * @param entry the end of the executable's path inside the zip it comes in; null: the download is the executable
  */
-record PinnedTool(String url, long size, String sha256, String entry) {
+record PinnedTool(String url, long size, String sha256, @Nullable String entry) {
     /** A first run unpacks itself (yt-dlp's) or is checked by the system: slow once, never this slow. */
     private static final long CHECK_SECONDS = 60;
 

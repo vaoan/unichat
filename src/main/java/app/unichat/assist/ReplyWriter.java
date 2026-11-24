@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /** Runs one AI program over one prompt. The prompt and the chat never reach a log. */
 public final class ReplyWriter {
@@ -40,29 +41,29 @@ public final class ReplyWriter {
     }
 
     /** The thread waiting for the program, which {@link #cancel} interrupts; both guarded by this. */
-    private Thread waiting;
+    private @Nullable Thread waiting;
     private boolean cancelled;
 
     /** Blocks until it answers. Null if {@link #cancel} stopped it. */
-    public String write(AiEngine engine, Path folder, String prompt) throws Failure {
+    public @Nullable String write(AiEngine engine, @Nullable Path folder, String prompt) throws Failure {
         return write(engine, folder, prompt, false);
     }
 
     /** {@code web}: it may search the web ({@link AiEngine#command(Path, Path, Path, Path, boolean)}). */
-    public String write(AiEngine engine, Path folder, String prompt, boolean web) throws Failure {
+    public @Nullable String write(AiEngine engine, @Nullable Path folder, String prompt, boolean web) throws Failure {
         Path bin = engine.find();
         if (bin == null) throw new Failure(I18n.t("ai.failure.notInstalled", engine.label()));
         if (folder != null && !Files.isDirectory(folder)) throw new Failure(I18n.t("ai.failure.noFolder", folder));
         return run(engine, bin, folder, prompt, web);
     }
 
-    String run(AiEngine engine, Path bin, Path folder, String prompt) throws Failure {
+    @Nullable String run(AiEngine engine, Path bin, @Nullable Path folder, String prompt) throws Failure {
         return run(engine, bin, folder, prompt, false);
     }
 
     /** Stopped (cancelled, or its thread interrupted), the program goes with its children ({@link Processes}). */
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the AI program with arguments of ours as a list (AiEngine.command: its path, the folder, flags); the chat's text goes on stdin, never in an argument")
-    String run(AiEngine engine, Path bin, Path folder, String prompt, boolean web) throws Failure {
+    @Nullable String run(AiEngine engine, Path bin, @Nullable Path folder, String prompt, boolean web) throws Failure {
         synchronized (this) {
             if (cancelled) return null;
             waiting = Thread.currentThread();

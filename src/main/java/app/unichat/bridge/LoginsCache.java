@@ -2,6 +2,7 @@ package app.unichat.bridge;
 
 import java.util.ArrayList;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The logins Unichat keeps of each network's bridge, in the setting {@code matrix.logins.<protocolId>}: a timestamp
@@ -12,7 +13,7 @@ public final class LoginsCache {
     private LoginsCache() {}
 
     /** One login; {@code name} and {@code state} null when unknown. */
-    public record Row(String id, String name, String state) {}
+    public record Row(String id, @Nullable String name, @Nullable String state) {}
 
     /** What was kept, and when ({@code at} 0 when the time can't be read: stale). */
     public record Cached(long at, List<Row> rows) {}
@@ -31,7 +32,7 @@ public final class LoginsCache {
     }
 
     /** {@code cached} read back; null when nothing was kept. */
-    public static Cached parse(String cached) {
+    public static @Nullable Cached parse(@Nullable String cached) {
         if (cached == null) return null;
         String[] lines = cached.split("\n");
         long at = 0;
@@ -50,7 +51,7 @@ public final class LoginsCache {
     }
 
     /** Whether {@code cached} (null when nothing was kept) holds at least one login. */
-    public static boolean hasLogin(String cached) {
+    public static boolean hasLogin(@Nullable String cached) {
         Cached c = parse(cached);
         return c != null && !c.rows().isEmpty();
     }

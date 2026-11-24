@@ -25,6 +25,7 @@ import javax.crypto.SecretKeyFactory;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Reads the user's own Chrome/Edge/Brave session cookies on macOS. Only runs on an explicit user
@@ -48,14 +49,14 @@ public final class ChromiumCookies {
             new Browser("Brave", "BraveSoftware/Brave-Browser", "Brave Safe Storage"));
 
     /** Windows and app-bound encryption ({@code v20}) cannot be read; the UI falls back to in-app login. */
-    public static Support classify(String osName, byte[] encryptedValuePrefix) {
+    public static Support classify(@Nullable String osName, byte @Nullable [] encryptedValuePrefix) {
         String os = osName == null ? "" : osName.toLowerCase(Locale.ROOT);
         if (os.contains("win")) return Support.NEEDS_IN_APP_LOGIN;
         if (hasPrefix(encryptedValuePrefix, "v20")) return Support.NEEDS_IN_APP_LOGIN;
         return Support.SUPPORTED;
     }
 
-    private static boolean hasPrefix(byte[] data, String prefix) {
+    private static boolean hasPrefix(byte @Nullable [] data, String prefix) {
         if (data == null || data.length < prefix.length()) return false;
         for (int i = 0; i < prefix.length(); i++) {
             if (data[i] != (byte) prefix.charAt(i)) return false;
@@ -141,7 +142,7 @@ public final class ChromiumCookies {
                 .resolve(b.relativeRoot());
     }
 
-    private static List<Path> overrideRoots() {
+    private static @Nullable List<Path> overrideRoots() {
         return FirefoxCookies.rootsOverride();
     }
 
@@ -160,7 +161,7 @@ public final class ChromiumCookies {
     }
 
     /** Newer Chromium keeps the DB in {@code Network/Cookies}, older versions directly in the profile. */
-    private static Path cookiesFile(Path profile) {
+    private static @Nullable Path cookiesFile(Path profile) {
         Path network = profile.resolve("Network").resolve("Cookies");
         if (Files.isRegularFile(network)) return network;
         Path legacy = profile.resolve("Cookies");
@@ -168,7 +169,7 @@ public final class ChromiumCookies {
     }
 
     /** Asks the macOS keychain (native prompt) for the Safe Storage password; null if denied/absent. */
-    private static byte[] keychainKey(String service) {
+    private static byte @Nullable [] keychainKey(String service) {
         try {
             // The person may need time to answer the native prompt, or to find their password.
             Processes.Result r = Processes.capture(List.of("security", "find-generic-password", "-wa", service), 600);

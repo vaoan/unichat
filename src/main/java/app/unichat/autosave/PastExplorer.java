@@ -22,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Exploring a chat's past ({@link AutoSave#explore}): page by page back to its beginning, each page a job of its own on
@@ -47,8 +48,8 @@ final class PastExplorer {
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private final Object stopLock = new Object();
     /** The thread exploring one message now, and its chat: what stopping interrupts. */
-    private Thread exploringThread;
-    private String exploringChat;
+    private @Nullable Thread exploringThread;
+    private @Nullable String exploringChat;
 
     PastExplorer(ChatPreferences prefs, ChatReader chats, SavedUpTo savedUpTo, AutoSave.Saver saver,
             AutoSave.Progress progress, Executor worker, java.util.function.Consumer<String> pageLoaded) {
@@ -103,7 +104,8 @@ final class PastExplorer {
         Exploring e = exploring(chatId);
         if (e.running()) set(chatId, withNow(e, new Now(Doing.STOPPING, null, null)));
         synchronized (stopLock) {
-            if (chatId.equals(exploringChat) && exploringThread != null) exploringThread.interrupt();
+            Thread t = exploringThread;
+            if (chatId.equals(exploringChat) && t != null) t.interrupt();
         }
     }
 
@@ -156,7 +158,7 @@ final class PastExplorer {
     }
 
     /** Runs {@code work} so that stopping interrupts it; the thread is left clean for the next job either way. */
-    private String interruptible(String chatId, Supplier<String> work) {
+    private @Nullable String interruptible(String chatId, Supplier<@Nullable String> work) {
         synchronized (stopLock) {
             if (stopping.contains(chatId)) return STOPPED;
             exploringThread = Thread.currentThread();
@@ -174,7 +176,7 @@ final class PastExplorer {
     }
 
     /** Saves what {@code m} has of {@code kinds}; null, {@link #STOPPED}, or why there's no room (then exploring stops). */
-    private String exploreOne(Message m, Set<SaveKind> kinds, String chatId, Path dir) {
+    private @Nullable String exploreOne(Message m, Set<SaveKind> kinds, String chatId, Path dir) {
         SaveKind kind = SaveKind.of(m);
         if (kind != null && kinds.contains(kind)) {
             doing(chatId, Doing.DOWNLOADING, m.timestamp(), FileNames.forMessage(m, ZoneId.systemDefault()));
@@ -193,8 +195,8 @@ final class PastExplorer {
     }
 
     /** Copies {@code m}'s file into {@code dir}: null, {@link #STOPPED}, or why not. */
-    private String copyQuietly(Message m, Path dir, String chatId) {
-        Path[] file = {null};
+    private @Nullable String copyQuietly(Message m, Path dir, String chatId) {
+        @Nullable Path[] file = {null};
         try {
             return SavedFile.copyInto(saver, m, dir, file, done -> arrived(chatId, done)) ? null : THERE;
         } catch (IOException | RuntimeException e) {
@@ -205,7 +207,7 @@ final class PastExplorer {
     }
 
     /** Saves the video behind {@code url} into {@code dir}: null, {@link #STOPPED}, or why not. */
-    private String linkQuietly(String url, Message m, Path dir, String chatId) {
+    private @Nullable String linkQuietly(String url, Message m, Path dir, String chatId) {
         try {
             Failure f = saver.link(url, dir, FileNames.tag(m), done -> arrived(chatId, done));
             String why = f == null ? null : f.why();
@@ -229,13 +231,13 @@ final class PastExplorer {
         set(chatId, withNow(e, new Now(now.doing(), now.at(), now.what(), done)));
     }
 
-    private void doing(String chatId, Doing what, Instant at, String item) {
+    private void doing(String chatId, Doing what, @Nullable Instant at, @Nullable String item) {
         if (stopping.contains(chatId)) return; // "Deteniendo…" stays until it's over
         set(chatId, withNow(exploring(chatId), new Now(what, at, item)));
     }
 
     /** Done (or stopped): one notice for what this run saved, one for what was no longer there. */
-    private void end(String chatId, Chat chat, boolean start) {
+    private void end(String chatId, @Nullable Chat chat, boolean start) {
         Exploring e = exploring(chatId);
         SavedUpTo.Back reached = savedUpTo.back(chatId);
         if (start) savedUpTo.exploredBack(chatId, reached == null ? Instant.EPOCH : reached.back(), true);

@@ -1,5 +1,6 @@
 package app.unichat.assist;
 
+import app.unichat.Present;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -36,7 +37,7 @@ class StyleHistoryTest {
         assertEquals(1, kept().size());
         assertEquals("- viejo", kept().get(0).text());
         assertEquals("- viejo\n- nuevo", s.text());
-        WritingStyle.LastLearned last = s.lastLearned();
+        WritingStyle.LastLearned last = Present.of(s.lastLearned());
         assertEquals(Instant.parse("2026-11-10T12:00:00Z"), last.when());
         assertEquals(List.of("nuevo"), last.changes().added());
         assertTrue(last.changes().removed().isEmpty());
@@ -69,7 +70,7 @@ class StyleHistoryTest {
         assertTrue(s.undoLast());
         assertEquals("- uno\n- dos", s.text());
         assertTrue(kept().stream().anyMatch(v -> v.undone() && v.text().equals("- tres")), "the undone one is kept: " + kept());
-        assertEquals(List.of("dos"), s.lastLearned().changes().added(), "now the learning before it is the last");
+        assertEquals(List.of("dos"), Present.of(s.lastLearned()).changes().added(), "now the learning before it is the last");
         assertTrue(s.undoLast());
         assertEquals("- uno", s.text());
         assertNull(s.lastLearned());

@@ -73,8 +73,7 @@ class StickerConverterTest {
     @Test
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aWebmBecomesAnAnimatedWebpWithItsTransparency() throws Exception {
-        Path ffmpeg = app.unichat.video.Ffmpeg.find();
-        Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path ffmpeg = Present.orSkip(app.unichat.video.Ffmpeg.find(), "no ffmpeg");
         Assumptions.assumeTrue(app.unichat.video.AnimatedWebp.img2webp() != null, "no img2webp");
         Path webm = dir.resolve("s.webm");
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10,format=yuva420p",

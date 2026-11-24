@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.time.Instant;
+import org.jspecify.annotations.Nullable;
 
 /**
  * One version of what a message said, as a computer kept it ({@link TextLog}): which message, of which chat, sent when
@@ -41,7 +42,7 @@ public record SavedText(String id, String chatId, Instant at, Instant seen, Stri
      * What {@code m} says now, seen {@code seen}; null when there's nothing to keep: deleted, media (auto-save's other
      * kinds), nothing said, or mine still going out (its id is a temporary one).
      */
-    static SavedText of(Message m, Instant seen) {
+    static @Nullable SavedText of(Message m, Instant seen) {
         boolean said = m.type() == MessageType.TEXT || m.type() == MessageType.NOTICE || m.type() == MessageType.EMOTE;
         if (!said || m.deleted() || m.timestamp() == null || m.body().isBlank()) return null;
         if (m.status() == MessageStatus.SENDING || m.status() == MessageStatus.FAILED) return null;
@@ -56,7 +57,7 @@ public record SavedText(String id, String chatId, Instant at, Instant seen, Stri
     }
 
     /** The entry a line holds; null for one that isn't whole (cut short, written by hand, from a later version). */
-    static SavedText parse(String line) {
+    static @Nullable SavedText parse(String line) {
         try {
             JsonNode n = JSON.readTree(line);
             if (n == null || !n.isObject()) return null;

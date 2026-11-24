@@ -9,6 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The AI command-line programs a reply can come from, already installed and signed in by the person.
@@ -32,7 +33,7 @@ public enum AiEngine {
     public String label() { return label; }
 
     /** The arguments of one reply; the prompt goes through stdin. {@code folder} may be null; {@code reply}: Codex's output file. */
-    List<String> command(Path bin, Path folder, Path workDir, Path reply) {
+    List<String> command(Path bin, @Nullable Path folder, Path workDir, Path reply) {
         return command(bin, folder, workDir, reply, false);
     }
 
@@ -40,7 +41,7 @@ public enum AiEngine {
      * {@code web}: the person asked for something to be looked up ([gaps] in what they wrote), so the program may search
      * the web. Searching only: opening any page would let a message in the chat send data out through its address.
      */
-    List<String> command(Path bin, Path folder, Path workDir, Path reply, boolean web) {
+    List<String> command(Path bin, @Nullable Path folder, Path workDir, Path reply, boolean web) {
         List<String> c = new ArrayList<>(List.of(bin.toString()));
         if (this == CLAUDE) {
             String tools = String.join(",", folder == null ? List.of() : List.of("Read", "Glob", "Grep"));
@@ -77,7 +78,7 @@ public enum AiEngine {
     }
 
     /** Where it's installed, or null. */
-    public Path find() {
+    public @Nullable Path find() {
         for (String name : names()) {
             Path f = BundledTools.onPath(name);
             if (f != null) return f;
@@ -104,7 +105,7 @@ public enum AiEngine {
                 home.resolve(".npm-global/bin"), home.resolve(".claude/local"), home.resolve(".bun/bin"));
     }
 
-    private Path fromLoginShell() {
+    private @Nullable Path fromLoginShell() {
         try {
             Processes.Result r = Processes.capture(List.of(System.getenv().getOrDefault("SHELL", "/bin/sh"), "-lc", "command -v " + exe), 5);
             if (!r.finished()) return null;

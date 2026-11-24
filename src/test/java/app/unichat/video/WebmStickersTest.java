@@ -1,5 +1,6 @@
 package app.unichat.video;
 
+import app.unichat.Present;
 import app.unichat.support.PathParts;
 
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -33,8 +34,7 @@ class WebmStickersTest {
     /** A video sticker for another network: an animated WebP that keeps its transparency, never a GIF (all or nothing). */
     @Test
     void aWebmBecomesAnAnimatedWebpWithItsTransparency() throws Exception {
-        Path ffmpeg = Ffmpeg.find();
-        assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "no ffmpeg");
         assumeTrue(AnimatedWebp.img2webp() != null, "no img2webp");
         Path webp = WebmStickers.toWebp(webmWithTransparency(ffmpeg), dir.resolve("out.webp"), p -> { });
         byte[] bytes = Files.readAllBytes(webp);
@@ -54,14 +54,13 @@ class WebmStickersTest {
         Path notWebm = Files.writeString(dir.resolve("x.webm"), "not a video");
         IOException e = org.junit.jupiter.api.Assertions.assertThrows(IOException.class,
                 () -> WebmStickers.toWebp(notWebm, dir.resolve("x.webp"), p -> { }));
-        assertTrue(e.getMessage().contains("exit"), "the log can tell why: " + e.getMessage());
+        assertTrue(Present.of(e.getMessage()).contains("exit"), "the log can tell why: " + e.getMessage());
     }
 
     @Test
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void anAnimatedGifBecomesATelegramVideoSticker() throws Exception {
-        Path ffmpeg = Ffmpeg.find();
-        assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "no ffmpeg");
         Path gif = dir.resolve("in.gif");
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=160x120:d=5:r=10",
                 gif.toString()).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();

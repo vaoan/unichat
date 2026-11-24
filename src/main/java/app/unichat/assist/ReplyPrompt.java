@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import org.jspecify.annotations.Nullable;
 
 /** What's sent to the AI program, and cleaning what comes back. Pure. */
 public final class ReplyPrompt {
@@ -42,36 +43,38 @@ public final class ReplyPrompt {
      * @param target the message to answer, or null for the last one
      * @param idea   what the person already wrote in the box, or blank
      */
-    public static String build(String instructions, boolean canReadFolder, List<Message> chat, Message target, String idea) {
+    public static String build(String instructions, boolean canReadFolder, List<Message> chat, @Nullable Message target,
+                               @Nullable String idea) {
         return build(instructions, canReadFolder, chat, target, idea, Map.of());
     }
 
     /** {@code heard}: what was said in voice notes, by message id; they appear as their text. */
-    public static String build(String instructions, boolean canReadFolder, List<Message> chat, Message target, String idea,
-                               Map<String, String> heard) {
+    public static String build(String instructions, boolean canReadFolder, List<Message> chat, @Nullable Message target,
+                               @Nullable String idea, Map<String, String> heard) {
         return build(instructions, canReadFolder, chat, target, idea, heard, "");
     }
 
     /** {@code style}: how the person writes ({@link StylePrompt}), after their own instructions. */
-    public static String build(String instructions, boolean canReadFolder, List<Message> chat, Message target, String idea,
-                               Map<String, String> heard, String style) {
+    public static String build(String instructions, boolean canReadFolder, List<Message> chat, @Nullable Message target,
+                               @Nullable String idea, Map<String, String> heard, @Nullable String style) {
         return build(instructions, canReadFolder, chat, target, idea, heard, style, List.of());
     }
 
     /** {@code examples}: how earlier drafts were corrected ({@link StylePrompt#examplesSection}). */
-    public static String build(String instructions, boolean canReadFolder, List<Message> chat, Message target, String idea,
-                               Map<String, String> heard, String style, List<StylePrompt.Correction> examples) {
+    public static String build(String instructions, boolean canReadFolder, List<Message> chat, @Nullable Message target,
+                               @Nullable String idea, Map<String, String> heard, @Nullable String style, List<StylePrompt.Correction> examples) {
         return build(instructions, canReadFolder, chat, target, idea, heard, style, examples, ZonedDateTime.now(ZoneId.systemDefault()));
     }
 
     /** {@code now}: when (and in which time zone) the reply is written, so "tomorrow" or "good morning" fit. */
-    public static String build(String instructions, boolean canReadFolder, List<Message> chat, Message target, String idea,
-                               Map<String, String> heard, String style, ZonedDateTime now) {
+    public static String build(String instructions, boolean canReadFolder, List<Message> chat, @Nullable Message target,
+                               @Nullable String idea, Map<String, String> heard, @Nullable String style, ZonedDateTime now) {
         return build(instructions, canReadFolder, chat, target, idea, heard, style, List.of(), now);
     }
 
-    public static String build(String instructions, boolean canReadFolder, List<Message> chat, Message target, String written,
-                               Map<String, String> heard, String style, List<StylePrompt.Correction> examples, ZonedDateTime now) {
+    public static String build(String instructions, boolean canReadFolder, List<Message> chat, @Nullable Message target,
+                               @Nullable String written, Map<String, String> heard, @Nullable String style,
+                               List<StylePrompt.Correction> examples, ZonedDateTime now) {
         String mark = "chat-" + UUID.randomUUID(); // a message can't fake the end of the chat without knowing it
         StringBuilder p = new StringBuilder("Draft the message the owner of this account (\"Me\" in the conversation) will reply with.\n\n");
         if (!instructions.isBlank()) p.append("Their instructions:\n").append(instructions.strip()).append("\n\n");
@@ -84,10 +87,10 @@ public final class ReplyPrompt {
         p.append(when(chat, now)).append("\n\n");
         // Marks written with the text ([+], [-], [!]…): the whole draft changed so. The marks themselves go no further.
         java.util.Set<Mark> marks = marks(written);
-        String idea = withoutMarks(written);
+        String idea = written == null ? "" : withoutMarks(written);
         // In this order: the gaps filled first, so the intention is complete; then what it answers; only then the reply.
         List<String> steps = new ArrayList<>();
-        boolean wrote = idea != null && !idea.isBlank();
+        boolean wrote = !idea.isBlank();
         if (hasGaps(idea)) steps.add(gapsStep(idea, canReadFolder));
         if (wrote) steps.add(ideaStep(idea, marks));
         steps.add(target == null
@@ -144,7 +147,7 @@ public final class ReplyPrompt {
     private static final java.util.regex.Pattern MARK = java.util.regex.Pattern.compile("\\[\\s*([+\\-−–—]{1,2}|[=!.?])\\s*]");
 
     /** The marks in {@code idea}, one of each kind (the last written), in {@link Mark}'s order. */
-    static java.util.Set<Mark> marks(String idea) {
+    static java.util.Set<Mark> marks(@Nullable String idea) {
         Mark[] byGroup = new Mark[4];
         java.util.regex.Matcher m = MARK.matcher(idea == null ? "" : idea);
         while (m.find()) {
@@ -158,7 +161,6 @@ public final class ReplyPrompt {
 
     /** {@code idea} without its marks (and the spaces they leave). */
     static String withoutMarks(String idea) {
-        if (idea == null) return null;
         return MARK.matcher(idea).replaceAll("").replaceAll("[ \\t]{2,}", " ").strip();
     }
 
@@ -215,13 +217,13 @@ public final class ReplyPrompt {
     private static final java.util.regex.Pattern GAP = java.util.regex.Pattern.compile("\\[[^\\[\\]\\n]+]");
 
     /** Where the first [gap] is in {@code text} (start, end), or null: one the draft couldn't fill, for the person to type. */
-    public static int[] firstGap(String text) {
+    public static int @Nullable [] firstGap(@Nullable String text) {
         java.util.regex.Matcher m = GAP.matcher(text == null ? "" : text);
         return m.find() ? new int[] {m.start(), m.end()} : null;
     }
 
     /** Whether what the person wrote has [gaps] to look up: then the program may search the web for them. */
-    public static boolean hasGaps(String idea) {
+    public static boolean hasGaps(@Nullable String idea) {
         return idea != null && GAP.matcher(withoutMarks(idea)).find();
     }
 
@@ -240,9 +242,9 @@ public final class ReplyPrompt {
      * The voice notes worth transcribing for a draft: the chosen message if it's one, and the newest since my last
      * message (what's being answered), at most {@link #MAX_VOICE_NOTES}.
      */
-    public static List<Message> voiceNotesToHear(List<Message> chat, Message target) {
+    public static List<Message> voiceNotesToHear(List<Message> chat, @Nullable Message target) {
         List<Message> out = new ArrayList<>();
-        if (isVoice(target)) out.add(target);
+        if (target != null && isVoice(target)) out.add(target);
         for (int i = chat.size() - 1; i >= 0 && out.size() < MAX_VOICE_NOTES; i--) {
             Message m = chat.get(i);
             if (m.outgoing() && !out.isEmpty()) break;
@@ -265,7 +267,7 @@ public final class ReplyPrompt {
     }
 
     /** {@code chosen}, the message being answered, is marked with → where it is. */
-    static String transcript(List<Message> chat, Map<String, String> heard, Message chosen) {
+    static String transcript(List<Message> chat, Map<String, String> heard, @Nullable Message chosen) {
         Deque<String> lines = new ArrayDeque<>();
         int size = 0;
         for (int i = chat.size() - 1; i >= 0; i--) {

@@ -1,5 +1,6 @@
 package app.unichat.video;
 
+import app.unichat.Present;
 import java.io.IOException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Assumptions;
@@ -17,8 +18,7 @@ class VideoFramesTest {
 
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     private Path webm(String filter, String size, int seconds, int rate) throws IOException, InterruptedException {
-        Path ffmpeg = Ffmpeg.find();
-        Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "no ffmpeg");
         Path webm = dir.resolve("s.webm");
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i",
                 filter + "=s=" + size + ":d=" + seconds + ":r=" + rate + ",format=yuva420p", "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p",

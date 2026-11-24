@@ -5,6 +5,7 @@ import app.unichat.settings.Settings;
 import app.unichat.support.BoundedBody;
 import app.unichat.support.Folders;
 import app.unichat.support.I18n;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.JsonNodeFactory;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -21,6 +22,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Turning a provider's GIF into something to send and keep: the library item (with the small GIF preview, since
@@ -35,15 +37,16 @@ public final class GifFiles {
     private GifFiles() {}
 
     public static MediaLibrary.Item item(Gif g) {
-        boolean mp4 = g.mp4Url() != null;
+        String mp4 = g.mp4Url();
         ObjectNode info = JsonNodeFactory.instance.objectNode().put("preview", g.previewUrl()).put("title", g.title());
-        return new MediaLibrary.Item(MediaLibrary.Kind.GIF, mp4 ? g.mp4Url() : g.gifUrl(), mp4 ? "video/mp4" : "image/gif",
+        return new MediaLibrary.Item(MediaLibrary.Kind.GIF, mp4 != null ? mp4 : g.gifUrl(), mp4 != null ? "video/mp4" : "image/gif",
                 g.width(), g.height(), info);
     }
 
     /** The image to show for a library GIF: its saved preview, else the file itself (null when there's neither). */
-    public static String preview(MediaLibrary.Item i) {
-        String p = i.info() == null ? null : HttpJson.text(i.info().path("preview"));
+    public static @Nullable String preview(MediaLibrary.Item i) {
+        JsonNode info = i.info();
+        String p = info == null ? null : HttpJson.text(info.path("preview"));
         return p != null ? p : "video/mp4".equals(i.mime()) ? null : i.url();
     }
 

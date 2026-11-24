@@ -13,6 +13,7 @@ import java.util.Properties;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import org.jspecify.annotations.Nullable;
 
 /**
  * What the person reads, in their language. Every text lives in {@code app/unichat/i18n/messages_<lang>.properties}
@@ -34,7 +35,7 @@ public final class I18n {
     private I18n() {}
 
     /** The text of {@code key} in the current language, with {@code {0}}… filled in. A missing key shows as itself. */
-    public static String t(String key, Object... args) {
+    public static String t(String key, @Nullable Object... args) {
         String s = lookup(locale.getLanguage(), key);
         if (s == null) s = lookup("", key);
         if (s == null) return key;

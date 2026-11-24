@@ -15,6 +15,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -28,7 +29,7 @@ class StyleLearningUnseenTest {
         started.incrementAndGet();
         Thread.ofVirtual().start(r);
     };
-    private Consumer<Boolean> listener;
+    private @Nullable Consumer<Boolean> listener;
 
     private StyleLearning learning() {
         StyleLearning l = new StyleLearning(() -> new WritingStyle(dir), starter);

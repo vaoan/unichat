@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import org.jspecify.annotations.Nullable;
 
 import static app.unichat.support.Urls.enc;
 
@@ -27,7 +28,7 @@ public final class BridgeStickerPacks {
     private final LoginApi api;
 
     /** @param base e.g. {@code http://127.0.0.1:29317/_matrix/provision} */
-    public BridgeStickerPacks(String base, String accessToken, String userId, String loginId) {
+    public BridgeStickerPacks(String base, String accessToken, String userId, @Nullable String loginId) {
         this.api = new LoginApi(base, accessToken, userId, loginId);
     }
 
@@ -38,7 +39,7 @@ public final class BridgeStickerPacks {
     }
 
     /** The whole set, as the bridge gives it (see {@link #pack(JsonNode, String)}); null when this bridge can't. */
-    public JsonNode raw(String url) throws IOException, InterruptedException {
+    public @Nullable JsonNode raw(String url) throws IOException, InterruptedException {
         return api.call(HTTP, "GET", "/v3/image_pack/import", "&pack_url=" + enc(url), null, TIMEOUT);
     }
 

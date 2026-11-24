@@ -1,5 +1,6 @@
 package app.unichat.video;
 
+import app.unichat.Present;
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -9,6 +10,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -46,7 +48,7 @@ class AnimDumpTest {
     @TempDir Path dir;
 
     /** The one built for development (run-dev.sh), when this machine has it: CI has no anim_dump and skips. */
-    private static Path tool() {
+    private static @Nullable Path tool() {
         Path built = Path.of(System.getProperty("user.home"), "Library/Caches/unichat-build/anim_dump");
         if (System.getProperty("unichat.animDump") == null && Files.isExecutable(built)) System.setProperty("unichat.animDump", built.toString());
         return AnimDump.find();
@@ -108,10 +110,10 @@ class AnimDumpTest {
     void eachFrameIsMadeSmallAsItsRead() throws Exception {
         assumeTrue(AnimDump.find() != null, "no anim_dump");
         List<int[]> sizes = new java.util.ArrayList<>();
-        List<BufferedImage> frames = AnimDump.frames(asset(), f -> {
+        List<BufferedImage> frames = Present.of(AnimDump.frames(asset(), f -> {
             sizes.add(new int[] {f.getWidth(), f.getHeight()});
             return new BufferedImage(8, 8, BufferedImage.TYPE_INT_ARGB);
-        });
+        }));
         assertEquals(sizes.size(), frames.size(), "every frame through it");
         assertTrue(frames.stream().allMatch(f -> f.getWidth() == 8), "only the small ones kept");
     }

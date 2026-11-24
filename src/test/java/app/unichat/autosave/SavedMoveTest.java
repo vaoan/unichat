@@ -1,5 +1,6 @@
 package app.unichat.autosave;
 
+import app.unichat.Present;
 import app.unichat.support.PathParts;
 
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class SavedMoveTest {
         Path to = Files.createDirectories(dir.resolve("new/Dann Serna"));
         Files.writeString(to.resolve("image.jpg"), "ya estaba");
 
-        assertEquals(2, SavedMove.move(from.getParent(), to));
+        assertEquals(2, SavedMove.move(Present.of(from.getParent()), to));
         assertEquals("ya estaba", Files.readString(to.resolve("image.jpg")), "what was there stays");
         assertEquals("vieja", Files.readString(to.resolve("image (2).jpg")), "and the moved one beside it");
         assertTrue(Files.exists(to.resolve("links/video.mp4")), "folders merged");

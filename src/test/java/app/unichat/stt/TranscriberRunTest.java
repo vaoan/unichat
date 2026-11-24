@@ -1,5 +1,6 @@
 package app.unichat.stt;
 
+import app.unichat.Present;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledOnOs;
@@ -29,17 +30,17 @@ class TranscriberRunTest {
     void itGivesWhatTheProgramPrintsAndOnFailureItsLastErrorLine() throws Exception {
         assertEquals("hola\n", Transcriber.run(sh("echo hola; echo ruido >&2"), dir));
         IOException e = assertThrows(IOException.class, () -> Transcriber.run(sh("echo uno >&2; echo 'sin modelo' >&2; exit 2"), dir));
-        assertTrue(e.getMessage().contains("sin modelo"), e.getMessage());
-        assertFalse(e.getMessage().contains("uno"), e.getMessage());
+        assertTrue(Present.of(e.getMessage()).contains("sin modelo"), e.getMessage());
+        assertFalse(Present.of(e.getMessage()).contains("uno"), e.getMessage());
     }
 
     /** A command saved with the Spanish names ({archivo}, {idioma}) still gets the audio and the language, and is saved again with the English ones. */
     @Test
     void anOldSpeechCommandStillRuns() throws Exception {
         app.unichat.settings.Settings s = app.unichat.settings.Settings.get();
-        String engine = s.getString("stt.engine", null);
-        String command = s.getString("stt.command", null);
-        String lang = s.getString("stt.language", null);
+        String engine = s.getString("stt.engine");
+        String command = s.getString("stt.command");
+        String lang = s.getString("stt.language");
         try {
             Path audio = dir.resolve("nota.wav");
             Files.write(audio, "RIFF\0\0\0\0WAVEfmt ".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));

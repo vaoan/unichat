@@ -27,7 +27,9 @@ class NullMarkedTest {
      * marked {@code @NullMarked}, and its name goes here. Once every package has, this is {@code app.unichat} alone.
      */
     private static final List<String> NULL_MARKED = List.of("app.unichat.support", "app.unichat.model", "app.unichat.settings",
-            "app.unichat.service", "app.unichat.cloud", "app.unichat.matrix", "app.unichat.server");
+            "app.unichat.service", "app.unichat.cloud", "app.unichat.matrix", "app.unichat.server", "app.unichat.assist",
+            "app.unichat.autosave", "app.unichat.bridge", "app.unichat.cloak", "app.unichat.gif", "app.unichat.links", "app.unichat.login",
+            "app.unichat.stt", "app.unichat.update", "app.unichat.video", "app.unichat.voice");
 
     /** The mark, by its simple or its qualified name, however it's spaced. */
     private static final Pattern MARK = Pattern.compile("@\\s*(org\\s*\\.\\s*jspecify\\s*\\.\\s*annotations\\s*\\.\\s*)?NullMarked\\b");

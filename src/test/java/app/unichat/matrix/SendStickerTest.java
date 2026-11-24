@@ -182,8 +182,7 @@ class SendStickerTest {
     @Test
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aTelegramVideoStickerGoesToDiscordAsAnAnimatedWebpThatPlaysByItself(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
-        java.nio.file.Path ffmpeg = app.unichat.video.Ffmpeg.find();
-        org.junit.jupiter.api.Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        java.nio.file.Path ffmpeg = Present.orSkip(app.unichat.video.Ffmpeg.find(), "no ffmpeg");
         org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.video.AnimatedWebp.img2webp() != null, "no img2webp");
         served = dir.resolve("s.webm");
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10",
@@ -311,8 +310,7 @@ class SendStickerTest {
     @Test
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aGifThatCameAsAVideoGoesToDiscordAsAnAnimatedWebpAndToTelegramAsItIs(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
-        java.nio.file.Path ffmpeg = app.unichat.video.Ffmpeg.find();
-        org.junit.jupiter.api.Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        java.nio.file.Path ffmpeg = Present.orSkip(app.unichat.video.Ffmpeg.find(), "no ffmpeg");
         org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.support.BundledTools.find("unichat.img2webp", null, "img2webp") != null, "no img2webp");
         served = dir.resolve("gif.mp4");
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10",
@@ -343,8 +341,7 @@ class SendStickerTest {
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aSavedGifThatIsAnMp4GoesToDiscordAsAnAnimatedWebpAndToTelegramAsItIs(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
         // From the GIF panel (a favourite from Telegram, a provider's MP4): Discord showed it as a video with a play button.
-        java.nio.file.Path ffmpeg = app.unichat.video.Ffmpeg.find();
-        org.junit.jupiter.api.Assumptions.assumeTrue(ffmpeg != null, "no ffmpeg");
+        java.nio.file.Path ffmpeg = Present.orSkip(app.unichat.video.Ffmpeg.find(), "no ffmpeg");
         org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.support.BundledTools.find("unichat.img2webp", null, "img2webp") != null, "no img2webp");
         java.nio.file.Path mp4 = dir.resolve("gif.mp4");
         Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x64:d=1:r=10",

@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.util.List;
 import java.util.Locale;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -70,7 +71,7 @@ class StylePromptTest {
         assertEquals(new StylePrompt.Verdict("- hahaha", null), StylePrompt.check("- hahaha"));
     }
 
-    private static String file(String reply) {
+    private static @Nullable String file(String reply) {
         return StylePrompt.check(reply).file();
     }
 

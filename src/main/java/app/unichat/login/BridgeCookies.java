@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Bridges a "cookies" login step to Unichat's cookie sources (browser session, in-app window, cookies.txt): the
@@ -24,7 +25,7 @@ public final class BridgeCookies {
      * True when every required field can come from a cookie. Other sources (request headers, local storage,
      * request bodies) need a browser-level capture Unichat doesn't have; those logins use the bot chat instead.
      */
-    public static boolean canCollect(BridgeLogin.CookieParams p) {
+    public static boolean canCollect(BridgeLogin.@Nullable CookieParams p) {
         if (p == null || p.fields().isEmpty()) return false;
         for (BridgeLogin.CookieField f : p.fields()) {
             if (f.required() && cookieSource(f) == null) return false;
@@ -36,7 +37,7 @@ public final class BridgeCookies {
      * True when it takes the login window, watching the page's own requests: some field wants a request header (LinkedIn
      * wants Cookie, X-LI-Track and X-LI-Page-Instance), which no browser profile or cookies.txt holds.
      */
-    public static boolean needsWindowCapture(BridgeLogin.CookieParams p) {
+    public static boolean needsWindowCapture(BridgeLogin.@Nullable CookieParams p) {
         if (p == null || p.fields().isEmpty() || canCollect(p)) return false;
         for (BridgeLogin.CookieField f : p.fields()) {
             if (f.required() && cookieSource(f) == null && headerSource(f) == null) return false;
@@ -58,14 +59,15 @@ public final class BridgeCookies {
     public static String cookieDomain(BridgeLogin.CookieParams p) {
         for (BridgeLogin.CookieField f : p.fields()) {
             BridgeLogin.Source s = headerSource(f);
-            if (s != null && isCookieHeader(s) && s.cookieDomain() != null) return stripDots(s.cookieDomain());
+            String domain = s == null || !isCookieHeader(s) ? null : s.cookieDomain();
+            if (domain != null) return stripDots(domain);
         }
         String h = host(p.url());
         return h == null ? "" : stripDots(h);
     }
 
     /** Whether a cookie set for {@code cookieHost} goes to {@code domain} (also its subdomains). */
-    public static boolean belongs(String cookieHost, String domain) {
+    public static boolean belongs(@Nullable String cookieHost, String domain) {
         String h = stripDots(cookieHost == null ? "" : cookieHost);
         return h.equals(domain) || h.endsWith("." + domain);
     }
@@ -76,7 +78,8 @@ public final class BridgeCookies {
      *
      * @param headers what the page sent, by lower-case name
      */
-    public static Map<String, String> captured(BridgeLogin.CookieParams p, String location, Map<String, String> cookies, Map<String, String> headers) {
+    public static @Nullable Map<String, String> captured(BridgeLogin.CookieParams p, @Nullable String location, Map<String, String> cookies,
+                                                         Map<String, String> headers) {
         return captured(p, location, cookies, headers, Map.of());
     }
 
@@ -85,14 +88,16 @@ public final class BridgeCookies {
      *
      * @param fallbacks by field id, for what the page didn't send ({@link #headerFallbacks})
      */
-    public static Map<String, String> captured(BridgeLogin.CookieParams p, String location, Map<String, String> cookies,
-                                               Map<String, String> headers, Map<String, String> fallbacks) {
-        if (p.waitForUrlPattern() != null && (location == null || !Pattern.compile(p.waitForUrlPattern()).matcher(location).find())) return null;
+    public static @Nullable Map<String, String> captured(BridgeLogin.CookieParams p, @Nullable String location, Map<String, String> cookies,
+                                                         Map<String, String> headers, Map<String, String> fallbacks) {
+        String until = p.waitForUrlPattern();
+        if (until != null && (location == null || !Pattern.compile(until).matcher(location).find())) return null;
         Map<String, String> out = new HashMap<>();
         for (BridgeLogin.CookieField f : p.fields()) {
             String v = value(f, cookies, headers);
             if ((v == null || v.isBlank()) && fallbacks.containsKey(f.id())) v = fallbacks.get(f.id());
-            boolean ok = v != null && !v.isBlank() && (f.pattern() == null || Pattern.compile(f.pattern()).matcher(v).find());
+            String shape = f.pattern();
+            boolean ok = v != null && !v.isBlank() && (shape == null || Pattern.compile(shape).matcher(v).find());
             if (ok) out.put(f.id(), v);
             else if (f.required()) return null;
         }
@@ -123,7 +128,7 @@ public final class BridgeCookies {
         return CookieSpec.find(n).map(s -> s.missing(cookies).isEmpty()).orElse(true);
     }
 
-    private static String value(BridgeLogin.CookieField f, Map<String, String> cookies, Map<String, String> headers) {
+    private static @Nullable String value(BridgeLogin.CookieField f, Map<String, String> cookies, Map<String, String> headers) {
         BridgeLogin.Source h = headerSource(f);
         if (h != null) return isCookieHeader(h) ? cookieHeader(cookies) : headers.get(h.name().toLowerCase(Locale.ROOT));
         BridgeLogin.Source c = cookieSource(f);
@@ -137,7 +142,7 @@ public final class BridgeCookies {
     @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a header name a bridge's login step gives, matched to know where the cookies go; nothing is allowed by it")
     private static boolean isCookieHeader(BridgeLogin.Source s) { return "Cookie".equalsIgnoreCase(s.name()); }
 
-    private static BridgeLogin.Source headerSource(BridgeLogin.CookieField f) {
+    private static BridgeLogin.@Nullable Source headerSource(BridgeLogin.CookieField f) {
         for (BridgeLogin.Source s : f.sources()) if ("request_header".equals(s.type()) && !s.name().isBlank()) return s;
         return null;
     }
@@ -150,10 +155,12 @@ public final class BridgeCookies {
             BridgeLogin.Source s = cookieSource(f);
             if (s == null) continue;
             (f.required() ? required : optional).add(s.name());
-            String d = s.cookieDomain() != null ? s.cookieDomain() : host(p.url());
+            String domain = s.cookieDomain();
+            String d = domain != null ? domain : host(p.url());
             if (d != null) domains.add(stripDots(d));
         }
-        if (domains.isEmpty() && host(p.url()) != null) domains.add(stripDots(host(p.url())));
+        String site = host(p.url());
+        if (domains.isEmpty() && site != null) domains.add(stripDots(site));
         return CookieSpec.of(n, required, optional, domains);
     }
 
@@ -169,12 +176,12 @@ public final class BridgeCookies {
         return out;
     }
 
-    private static BridgeLogin.Source cookieSource(BridgeLogin.CookieField f) {
+    private static BridgeLogin.@Nullable Source cookieSource(BridgeLogin.CookieField f) {
         for (BridgeLogin.Source s : f.sources()) if ("cookie".equals(s.type()) && !s.name().isBlank()) return s;
         return null;
     }
 
-    private static String host(String url) {
+    private static @Nullable String host(@Nullable String url) {
         try {
             return url == null ? null : URI.create(url).getHost();
         } catch (IllegalArgumentException e) {

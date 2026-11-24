@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jspecify.annotations.Nullable;
 
 /**
  * What's known of how the person writes ({@code writing-style.md}, which travels with them) and the corrections to
@@ -27,7 +28,7 @@ public final class WritingStyle {
     static final int MAX_LEARNED = 40;
     private static final int MAX_AI_TEXTS = 200;
     private static final ObjectMapper JSON = new ObjectMapper();
-    private static WritingStyle instance;
+    private static @Nullable WritingStyle instance;
 
     private final Path styleFile;
     private final Path correctionsFile;
@@ -127,13 +128,13 @@ public final class WritingStyle {
     }
 
     /** Sent from a draft: the AI's words, not the person's, so they're never learned from as their writing. */
-    public synchronized void writtenByAi(String text) {
+    public synchronized void writtenByAi(@Nullable String text) {
         if (text == null) return;
         aiTexts.add(text.strip());
         while (aiTexts.size() > MAX_AI_TEXTS) aiTexts.remove(aiTexts.iterator().next());
     }
 
-    synchronized boolean isWrittenByAi(String text) {
+    synchronized boolean isWrittenByAi(@Nullable String text) {
         return text != null && aiTexts.contains(text.strip());
     }
 
@@ -141,7 +142,7 @@ public final class WritingStyle {
      * Saves what was learned, uses up the corrections it came from and marks the chat as learned, but only if the
      * file is still {@code readAs}: the person may have changed it by hand meanwhile (Ajustes), and that wins.
      */
-    synchronized boolean commit(String readAs, String style, int correctionsUsed, String chatId, String newest) {
+    synchronized boolean commit(String readAs, String style, int correctionsUsed, String chatId, @Nullable String newest) {
         if (!text().equals(readAs)) return false;
         history.replaced(readAs);
         save(style);
@@ -151,7 +152,7 @@ public final class WritingStyle {
     }
 
     /** The last change learning made, against the file as it is now; null when there's none kept. */
-    public synchronized LastLearned lastLearned() {
+    public synchronized @Nullable LastLearned lastLearned() {
         StyleHistory.Version v = history.lastLearned();
         return v == null ? null : new LastLearned(v.when(), StyleDiff.between(v.text(), text()));
     }
@@ -170,11 +171,11 @@ public final class WritingStyle {
         return true;
     }
 
-    String learnedUpTo(String chatId) {
+    @Nullable String learnedUpTo(String chatId) {
         return learnedUpTo.get(chatId);
     }
 
-    void learnedUpTo(String chatId, String messageId) {
+    void learnedUpTo(String chatId, @Nullable String messageId) {
         if (messageId != null) learnedUpTo.put(chatId, messageId);
     }
 

@@ -1,5 +1,6 @@
 package app.unichat.gif;
 
+import app.unichat.Present;
 import app.unichat.model.MediaLibrary;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class GifFilesTest {
         assertEquals("https://m/giphy.mp4", i.url());
         assertEquals("video/mp4", i.mime());
         assertEquals("https://m/200w.gif", GifFiles.preview(i), "an mp4 can't be shown as an Image: keep the GIF preview");
-        assertEquals("Gato", i.info().path("title").asText());
+        assertEquals("Gato", Present.of(i.info()).path("title").asText());
     }
 
     @Test
@@ -118,7 +119,7 @@ class GifFilesTest {
             Path f = GifFiles.fetch(java.net.URI.create("http://127.0.0.1:" + server.getAddress().getPort() + "/g"), ".gif", GifFiles.TIMEOUT,
                     GifFiles.MAX_BYTES);
             assertTrue(Files.exists(f));
-            assertEquals("gif-cache", f.getParent().getFileName().toString());
+            assertEquals("gif-cache", Present.of(f.getParent()).getFileName().toString());
             assertFalse(f.getFileName().toString().contains("/"));
         } finally {
             server.stop(0);

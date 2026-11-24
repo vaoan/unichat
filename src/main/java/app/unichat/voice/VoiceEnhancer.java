@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
 import java.util.function.DoubleConsumer;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Cleans a voice note before it goes out, on this computer: no rumble, background noise off (RNNoise, a small neural
@@ -106,7 +107,7 @@ public final class VoiceEnhancer {
     }
 
     /** The model, downloaded if allowed; null means ffmpeg's plain noise filter, which needs none. */
-    private static Path model(DoubleConsumer installing) throws InterruptedException {
+    private static @Nullable Path model(DoubleConsumer installing) throws InterruptedException {
         Path f = Settings.get().dir().resolve("tools").resolve("rnnoise").resolve(MODEL);
         if (Files.isRegularFile(f)) return f;
         if (!Ffmpeg.autoInstall()) return null;

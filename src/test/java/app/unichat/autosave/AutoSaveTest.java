@@ -1,5 +1,6 @@
 package app.unichat.autosave;
 
+import app.unichat.Present;
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
@@ -24,6 +25,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
@@ -43,7 +45,7 @@ class AutoSaveTest {
     /** Where each link went and the name tag it got: "folder tag". */
     private final List<String> linkedInto = new CopyOnWriteArrayList<>();
     /** The message each failure told came in. */
-    private final List<String> failedIn = new CopyOnWriteArrayList<>();
+    private final List<@Nullable String> failedIn = new CopyOnWriteArrayList<>();
     // A link that has no video, and a file that can't be downloaded.
     private static final String NO_VIDEO = "https://example.org/sin-video";
     private static final String BROKEN = "mxc://s/roto.jpg";
@@ -53,7 +55,7 @@ class AutoSaveTest {
     private static final String FLAKY = "mxc://s/a-veces.jpg";
     private static final String FLAKY_LINK = "https://example.org/a-veces";
 
-    private volatile String flaky;
+    private volatile @Nullable String flaky;
     /** Every file asked for, in order. */
     private final List<String> asked = new CopyOnWriteArrayList<>();
     /** Counted down when a download of {@link #ENDLESS} starts: it never ends by itself (a huge video). */
@@ -66,7 +68,7 @@ class AutoSaveTest {
     private ChatReader reader() {
         return new ChatReader() {
             @Override public List<Chat> chats() { return List.of(chat); }
-            @Override public Chat chat(String id) { return id.equals(chat.id()) ? chat : null; }
+            @Override public @Nullable Chat chat(String id) { return id.equals(chat.id()) ? chat : null; }
             @Override public List<Message> messages(String id) { return new ArrayList<>(timeline); }
             @Override public CompletableFuture<Boolean> loadOlder(String id) {
                 List<Message> page = older.poll();
@@ -74,14 +76,14 @@ class AutoSaveTest {
                 timeline.addAll(0, page);
                 return CompletableFuture.completedFuture(true);
             }
-            @Override public CompletableFuture<Message> message(String c, String m) { return CompletableFuture.completedFuture(null); }
+            @Override public CompletableFuture<@Nullable Message> message(String c, String m) { return CompletableFuture.completedFuture(null); }
         };
     }
 
     @BeforeEach
     void start() throws Exception {
         svc = new MockChatService();
-        chat = svc.chat("!family:demo");
+        chat = Present.of(svc.chat("!family:demo"));
         SaveFolders.setOwn(chat.id(), dir.resolve("out"));
         save = create(NO_RETRY);
     }
@@ -108,7 +110,7 @@ class AutoSaveTest {
                 return cached;
             }
 
-            @Override public Failure link(String url, Path folder, String tag, java.util.function.DoubleConsumer progress) {
+            @Override public @Nullable Failure link(String url, Path folder, String tag, java.util.function.DoubleConsumer progress) {
                 if (url.equals(NO_VIDEO)) return Failure.forGood("Unsupported URL");
                 String why = flaky;
                 if (url.equals(FLAKY_LINK) && why != null) return Failure.forNow(why);
@@ -123,7 +125,7 @@ class AutoSaveTest {
                 told.add("finished " + saved + " " + c.id());
                 roundFinished.countDown();
             }
-            @Override public void failed(String what, Chat c, String messageId, String why) {
+            @Override public void failed(String what, Chat c, @Nullable String messageId, String why) {
                 told.add("failed " + what + ": " + why);
                 failedIn.add(messageId);
             }

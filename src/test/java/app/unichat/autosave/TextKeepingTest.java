@@ -1,5 +1,6 @@
 package app.unichat.autosave;
 
+import app.unichat.Present;
 import app.unichat.model.Chat;
 import app.unichat.model.Message;
 import app.unichat.model.MessageType;
@@ -25,6 +26,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -42,23 +44,23 @@ class TextKeepingTest {
     private ChatReader reader() {
         return new ChatReader() {
             @Override public List<Chat> chats() { return List.of(chat); }
-            @Override public Chat chat(String id) { return id.equals(chat.id()) ? chat : null; }
+            @Override public @Nullable Chat chat(String id) { return id.equals(chat.id()) ? chat : null; }
             @Override public List<Message> messages(String id) { return new ArrayList<>(timeline); }
             @Override public CompletableFuture<Boolean> loadOlder(String id) { return CompletableFuture.completedFuture(false); }
-            @Override public CompletableFuture<Message> message(String c, String m) { return CompletableFuture.completedFuture(null); }
+            @Override public CompletableFuture<@Nullable Message> message(String c, String m) { return CompletableFuture.completedFuture(null); }
         };
     }
 
     @BeforeEach
     void start() {
         svc = new MockChatService();
-        chat = svc.chat("!family:demo");
+        chat = Present.of(svc.chat("!family:demo"));
         SaveFolders.setOwn(chat.id(), dir.resolve("out"));
         keeping = new TextKeeping(svc, reader(), new TextLog(dir.resolve("texts"), Instant::now), Duration.ZERO, Duration.ZERO,
                 new AutoSave.Progress() {
                     @Override public void changed(int done, int total) { /* the fake ignores it */ }
                     @Override public void finished(int saved, Chat c) { /* the fake ignores it */ }
-                    @Override public void failed(String what, Chat c, String messageId, String why) { failed.add(what + ": " + why); }
+                    @Override public void failed(String what, Chat c, @Nullable String messageId, String why) { failed.add(what + ": " + why); }
                 });
     }
 
@@ -245,7 +247,7 @@ class TextKeepingTest {
         svc.setAutoSave(chat.id(), EnumSet.of(SaveKind.TEXTS)).get();
         Path other = Files.createDirectories(dir.resolve("texts/0b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44"));
         Files.writeString(other.resolve(TextLog.key(chat.id()) + " 2026-11.jsonl"),
-                SavedText.of(said("$0", "lo que vio la laptop"), Instant.now()).json() + "\n", StandardCharsets.UTF_8);
+                Present.of(SavedText.of(said("$0", "lo que vio la laptop"), Instant.now())).json() + "\n", StandardCharsets.UTF_8);
         keeping.arrived(Set.of(TextLog.key(chat.id())));
         settled();
         assertTrue(copy().contains("  lo que vio la laptop\n"), "made again with it");

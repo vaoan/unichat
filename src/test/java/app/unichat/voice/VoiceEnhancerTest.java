@@ -1,5 +1,6 @@
 package app.unichat.voice;
 
+import app.unichat.Present;
 import app.unichat.model.VoiceNote;
 import app.unichat.stt.OggOpus;
 import app.unichat.support.PathParts;
@@ -125,7 +126,7 @@ class VoiceEnhancerTest {
     private void speechAndNoise(Path clean, Path noisy) throws IOException, InterruptedException {
         Path aiff = dir.resolve("voz.aiff");
         run("say", "-o", aiff.toString(), "Oye, te cuento que perdí el vuelo. [[slnc 4000]] Te llamo cuando llegue.");
-        String ffmpeg = Ffmpeg.find().toString();
+        String ffmpeg = Present.of(Ffmpeg.find()).toString();
         run(ffmpeg, "-y", "-loglevel", "error", "-i", aiff.toString(), "-f", "s16le", "-ar", "48000", "-ac", "1", clean.toString());
         run(ffmpeg, "-y", "-loglevel", "error", "-f", "s16le", "-ar", "48000", "-ac", "1", "-i", clean.toString(),
                 "-f", "lavfi", "-i", "anoisesrc=c=pink:a=0.05:r=48000",

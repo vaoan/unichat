@@ -1,5 +1,6 @@
 package app.unichat.bridge;
 
+import app.unichat.Present;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -27,6 +28,6 @@ class LoginsCacheTest {
         assertFalse(LoginsCache.hasLogin("1763000000000\n"));
         assertNull(LoginsCache.parse(null));
         assertFalse(LoginsCache.hasLogin(null));
-        assertEquals(0, LoginsCache.parse("garbage\n1\t\t\n").at(), "a broken time is stale");
+        assertEquals(0, Present.of(LoginsCache.parse("garbage\n1\t\t\n")).at(), "a broken time is stale");
     }
 }

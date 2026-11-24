@@ -1,5 +1,6 @@
 package app.unichat.assist;
 
+import app.unichat.Present;
 import java.io.IOException;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -85,7 +87,7 @@ class ReplyWriterTest {
     @DisabledOnOs(OS.WINDOWS)
     void aBigPromptDoesntBlockAProgramThatTalksFirst() throws Exception {
         Path bin = script("head -c 300000 /dev/zero | tr '\\0' 'x'\ncat > /dev/null");
-        assertEquals(300_000, new ReplyWriter().run(AiEngine.CLAUDE, bin, null, "y".repeat(2_000_000)).length());
+        assertEquals(300_000, Present.of(new ReplyWriter().run(AiEngine.CLAUDE, bin, null, "y".repeat(2_000_000))).length());
     }
 
     @Test
@@ -93,7 +95,7 @@ class ReplyWriterTest {
     void itSaysWhyWhenItFails() throws Exception {
         Path bin = script("echo 'Not logged in' >&2\nexit 1");
         ReplyWriter.Failure f = assertThrows(ReplyWriter.Failure.class, () -> new ReplyWriter().run(AiEngine.CLAUDE, bin, null, "x"));
-        assertTrue(f.getMessage().contains("Not logged in"));
+        assertTrue(Present.of(f.getMessage()).contains("Not logged in"));
         Path empty = script("cat > /dev/null");
         assertThrows(ReplyWriter.Failure.class, () -> new ReplyWriter().run(AiEngine.CLAUDE, empty, null, "x"));
     }
@@ -126,7 +128,7 @@ class ReplyWriterTest {
         Path never = fifo("never");
         // It says its own process id, then waits for ever on a pipe nobody opens: only being stopped ends it.
         Path bin = script("echo $$ > '" + started + "'\nexec cat '" + never + "'");
-        java.util.concurrent.atomic.AtomicReference<String> got = new java.util.concurrent.atomic.AtomicReference<>("not returned");
+        java.util.concurrent.atomic.AtomicReference<@Nullable String> got = new java.util.concurrent.atomic.AtomicReference<>("not returned");
         Thread t = Thread.ofPlatform().start(() -> {
             try {
                 got.set(new ReplyWriter(java.time.Duration.ofDays(1)).run(AiEngine.CLAUDE, bin, null, "x"));
@@ -164,14 +166,15 @@ class ReplyWriterTest {
     }
 
     /** The real text a program answers with; null when it isn't signed in here, so there's nothing to learn from it. */
-    private static String corrected(AiEngine engine, String text) throws ReplyWriter.Failure {
+    private static @Nullable String corrected(AiEngine engine, String text) throws ReplyWriter.Failure {
         if (engine.find() == null) return null;
         try {
             String reply = new ReplyWriter().write(engine, null, FixPrompt.build(text));
             System.out.println(engine + " -> " + reply);
             return reply;
         } catch (ReplyWriter.Failure e) {
-            if (e.getMessage().contains("401") || e.getMessage().contains("Not logged in")) return null;
+            String why = Present.of(e.getMessage());
+            if (why.contains("401") || why.contains("Not logged in")) return null;
             throw e;
         }
     }
@@ -201,9 +204,9 @@ class ReplyWriterTest {
             String english = corrected(engine, "i dont no if their coming tomorow");
             if (english == null) continue;
             assertTrue(english.contains("don't know") && english.contains("they're") && english.contains("tomorrow"), english);
-            String french = corrected(engine, "je suis alle a la plage avec ma soeur");
+            String french = Present.of(corrected(engine, "je suis alle a la plage avec ma soeur"));
             assertTrue(french.contains("allé") && french.contains("à la plage"), french);
-            String mixed = corrected(engine, "mañana tengo el meeting, see you their");
+            String mixed = Present.of(corrected(engine, "mañana tengo el meeting, see you their"));
             assertTrue((mixed.contains("meeting") && mixed.contains("see you there")) || mixed.contains("See you there"), mixed);
             assertTrue(mixed.contains("añana"), mixed);
         }

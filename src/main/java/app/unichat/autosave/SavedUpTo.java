@@ -13,7 +13,9 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Up to where each chat's messages were saved ({@code autosave.json}): the newest one's time, and the ids sharing that
@@ -48,14 +50,14 @@ final class SavedUpTo {
         Mark mark = marks.get(chatId);
         if (mark == null) {
             startNow(chatId);
-            mark = marks.get(chatId);
+            mark = Objects.requireNonNull(marks.get(chatId), "startNow just put it");
         }
         int c = m.timestamp().compareTo(mark.at());
         return c > 0 || (c == 0 && !mark.ids().contains(m.id()));
     }
 
     /** Where exploring {@code chatId}'s past got to; null: never explored. */
-    synchronized Back back(String chatId) {
+    synchronized @Nullable Back back(String chatId) {
         return backs.get(chatId);
     }
 

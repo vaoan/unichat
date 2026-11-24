@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Every frame of an animated WebP, composited by libwebp's {@code anim_dump} (shipped in app/server, beside gif2webp): as a
@@ -29,12 +30,12 @@ public final class AnimDump {
     private AnimDump() {}
 
     /** {@code -Dunichat.animDump} (development), the copy inside the app, or one on the PATH; null when there's none. */
-    public static Path find() {
+    public static @Nullable Path find() {
         return BundledTools.find("unichat.animDump", null, "anim_dump");
     }
 
     /** The frames, oldest first, each the whole canvas; null when there's no anim_dump or it can't read the file. */
-    public static List<BufferedImage> frames(Path webp) {
+    public static @Nullable List<BufferedImage> frames(Path webp) {
         return frames(webp, f -> f);
     }
 
@@ -42,7 +43,7 @@ public final class AnimDump {
      * The frames, oldest first, each made {@code each} (smaller) as it's read: a 512 px sticker's frames all whole at
      * once (1 MB each) were the peak that filled the memory when the sticker panel opened. Null as {@link #frames(Path)}.
      */
-    public static List<BufferedImage> frames(Path webp, java.util.function.UnaryOperator<BufferedImage> each) {
+    public static @Nullable List<BufferedImage> frames(Path webp, java.util.function.UnaryOperator<BufferedImage> each) {
         Path tool = find();
         if (tool == null) return null;
         Path dir = null;
@@ -119,7 +120,7 @@ public final class AnimDump {
         }
     }
 
-    private static String line(InputStream in) throws IOException {
+    private static @Nullable String line(InputStream in) throws IOException {
         StringBuilder b = new StringBuilder();
         for (int c = in.read(); c != '\n'; c = in.read()) {
             if (c < 0) return b.isEmpty() ? null : b.toString();

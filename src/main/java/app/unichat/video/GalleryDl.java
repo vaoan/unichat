@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * gallery-dl, for the sites yt-dlp doesn't download (Pixiv, FANBOX, Misskey…), when the person has it: Unichat doesn't
@@ -20,7 +21,7 @@ public final class GalleryDl {
 
     /** {@code -Dunichat.galleryDl} is the only one considered when set. */
     @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "where Homebrew and the usual installers put gallery-dl, looked in when it isn't on the PATH")
-    public static Path find() {
+    public static @Nullable Path find() {
         String forced = System.getProperty("unichat.galleryDl");
         if (forced != null) return Files.isExecutable(Path.of(forced)) ? Path.of(forced) : null;
         List<Path> places = new ArrayList<>(List.of(Path.of("/opt/homebrew/bin"), Path.of("/usr/local/bin")));

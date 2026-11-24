@@ -1,5 +1,6 @@
 package app.unichat.login;
 
+import app.unichat.Present;
 import app.unichat.model.Network;
 import org.junit.jupiter.api.Test;
 
@@ -28,7 +29,7 @@ class CookieLoginTest {
         Path f = Path.of(getClass().getResource("/app/unichat/login/sample-cookies.txt").toURI());
         CookieLogin.TxtResult r = CookieLogin.fromCookieTxt(f, Network.INSTAGRAM);
         assertEquals(CookieLogin.TxtResult.Kind.OK, r.kind());
-        assertTrue(r.cookies().complete());
+        assertTrue(Present.of(r.cookies()).complete());
     }
 
     @Test
@@ -48,7 +49,7 @@ class CookieLoginTest {
     void unreadableFileIsError() {
         CookieLogin.TxtResult r = CookieLogin.fromCookieTxt(Path.of("no-such-file.txt"), Network.INSTAGRAM);
         assertEquals(CookieLogin.TxtResult.Kind.ERROR, r.kind());
-        assertFalse(r.message().isBlank());
+        assertFalse(Present.of(r.message()).isBlank());
     }
 
     @Test

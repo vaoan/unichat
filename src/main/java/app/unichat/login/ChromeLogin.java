@@ -33,6 +33,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Signing in through the person's real Chrome, for what doesn't work in an embedded window: Google refuses those.
@@ -61,9 +62,9 @@ public final class ChromeLogin {
     private final Path profile;
     private final boolean headless;
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
-    private volatile Process process;
+    private volatile @Nullable Process process;
     private volatile int debugPort;
-    private volatile DevTools siteTab;
+    private volatile @Nullable DevTools siteTab;
     private final Duration maxWait;
     private final Duration poll;
     private volatile boolean cancelled;
@@ -93,7 +94,7 @@ public final class ChromeLogin {
     public static boolean usefulFor(Network n) { return n == Network.LINKEDIN; }
 
     /** Chrome, or a browser built on it, if there's one; null otherwise. */
-    public static Path findChrome() {
+    public static @Nullable Path findChrome() {
         for (Path p : candidates()) {
             if (Files.isExecutable(p)) return p;
         }
@@ -166,17 +167,19 @@ public final class ChromeLogin {
 
     /** Blocks until signed in: the step's values, or null if the person closed Chrome or {@link #cancel cancelled}. */
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "Chrome found at its install place, with our profile folder, a port and fixed flags, as a list, no shell")
-    public Map<String, String> run() throws IOException, InterruptedException {
+    public @Nullable Map<String, String> run() throws IOException, InterruptedException {
         Folders.deleteQuietly(profile);
         Files.createDirectories(profile);
         try { // NOPMD: UseTryWithResources, the finally stops Chrome and its tab, not one stream
             int port = freePort();
-            process = new ProcessBuilder(launched(command(chrome, profile, port, headless)))
+            Process started = new ProcessBuilder(launched(command(chrome, profile, port, headless)))
                     .redirectOutput(ProcessBuilder.Redirect.DISCARD).redirectError(ProcessBuilder.Redirect.DISCARD).start();
-            awaitDebugPort(port);
+            process = started;
+            awaitDebugPort(started, port);
             debugPort = port;
             openSite(port);
-            Pattern end = Pattern.compile(params.waitForUrlPattern() == null ? ".*" : params.waitForUrlPattern());
+            String until = params.waitForUrlPattern();
+            Pattern end = Pattern.compile(until == null ? ".*" : until);
             String domain = BridgeCookies.cookieDomain(params);
             int[] noTabs = {0};
             return waitForLogin(() -> {
@@ -202,11 +205,11 @@ public final class ChromeLogin {
     /** One look at Chrome: the step's values, {@link #CLOSED}, or null to look again. */
     @FunctionalInterface
     interface Look {
-        Map<String, String> next() throws IOException, InterruptedException;
+        @Nullable Map<String, String> next() throws IOException, InterruptedException;
     }
 
     /** Looks every {@code poll} until {@code look} has the values; null once cancelled, closed, Chrome gone or out of time. */
-    Map<String, String> waitForLogin(Look look) throws IOException, InterruptedException {
+    @Nullable Map<String, String> waitForLogin(Look look) throws IOException, InterruptedException {
         long deadline = System.nanoTime() + maxWait.toNanos();
         while (!cancelled && chromeAlive() && System.nanoTime() - deadline < 0) {
             Map<String, String> found = look.next();
@@ -244,7 +247,7 @@ public final class ChromeLogin {
     }
 
     /** The debugging address of the tab Chrome started with, if it's there yet. */
-    static String blankTabSocketIn(String json) throws IOException {
+    static @Nullable String blankTabSocketIn(String json) throws IOException {
         for (JsonNode t : JSON.readTree(json)) {
             if ("page".equals(t.path("type").asText()) && BLANK.equals(t.path("url").asText())) return t.path("webSocketDebuggerUrl").asText();
         }
@@ -258,7 +261,7 @@ public final class ChromeLogin {
     }
 
     /** The step's values from these cookies, or null while the session isn't there yet. */
-    Map<String, String> values(String url, Map<String, String> cookies) {
+    @Nullable Map<String, String> values(String url, Map<String, String> cookies) {
         if (!BridgeCookies.signedIn(network, cookies)) return null;
         return BridgeCookies.captured(params, url, cookies, Map.of(), BridgeCookies.headerFallbacks(network, params));
     }
@@ -270,8 +273,8 @@ public final class ChromeLogin {
         }
     }
 
-    private void awaitDebugPort(int port) throws IOException, InterruptedException {
-        for (int i = 0; i < 200 && !cancelled && process.isAlive(); i++) {
+    private void awaitDebugPort(Process started, int port) throws IOException, InterruptedException {
+        for (int i = 0; i < 200 && !cancelled && started.isAlive(); i++) {
             try {
                 get(port, "/json/version");
                 return;
@@ -364,7 +367,7 @@ public final class ChromeLogin {
             }
         }
 
-        @Override public CompletionStage<?> onText(WebSocket w, CharSequence data, boolean last) {
+        @Override public @Nullable CompletionStage<?> onText(WebSocket w, CharSequence data, boolean last) {
             text.append(data);
             if (last) {
                 answer.complete(text.toString());
@@ -374,7 +377,7 @@ public final class ChromeLogin {
             return null;
         }
 
-        @Override public CompletionStage<?> onClose(WebSocket w, int code, String reason) {
+        @Override public @Nullable CompletionStage<?> onClose(WebSocket w, int code, String reason) {
             answer.completeExceptionally(new IOException("closed"));
             return null;
         }

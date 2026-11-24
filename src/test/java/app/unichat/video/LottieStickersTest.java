@@ -12,6 +12,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.zip.GZIPOutputStream;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,7 +26,7 @@ public class LottieStickersTest { // NOPMD: JUnitJupiterTestShouldBePackagePriva
     @TempDir Path dir;
 
     /** The one built for development (native/build-lottie.sh), when this machine has it: CI has none and skips. */
-    public static Path tool() {
+    public static @Nullable Path tool() {
         Path built = Path.of(System.getProperty("user.home"), "Library/Caches/unichat-build/lottieconverter");
         if (System.getProperty("unichat.lottieconverter") == null && Files.isExecutable(built)) {
             System.setProperty("unichat.lottieconverter", built.toString());

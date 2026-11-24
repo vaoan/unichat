@@ -20,6 +20,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.function.DoubleConsumer;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Saves what a link in a chat leads to, with InstaTray's engine ({@code instatray.core}: its sites, gallery-dl for
@@ -47,7 +48,7 @@ final class LinkSaver {
     }
 
     /** Null when saved; otherwise why not, and whether that's for good. Interrupted: stopped (nothing half-written stays). */
-    static Failure save(String url, Path dir, String tag, DoubleConsumer progress, Tools tools, Path cookiesDir)
+    static @Nullable Failure save(String url, Path dir, String tag, DoubleConsumer progress, Tools tools, Path cookiesDir)
             throws IOException, InterruptedException {
         // Only a web address reaches a tool: the engine ends its options before the link too ("--"), but what a chat
         // says should never get that far.
@@ -67,7 +68,8 @@ final class LinkSaver {
             case DONE -> {
                 for (Path f : r.files()) {
                     if (!Files.isRegularFile(f)) continue;
-                    if (tools.ffmpeg() != null) VideoTranscoder.makePlayable(Path.of(tools.ffmpeg()), f);
+                    String ffmpeg = tools.ffmpeg();
+                    if (ffmpeg != null) VideoTranscoder.makePlayable(Path.of(ffmpeg), f);
                     MarkOfTheWeb.mark(f); // from the internet, as a file received in the chat is (SavedFile)
                 }
                 yield null;
@@ -108,9 +110,9 @@ final class LinkSaver {
         Path ffmpeg = Ffmpeg.whenNeeded(p -> { });
         Path gallery = GalleryDl.find();
         return new Tools() {
-            @Override public String ytDlp() { return ytDlp == null ? null : ytDlp.toString(); }
-            @Override public String galleryDl() { return gallery == null ? null : gallery.toString(); }
-            @Override public String ffmpeg() { return ffmpeg == null ? null : ffmpeg.toString(); }
+            @Override public @Nullable String ytDlp() { return ytDlp == null ? null : ytDlp.toString(); }
+            @Override public @Nullable String galleryDl() { return gallery == null ? null : gallery.toString(); }
+            @Override public @Nullable String ffmpeg() { return ffmpeg == null ? null : ffmpeg.toString(); }
         };
     }
 }

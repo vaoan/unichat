@@ -10,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 
 /**
  * A file another program makes: written under a hidden ".part" name beside where it goes and moved into place once
@@ -28,7 +29,7 @@ final class PartFile {
     /** One way to make it: the command that writes {@code into}; null when this way isn't there (no ffmpeg). */
     @FunctionalInterface
     interface Way {
-        List<String> command(Path into) throws IOException, InterruptedException;
+        @Nullable List<String> command(Path into) throws IOException, InterruptedException;
     }
 
     /** An ffmpeg command writing {@code into}. */
@@ -43,7 +44,7 @@ final class PartFile {
      * Tries each way in turn, each given {@code timeoutSeconds}; the first that ends well with a file that isn't empty
      * is moved to {@code out}, which is given back. Null when none did.
      */
-    static Path firstOf(Path out, long timeoutSeconds, List<Way> ways) throws IOException, InterruptedException {
+    static @Nullable Path firstOf(Path out, long timeoutSeconds, List<Way> ways) throws IOException, InterruptedException {
         Path part = part(out);
         try {
             for (Way way : ways) {

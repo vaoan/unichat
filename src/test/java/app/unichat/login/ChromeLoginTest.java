@@ -1,5 +1,6 @@
 package app.unichat.login;
 
+import app.unichat.Present;
 import app.unichat.model.Network;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -102,9 +103,9 @@ class ChromeLoginTest {
         ChromeLogin login = new ChromeLogin(Network.LINKEDIN, params("https://www.linkedin.com/login"), Path.of("/x"), dir);
         String feed = "https://www.linkedin.com/feed/";
         assertNull(login.values(feed, Map.of("JSESSIONID", "guest", "bcookie", "x")), "no li_at yet");
-        Map<String, String> v = login.values(feed, Map.of("JSESSIONID", "\"ajax:1\"", "li_at", "x", "bcookie", "b"));
-        assertTrue(v.get("cookie_header").contains("bcookie=b"), "every cookie the browser has");
-        assertTrue(v.get("cookie_header").contains("JSESSIONID=\"ajax:1\""));
+        Map<String, String> v = Present.of(login.values(feed, Map.of("JSESSIONID", "\"ajax:1\"", "li_at", "x", "bcookie", "b")));
+        assertTrue(Present.of(v.get("cookie_header")).contains("bcookie=b"), "every cookie the browser has");
+        assertTrue(Present.of(v.get("cookie_header")).contains("JSESSIONID=\"ajax:1\""));
     }
 
     /** Any program here can drive Chrome through its debugging port while it waits: no longer than a login takes. */
@@ -188,8 +189,8 @@ class ChromeLoginTest {
             String base = "http://127.0.0.1:" + server.getAddress().getPort();
             Map<String, String> v = new ChromeLogin(Network.LINKEDIN, params(base + "/login"), chrome, profile, true).run();
             assertNotNull(v);
-            assertTrue(v.get("cookie_header").contains("li_at=secreto"), "an HttpOnly cookie too");
-            assertTrue(v.get("track").contains("clientVersion"));
+            assertTrue(Present.of(v.get("cookie_header")).contains("li_at=secreto"), "an HttpOnly cookie too");
+            assertTrue(Present.of(v.get("track")).contains("clientVersion"));
             assertEquals("Agente-Del-Puente/1.0", agent.get());
             assertNotNull(popupAgent.get(), "the window it opened");
             assertTrue(popupAgent.get().contains("Chrome/"), "a window it opens, like Google's, stays the real Chrome: " + popupAgent.get());

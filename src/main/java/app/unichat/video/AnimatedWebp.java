@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 
 /**
  * An animated WebP made from a video's frames: ffmpeg takes them out (as PAM, which img2webp reads without a PNG
@@ -44,7 +45,7 @@ public final class AnimatedWebp {
     private static final String OUT = "out.webp";
 
     /** libwebp's img2webp, shipped beside gif2webp (native/build-gif2webp.sh); null when it isn't there. */
-    public static Path img2webp() {
+    public static @Nullable Path img2webp() {
         return BundledTools.find("unichat.img2webp", null, "img2webp");
     }
 

@@ -1,5 +1,6 @@
 package app.unichat.links;
 
+import app.unichat.Present;
 import app.unichat.model.LinkPreview;
 import org.junit.jupiter.api.Test;
 
@@ -31,12 +32,12 @@ class TweetPreviewTest {
 
     @Test
     void aGifPostIsACardWithItsGifToPlay() throws Exception {
-        LinkPreview p = TweetPreview.parse(GIF_POST, "https://fixupx.com/montelobo_/status/2121725725623628253");
+        LinkPreview p = Present.of(TweetPreview.parse(GIF_POST, "https://fixupx.com/montelobo_/status/2121725725623628253"));
         assertEquals("https://fixupx.com/montelobo_/status/2121725725623628253", p.url(), "the link sent, not the API");
         assertEquals("X", p.site());
         assertEquals("Montelobo (LOST AT 16K) (@Montelobo_)", p.title());
         assertEquals("This is what I’ve been doing over Cancun lately~ 😉", p.description());
-        assertEquals("https://video.twimg.com/tweet_video/HXHiRchaoAAa4L1.mp4", p.video().url());
+        assertEquals("https://video.twimg.com/tweet_video/HXHiRchaoAAa4L1.mp4", Present.of(p.video()).url());
         assertTrue(p.gif(), "plays by itself, muted, looping");
         assertEquals("https://pbs.twimg.com/tweet_video_thumb/HXHiRchaoAAa4L1.jpg", p.image());
         assertEquals(800, p.width());
@@ -45,14 +46,14 @@ class TweetPreviewTest {
 
     @Test
     void aPhotoPostHasItsPictureAndNoVideoAndOnlyWebAddressesCount() throws Exception {
-        LinkPreview photo = TweetPreview.parse("""
+        LinkPreview photo = Present.of(TweetPreview.parse("""
                 {"tweet":{"text":"hola","author":{"name":"Ana","screen_name":"ana"},
-                 "media":{"all":[{"type":"photo","url":"https://pbs.twimg.com/media/a.jpg","width":1200,"height":800}]}}}""", "https://x.com/ana/status/3");
+                 "media":{"all":[{"type":"photo","url":"https://pbs.twimg.com/media/a.jpg","width":1200,"height":800}]}}}""", "https://x.com/ana/status/3"));
         assertEquals("https://pbs.twimg.com/media/a.jpg", photo.image());
         assertNull(photo.video());
         assertFalse(photo.gif());
-        LinkPreview local = TweetPreview.parse("""
-                {"tweet":{"text":"x","media":{"all":[{"type":"video","url":"file:///etc/passwd","thumbnail_url":"smb://h/s"}]}}}""", "https://x.com/a/status/4");
+        LinkPreview local = Present.of(TweetPreview.parse("""
+                {"tweet":{"text":"x","media":{"all":[{"type":"video","url":"file:///etc/passwd","thumbnail_url":"smb://h/s"}]}}}""", "https://x.com/a/status/4"));
         assertNull(local.video());
         assertNull(local.image());
         assertNull(TweetPreview.parse("{\"code\":404}", "https://x.com/a/status/5"), "no such post");

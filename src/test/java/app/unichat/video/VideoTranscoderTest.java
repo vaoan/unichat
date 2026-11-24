@@ -1,5 +1,6 @@
 package app.unichat.video;
 
+import app.unichat.Present;
 import app.unichat.support.PathParts;
 import app.unichat.support.Processes;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -39,8 +40,7 @@ class VideoTranscoderTest {
     @Test
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void aVp9VideoBecomesH264InItsPlace() throws Exception {
-        Path ffmpeg = Ffmpeg.find();
-        Assumptions.assumeTrue(ffmpeg != null, "needs an ffmpeg");
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "needs an ffmpeg");
         Path vp9 = dir.resolve("Video by alguien [Dx1] [abc].mp4");
         Processes.Result made = Processes.capture(new ProcessBuilder(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error",
                 "-f", "lavfi", "-i", "testsrc=size=64x64:rate=10:duration=1", "-c:v", "libvpx-vp9", vp9.toString())
@@ -78,8 +78,7 @@ class VideoTranscoderTest {
     @Test
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg, mkfifo, sh, java) with its own fixed arguments; nothing from outside")
     void picturesAreLeftAlone() throws Exception {
-        Path ffmpeg = Ffmpeg.find();
-        Assumptions.assumeTrue(ffmpeg != null, "needs an ffmpeg");
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "needs an ffmpeg");
         for (String name : List.of("foto [1].png", "foto [2].jpg", "animada [3].gif")) {
             Path picture = dir.resolve(name);
             List<String> make = new java.util.ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error",

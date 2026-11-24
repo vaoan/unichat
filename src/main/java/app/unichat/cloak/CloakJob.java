@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The picture being protected, one at a time for the whole app (it takes minutes and a good part of the memory), so the
@@ -26,8 +27,8 @@ public final class CloakJob {
      * @param fraction 0..1, or -1 when it can't tell
      * @param startedMs when the current phase started, for the time left
      */
-    public record Status(Phase phase, String file, CloakLevel level, String stepKey, double fraction, long startedMs,
-                         String error) {
+    public record Status(Phase phase, @Nullable String file, @Nullable CloakLevel level, @Nullable String stepKey, double fraction,
+                         long startedMs, @Nullable String error) {
         static final Status IDLE = new Status(Phase.IDLE, null, null, null, 0, 0, null);
 
         public boolean busy() { return phase == Phase.INSTALLING || phase == Phase.PROTECTING; }
@@ -47,7 +48,7 @@ public final class CloakJob {
     private final Runner runner;
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
     private volatile Status status = Status.IDLE;
-    private Thread worker;
+    private @Nullable Thread worker;
     /**
      * Which start the status belongs to (guarded by this). A cancelled job's thread can take a while to stop (a download
      * doesn't end at the interrupt): what it reports then is its own job's, never the next one's.
@@ -103,9 +104,9 @@ public final class CloakJob {
         } catch (InterruptedException e) {
             // Cancelled: the status already says so.
         } catch (IOException | RuntimeException e) {
-            System.err.println("Image protection failed: " + e.getMessage());
-            update(id, new Status(Phase.FAILED, name, level, null, 0, 0,
-                    e.getMessage() == null ? I18n.t("cloak.error.run") : e.getMessage()));
+            String why = e.getMessage();
+            System.err.println("Image protection failed: " + why);
+            update(id, new Status(Phase.FAILED, name, level, null, 0, 0, why == null ? I18n.t("cloak.error.run") : why));
         }
     }
 

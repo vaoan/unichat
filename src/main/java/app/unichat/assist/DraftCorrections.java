@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import org.jspecify.annotations.Nullable;
 
 /**
  * The AI's last draft in each chat, until the person sends something there: then the two are a correction for
@@ -38,7 +39,7 @@ public final class DraftCorrections {
     }
 
     /** The person emptied the box: that draft wasn't sent, and what comes next isn't a correction of it. */
-    public void forget(String chatId) {
+    public void forget(@Nullable String chatId) {
         if (chatId != null) drafts.remove(chatId);
     }
 
@@ -46,21 +47,22 @@ public final class DraftCorrections {
      * The draft and what was sent instead, with {@code context} (what it answered), if there was a draft in that chat
      * and what was sent is that draft changed rather than another message; the draft is used up either way.
      */
-    public StylePrompt.Correction sent(String chatId, String text, String context) {
+    public StylePrompt.@Nullable Correction sent(String chatId, @Nullable String text, @Nullable String context) {
         String draft = drafts.remove(chatId);
         if (draft == null || text == null || similarity(draft, text) < MIN_SIMILARITY) return null;
         return new StylePrompt.Correction(draft, text, context, chatId);
     }
 
     /** The newest messages from others before {@code chat}'s last ones of mine, oldest first, one line each; null with none. */
-    public static String context(List<Message> chat) {
+    public static @Nullable String context(List<Message> chat) {
         List<String> out = new ArrayList<>();
         int i = chat.size() - 1;
         while (i >= 0 && chat.get(i).outgoing()) i--;
         for (; i >= 0 && out.size() < CONTEXT_MESSAGES && !chat.get(i).outgoing(); i--) {
             Message m = chat.get(i);
-            if (m.type() != MessageType.TEXT || m.deleted() || m.body() == null || m.body().isBlank()) continue;
-            String line = m.body().strip().replaceAll("\\s+", " ");
+            String body = m.body();
+            if (m.type() != MessageType.TEXT || m.deleted() || body == null || body.isBlank()) continue;
+            String line = body.strip().replaceAll("\\s+", " ");
             out.add(0, line.length() > CONTEXT_CHARS ? line.substring(0, CONTEXT_CHARS) + "…" : line);
         }
         return out.isEmpty() ? null : String.join("\n", out);

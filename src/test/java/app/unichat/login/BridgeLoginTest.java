@@ -1,5 +1,6 @@
 package app.unichat.login;
 
+import app.unichat.Present;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -103,8 +104,8 @@ class BridgeLoginTest {
     void qrFlowWaitsUntilComplete() throws Exception {
         BridgeLogin.Step s = api().start("qr");
         assertEquals("display_and_wait", s.type());
-        assertEquals("qr", s.display().type());
-        assertEquals("2@abc,def", s.display().data());
+        assertEquals("qr", Present.of(s.display()).type());
+        assertEquals("2@abc,def", Present.of(s.display()).data());
         BridgeLogin.Step done = api().await(s);
         assertTrue(done.isComplete());
         assertEquals("573001112233", done.userLoginId());
@@ -118,8 +119,8 @@ class BridgeLoginTest {
         assertEquals("^\\+[0-9]+$", f.pattern());
         assertFalse(f.optional());
         BridgeLogin.Step code = api().submit(s, Map.of("phone_number", "+573001112233"));
-        assertEquals("code", code.display().type());
-        assertEquals("ABCD-EFGH", code.display().data());
+        assertEquals("code", Present.of(code.display()).type());
+        assertEquals("ABCD-EFGH", Present.of(code.display()).data());
         assertTrue(requests.get(requests.size() - 1).endsWith("{\"phone_number\":\"+573001112233\"}"));
     }
 
@@ -132,9 +133,9 @@ class BridgeLoginTest {
     @Test
     void cookieStepListsWhatTheBridgeNeeds() throws Exception {
         BridgeLogin.Step s = api().start("cookie");
-        assertEquals("https://www.instagram.com/", s.cookies().url());
-        assertEquals(List.of("sessionid", "csrftoken"), s.cookies().fields().stream().map(BridgeLogin.CookieField::id).toList());
-        assertEquals("instagram.com", s.cookies().fields().get(0).sources().get(0).cookieDomain());
+        assertEquals("https://www.instagram.com/", Present.of(s.cookies()).url());
+        assertEquals(List.of("sessionid", "csrftoken"), Present.of(s.cookies()).fields().stream().map(BridgeLogin.CookieField::id).toList());
+        assertEquals("instagram.com", Present.of(s.cookies()).fields().get(0).sources().get(0).cookieDomain());
         assertNull(s.display());
     }
 

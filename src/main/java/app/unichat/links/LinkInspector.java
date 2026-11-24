@@ -32,6 +32,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Predicate;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Opens the links in messages, as a browser would, to learn whether they hold video or audio: by what the server
@@ -99,7 +100,7 @@ public final class LinkInspector {
     }
 
     /** Saves the file to {@code target} under the same rules; returns its content type. */
-    public String download(String url, Path target) throws IOException {
+    public @Nullable String download(String url, Path target) throws IOException {
         try {
             Answer a = open(url);
             try (InputStream in = new BoundedBody(a.response().body(), MAX_DOWNLOAD_BYTES, DOWNLOAD_DEADLINE)) {
@@ -114,7 +115,7 @@ public final class LinkInspector {
         }
     }
 
-    private LinkPreview read(String url) throws IOException, InterruptedException {
+    private @Nullable LinkPreview read(String url) throws IOException, InterruptedException {
         String api = TweetPreview.api(url);
         if (api != null) {
             Answer a = open(api);
@@ -181,7 +182,7 @@ public final class LinkInspector {
 
     /** By what the server says; a generic answer falls back on the file's extension. */
     @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "only guesses video or audio from an extension, to label a link; nothing is allowed by it")
-    static LinkMedia.Kind kindOf(String mime, String path) {
+    static LinkMedia.@Nullable Kind kindOf(String mime, @Nullable String path) {
         if (mime.startsWith("video/")) return LinkMedia.Kind.VIDEO;
         if (mime.startsWith("audio/") || mime.equals("application/ogg")) return LinkMedia.Kind.AUDIO;
         if (!mime.isEmpty() && !mime.equals("application/octet-stream") && !mime.equals("binary/octet-stream")) return null;
@@ -251,7 +252,7 @@ public final class LinkInspector {
         }
     }
 
-    private static byte[] carriedV4(byte[] b) {
+    private static byte @Nullable [] carriedV4(byte[] b) {
         boolean sixToFour = (b[0] & 0xFF) == 0x20 && b[1] == 0x02; // 2002::/16, the IPv4 in bytes 2 to 5
         if (sixToFour) return java.util.Arrays.copyOfRange(b, 2, 6);
         byte[] nat64 = {0, 0x64, (byte) 0xFF, (byte) 0x9B, 0, 0, 0, 0, 0, 0, 0, 0}; // 64:ff9b::/96

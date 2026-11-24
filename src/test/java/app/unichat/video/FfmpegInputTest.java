@@ -1,5 +1,6 @@
 package app.unichat.video;
 
+import app.unichat.Present;
 import app.unichat.support.Processes;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Assumptions;
@@ -63,8 +64,7 @@ class FfmpegInputTest {
 
     @Test
     void ffmpegRefusesAFileOfAFormatOutsideTheList() throws IOException, InterruptedException {
-        Path ffmpeg = Ffmpeg.find();
-        Assumptions.assumeTrue(ffmpeg != null, "needs an ffmpeg");
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "needs an ffmpeg");
         // Subtitles pass the check of how lists begin, and ffmpeg would read them: a format of no use to Unichat.
         Path subtitles = Files.writeString(dir.resolve("clip"), "1\n00:00:00,000 --> 00:00:01,000\nhola\n");
         Processes.Result r = read(ffmpeg, subtitles);
@@ -79,8 +79,7 @@ class FfmpegInputTest {
 
     @Test
     void ffmpegStillReadsEveryKindUnichatGivesIt() throws IOException, InterruptedException {
-        Path ffmpeg = Ffmpeg.find();
-        Assumptions.assumeTrue(ffmpeg != null, "needs an ffmpeg");
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "needs an ffmpeg");
         for (String name : List.of("a.mp4", "a.mov", "a.mkv", "a.webm", "a.gif", "a.png", "a.jpg", "a.ogg", "a.mp3", "a.m4a", "a.wav",
                 "a.flac", "a.aac")) {
             Path made = dir.resolve(name);

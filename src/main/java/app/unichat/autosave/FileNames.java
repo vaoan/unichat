@@ -11,6 +11,7 @@ import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.regex.Pattern;
+import org.jspecify.annotations.Nullable;
 
 /** Names for saved files and folders that are safe on any system, and never step outside the folder. Pure. */
 public final class FileNames {
@@ -24,7 +25,8 @@ public final class FileNames {
      * ("image-20261026-100405.jpg": a name on disk, English in every UI language). Stickers always get the made-up name.
      */
     public static String forMessage(Message m, ZoneId zone) {
-        String name = m.fileName() == null ? "" : m.fileName().replace('\\', '/');
+        String sent = m.fileName();
+        String name = sent == null ? "" : sent.replace('\\', '/');
         name = safe(name.substring(name.lastIndexOf('/') + 1).strip());
         String ext = MimeTypes.extension(m.mimeType());
         if (name.isEmpty() || name.equals(".") || name.equals("..") || m.type() == MessageType.STICKER) {
@@ -103,7 +105,7 @@ public final class FileNames {
     }
 
     /** A folder named after a chat: {@link #safe}, and never empty nor "..". */
-    public static String folder(String chatName) {
+    public static String folder(@Nullable String chatName) {
         String n = safe(chatName == null ? "" : chatName);
         return n.isEmpty() || n.equals("..") ? "_" : n;
     }

@@ -1,5 +1,6 @@
 package app.unichat.autosave;
 
+import app.unichat.Present;
 import app.unichat.model.Message;
 import app.unichat.model.MessageStatus;
 import app.unichat.model.MessageType;
@@ -39,7 +40,7 @@ class TextLogTest {
     }
 
     private SavedText seen(Message m) {
-        return SavedText.of(m, now);
+        return Present.of(SavedText.of(m, now));
     }
 
     @Test
@@ -65,11 +66,11 @@ class TextLogTest {
         log.record(CHAT, List.of(seen(text("$1", "hola"))));
         Path other = Files.createDirectories(dir.resolve("0b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44"));
         Files.writeString(other.resolve(TextLog.key(CHAT) + " 2026-10.jsonl"),
-                SavedText.of(text("$0", "lo que la laptop vio"), SENT.minusSeconds(86_400 * 30)).json() + "\n"
-                        + SavedText.of(text("$1", "hola"), SENT.minusSeconds(5)).json() + "\n"
+                Present.of(SavedText.of(text("$0", "lo que la laptop vio"), SENT.minusSeconds(86_400 * 30))).json() + "\n"
+                        + Present.of(SavedText.of(text("$1", "hola"), SENT.minusSeconds(5))).json() + "\n"
                         + "{esto no es json\n"
                         + "{\"id\": \"$9\"}\n"
-                        + SavedText.of(text("$2", "cortado"), SENT).json().substring(0, 20), StandardCharsets.UTF_8);
+                        + Present.of(SavedText.of(text("$2", "cortado"), SENT)).json().substring(0, 20), StandardCharsets.UTF_8);
         assertEquals(List.of("lo que la laptop vio"), log.versions(CHAT, "$0").stream().map(SavedText::text).toList());
         List<SavedText> hello = log.versions(CHAT, "$1");
         assertEquals(1, hello.size(), "seen by both: once");
@@ -101,7 +102,7 @@ class TextLogTest {
         assertNull(SavedText.of(sending, SENT), "its id isn't the one it will have");
         Message emote = text("$4", "saluda");
         emote.setType(MessageType.EMOTE);
-        assertEquals("saluda", SavedText.of(emote, SENT).text());
+        assertEquals("saluda", Present.of(SavedText.of(emote, SENT)).text());
     }
 
     @Test

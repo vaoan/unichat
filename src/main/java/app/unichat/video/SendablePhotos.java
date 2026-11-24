@@ -9,6 +9,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Pictures sent "as a photo" (SendAs.PHOTO): what a network shows as a photo rather than a file. Telegram's bridge sends
@@ -27,7 +28,7 @@ public final class SendablePhotos {
 
     /** Whether a picture of {@code mime} can be made a photo: GIFs stay animated, and an SVG is a drawing. */
     @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a MIME type compared to our own ASCII ones: a look-alike only means the photo is converted")
-    public static boolean convertible(String mime) {
+    public static boolean convertible(@Nullable String mime) {
         String m = mime == null ? "" : mime.toLowerCase(Locale.ROOT);
         return m.startsWith("image/") && !m.equals("image/gif") && !m.contains("svg");
     }

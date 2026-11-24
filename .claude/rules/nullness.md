@@ -21,3 +21,8 @@ paths:
 - `Set.of(…)`, `List.of(…)` and `Map.of(…)` throw on `contains(null)`/`get(null)`: a nullable value is checked before it's looked up (`NetworkFormats.sticker`).
 - Generic helpers that may answer null (`MatrixCore.call`) take `<T extends @Nullable Object>`, so a `Callable` that returns null is accepted.
 - A test field a request handler sets (`SendStickerTest.path`) is `@Nullable` and read with `Present.of`; one each test sets before use and `@AfterEach` checks carries `@SuppressWarnings("NullAway.Init") // why`, which lambdas can read too.
+- A tool this computer may lack (`Ffmpeg.find()`, `AnimDump.find()`): a test takes it through `app.unichat.Present.orSkip(x, "no ffmpeg")`, which skips the test when it's null and gives it back non-null; NullAway doesn't read `assumeTrue(x != null)`.
+- An override of an unmarked library's method that answers null (`WebSocket.Listener.onText`, InstaTray's `Fetch.Tools.ffmpeg()`) says `@Nullable` on its return; a getter of such a library read twice goes through a local too.
+- A field a method sets and then hands on (`ChromeLogin.process`) is passed to the helper as the checked local (`awaitDebugPort(started, port)`), not read back from the field.
+- `I18n.t`'s arguments are `@Nullable Object...`: an exception's message goes in as it is and shows "null" as before. A cleaner text is a behaviour change with its own test (`Errors.message`).
+- A helper that answered null only for a null input (`ReplyPrompt.withoutMarks`) takes and gives non-null; its caller decides what a missing value is (`written == null ? "" : …`).

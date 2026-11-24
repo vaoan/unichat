@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 /** Which cookies a "cookie network" needs, and on which domains they live. */
 public final class CookieSpec {
@@ -70,7 +71,7 @@ public final class CookieSpec {
 
     /** True if a cookie domain (e.g. {@code .facebook.com}) belongs to this network. */
     @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "cookie domains come from the person's own browser, which stores them as ASCII (punycode)")
-    public boolean isForNetwork(String cookieDomain) {
+    public boolean isForNetwork(@Nullable String cookieDomain) {
         if (cookieDomain == null) return false;
         String d = cookieDomain.toLowerCase(Locale.ROOT);
         while (d.startsWith(".")) d = d.substring(1);

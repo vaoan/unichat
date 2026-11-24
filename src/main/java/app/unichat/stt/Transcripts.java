@@ -18,6 +18,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Supplier;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Transcripts of voice notes, keyed by the audio's media URL and kept on disk ({@code <data>/transcripts/}) so each
@@ -36,7 +37,7 @@ public final class Transcripts {
         String transcribe(Path audio, java.util.function.Consumer<String> status) throws Exception; // NOPMD: SignatureDeclareThrowsException, a callback: each engine (whisper, a test's) fails its own way
     }
 
-    private static Transcripts instance;
+    private static @Nullable Transcripts instance;
 
     private final Path dir;
     private final Engine engine;
@@ -58,7 +59,7 @@ public final class Transcripts {
     public void removeListener(Runnable r) { listeners.remove(r); }
 
     /** Null when this audio was never transcribed. */
-    public State state(String mediaUrl) {
+    public @Nullable State state(@Nullable String mediaUrl) {
         if (mediaUrl == null) return null;
         State s = states.get(mediaUrl);
         if (s != null) return s;
@@ -107,8 +108,8 @@ public final class Transcripts {
      * What {@code mediaUrl} says, transcribing it first if needed. Blocking; null if it fails or isn't done within
      * {@code timeout} (it carries on, and the next ask finds it).
      */
-    public String await(String mediaUrl, Supplier<CompletableFuture<Path>> audio, java.time.Duration timeout) throws InterruptedException {
-        CompletableFuture<String> text = new CompletableFuture<>();
+    public @Nullable String await(String mediaUrl, Supplier<CompletableFuture<Path>> audio, java.time.Duration timeout) throws InterruptedException {
+        CompletableFuture<@Nullable String> text = new CompletableFuture<>();
         Runnable check = () -> {
             State s = state(mediaUrl);
             if (s instanceof Done d) text.complete(d.text());

@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import org.jspecify.annotations.Nullable;
 
 /** Entry points for the cookie-based login sources (browser sessions, cookies.txt). */
 public final class CookieLogin {
@@ -52,7 +53,7 @@ public final class CookieLogin {
     }
 
     /** Outcome of importing a cookies.txt file. */
-    public record TxtResult(Kind kind, SessionCookies cookies, List<String> missing, String message) {
+    public record TxtResult(Kind kind, @Nullable SessionCookies cookies, List<String> missing, @Nullable String message) {
         public enum Kind { OK, MISSING, ERROR }
 
         public TxtResult {

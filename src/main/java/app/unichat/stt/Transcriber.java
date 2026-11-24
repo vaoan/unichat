@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Speech to text with what the user already has, no paid service: whisper.cpp shipped with the app (model
@@ -32,7 +33,7 @@ public final class Transcriber {
     private Transcriber() {}
 
     /** whisper-cli: -Dunichat.whisper (development), app/server/whisper/ inside the app, or the PATH. */
-    public static Path whisperBinary() {
+    public static @Nullable Path whisperBinary() {
         return BundledTools.find("unichat.whisper", "whisper", "whisper-cli");
     }
 

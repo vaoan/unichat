@@ -1,5 +1,6 @@
 package app.unichat.links;
 
+import app.unichat.Present;
 import app.unichat.model.LinkMedia;
 import com.sun.net.httpserver.HttpServer;
 import java.util.concurrent.ExecutionException;
@@ -21,6 +22,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -37,7 +39,7 @@ class LinkInspectorTest {
     private final CountDownLatch over = new CountDownLatch(1);
     private final ExecutorService handlers = Executors.newCachedThreadPool();
 
-    private void answer(String path, int code, String type, String body, String location) {
+    private void answer(String path, int code, @Nullable String type, String body, @Nullable String location) {
         server.createContext(path, ex -> {
             hits.incrementAndGet();
             if (type != null) ex.getResponseHeaders().add("Content-Type", type);
@@ -174,7 +176,7 @@ class LinkInspectorTest {
         assertEquals("Un GIF", p.title());
         assertEquals("Sitio", p.site());
         assertEquals(base + "/quieto.jpg", p.image());
-        assertEquals(base + "/gif.mp4", p.video().url(), "checked by what its server answers");
+        assertEquals(base + "/gif.mp4", Present.of(p.video()).url(), "checked by what its server answers");
         assertEquals(base + "/gif.mp4", inspect(open, "/pagina").orElseThrow().url(), "the same answer for its video");
         assertEquals(base + "/foto", open.preview(base + "/foto").get().orElseThrow().image(), "a link to a picture is its picture");
     }

@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -49,8 +50,8 @@ class LinkSaverTest {
         Path out = Files.createDirectories(dir.resolve("Ana"));
         return new Tools() {
             @Override public String ytDlp() { return tool.toString(); }
-            @Override public String galleryDl() { return null; }
-            @Override public String ffmpeg() { return null; }
+            @Override public @Nullable String galleryDl() { return null; }
+            @Override public @Nullable String ffmpeg() { return null; }
             @Override public Map<String, String> environment() {
                 Map<String, String> env = new HashMap<>(Tools.super.environment());
                 env.put("FAKE_OUT", out.toString());
