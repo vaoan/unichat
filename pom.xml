@@ -325,8 +325,10 @@
         <version>3.3.1</version>
         <configuration>
           <!-- Tests' temp files under target, emptied when the run ends (app.unichat.TestTemp): in the system's temp
-               folder they stayed for good. On the command line, as the JDK reads java.io.tmpdir once at start. -->
-          <argLine>@{argLine} -Djava.io.tmpdir=${project.build.directory}/test-tmp</argLine>
+               folder they stayed for good. On the command line, as the JDK reads java.io.tmpdir once at start.
+               Headless and without a Dock icon in every build: a test that drew a picture put "ForkedBooter" in the
+               Dock and took the person's focus (BuildRulesTest.theJvmsABuildStartsStayOffTheScreen). -->
+          <argLine>@{argLine} -Djava.io.tmpdir=${project.build.directory}/test-tmp -Djava.awt.headless=true -Dapple.awt.UIElement=true</argLine>
           <systemPropertyVariables>
             <!-- Keep tests away from the real user data folder. -->
             <unichat.dataDir>${project.build.directory}/test-data</unichat.dataDir>
@@ -494,9 +496,10 @@
           <threshold>Low</threshold>
           <failOnError>true</failOnError>
           <!-- Its own JVM: room for effort Max, and one GC thread and two compiler threads, which take a third of the
-               CPU off it (measured: 231 s user to 156 s, the same wall time; SpotBugs analyses on one thread). -->
+               CPU off it (measured: 231 s user to 156 s, the same wall time; SpotBugs analyses on one thread).
+               Headless and without a Dock icon, as the tests' JVM. -->
           <maxHeap>2048</maxHeap>
-          <jvmArgs>-XX:+UseSerialGC -XX:CICompilerCount=2</jvmArgs>
+          <jvmArgs>-XX:+UseSerialGC -XX:CICompilerCount=2 -Djava.awt.headless=true -Dapple.awt.UIElement=true</jvmArgs>
           <!-- The tests too: they add about 5 s to the 80 s of main code. -->
           <includeTests>true</includeTests>
           <excludeFilterFile>spotbugs-exclude.xml</excludeFilterFile>

@@ -211,6 +211,18 @@ class BuildRulesTest {
     }
 
     @Test
+    void theJvmsABuildStartsStayOffTheScreen() {
+        // A test that drew a picture (ImageIO, Graphics2D) put "ForkedBooter" in the Dock and took the focus, in every
+        // build without headless-ui; SpotBugs' own JVM is started the same way.
+        String tests = Present.of(text(configuration("maven-surefire-plugin"), "argLine"));
+        String spotbugs = Present.of(text(configuration("spotbugs-maven-plugin"), "jvmArgs"));
+        for (String flag : List.of("-Djava.awt.headless=true", "-Dapple.awt.UIElement=true")) {
+            assertTrue(List.of(tests.split("\\s+")).contains(flag), "the tests' JVM has " + flag);
+            assertTrue(List.of(spotbugs.split("\\s+")).contains(flag), "SpotBugs' JVM has " + flag);
+        }
+    }
+
+    @Test
     void jacocoMeasuresEveryRunThatTestsAndChecksItInVerify() {
         Element agent = execution("jacoco-maven-plugin", "prepare-agent");
         Element report = execution("jacoco-maven-plugin", "report");
