@@ -62,8 +62,13 @@ class WorkflowRulesTest {
     @Test
     void noExpressionIsPastedIntoAScript() throws IOException {
         for (Path file : workflows()) {
-            for (String run : values(read(file), "run")) {
-                assertFalse(run.contains("${{"), file + ": a value goes into a run: through env:, never as ${{ }}: " + run);
+            JsonNode workflow = read(file);
+            // run: is a shell script, github-script's script: a JavaScript one: both take a value through env: only.
+            for (String key : List.of("run", "script")) {
+                for (String script : values(workflow, key)) {
+                    assertFalse(script.contains("${{"), file + ": a value goes into a " + key + ": through env:, never as ${{ }}: "
+                            + script);
+                }
             }
         }
     }
@@ -74,11 +79,18 @@ class WorkflowRulesTest {
             JsonNode workflow = read(file);
             assertEquals(Map.of("contents", "read"), YAML.convertValue(workflow.path("permissions"), Map.class),
                     file + ": the token reads the contents only, at the top");
-            workflow.path("jobs").properties().forEach(job -> job.getValue().path("permissions").properties().forEach(p -> {
-                String who = file.getFileName() + " " + job.getKey() + " " + p.getKey();
-                assertTrue("read".equals(p.getValue().asText()) || "none".equals(p.getValue().asText()) || WRITERS.contains(who),
-                        who + ": " + p.getValue().asText() + " (only " + WRITERS + " write)");
-            }));
+            workflow.path("jobs").properties().forEach(job -> {
+                JsonNode permissions = job.getValue().path("permissions");
+                String name = file.getFileName() + " " + job.getKey();
+                // A scalar grants every scope at once: write-all (or anything else) is refused, read-all only reads.
+                assertTrue(permissions.isMissingNode() || permissions.isObject() || "read-all".equals(permissions.asText()),
+                        name + ": permissions: " + permissions + " (a scope at a time, or read-all)");
+                permissions.properties().forEach(p -> {
+                    String who = name + " " + p.getKey();
+                    assertTrue("read".equals(p.getValue().asText()) || "none".equals(p.getValue().asText()) || WRITERS.contains(who),
+                            who + ": " + p.getValue().asText() + " (only " + WRITERS + " write)");
+                });
+            });
         }
     }
 
@@ -95,6 +107,7 @@ class WorkflowRulesTest {
         String gate = steps.get(steps.indexOf(analyze) + 1).path("run").asText();
         assertTrue(gate.contains("sarif/*.sarif") && gate.contains("exit 1"), "the step after the analysis fails on a result: " + gate);
         assertTrue(gate.contains("suppressions"), "a result suppressed in the code with its reason doesn't count: " + gate);
+        assertEquals(List.of(), errorsLetThrough(workflow.path("jobs").path("analyze")), "a failing analysis fails the run");
     }
 
     @Test
@@ -106,13 +119,18 @@ class WorkflowRulesTest {
         List<String> args = List.of(check.split("\\s+"));
         assertTrue(args.stream().anyMatch(a -> a.matches("org\\.owasp:dependency-check-maven:\\d+\\.\\d+\\.\\d+:check")),
                 "the plugin at a pinned version: " + check);
-        assertTrue(args.contains("-DfailBuildOnCVSS=7"), "a CVSS of 7 or more fails the job: " + check);
+        assertEquals(List.of("-DfailBuildOnCVSS=7"), args.stream().filter(a -> a.contains("failBuildOnCVSS")).toList(),
+                "a CVSS of 7 or more fails the job, set once: " + check);
         assertTrue(args.contains("-DsuppressionFile=" + SUPPRESSIONS), "the suppressions file, and no other: " + check);
         assertTrue(args.contains("-DdataDirectory=\"$HOME/.dependency-check\""), "its database where the cache keeps it: " + check);
         assertFalse(check.contains("failOnError") || check.contains("skip") || check.contains("failBuildOnAnyVulnerability"),
                 "nothing that lets an error or a finding pass: " + check);
-        JsonNode cache = step(steps, "actions/cache@");
-        assertEquals("~/.dependency-check", cache.path("with").path("path").asText(), "the database is cached between runs");
+        JsonNode restore = step(steps, "actions/cache/restore@");
+        JsonNode save = step(steps, "actions/cache/save@");
+        assertEquals("~/.dependency-check", restore.path("with").path("path").asText(), "the database is cached between runs");
+        assertEquals("~/.dependency-check", save.path("with").path("path").asText(), "the database is cached between runs");
+        assertTrue(save.path("if").asText().startsWith("always()"), "what the scan downloaded is kept when it fails: " + save);
+        assertEquals(List.of(), errorsLetThrough(workflow.path("jobs").path("dependency-check")), "a failing scan fails the run");
         List<String> needs = new ArrayList<>();
         workflow.path("jobs").path("release").path("needs").forEach(n -> needs.add(n.asText()));
         assertTrue(needs.contains("dependency-check"), "a release waits for it: " + needs);
@@ -134,6 +152,8 @@ class WorkflowRulesTest {
         assertEquals(1, problems(parse(good.replace("<cve>CVE-2026-1</cve>", "<cvssBelow>7</cvssBelow>"))).size(), "no CVE");
         assertEquals(1, problems(parse(good.replace("<cve>", "<cpe>cpe:/a:x</cpe><cve>"))).size(), "a whole product");
         assertEquals(1, problems(parse(good.replace("<packageUrl>pkg:maven/a/b@1</packageUrl>", ""))).size(), "every dependency");
+        assertEquals(1, problems(parse(good.replace("<packageUrl>pkg:maven/a/b@1", "<packageUrl regex=\"true\">.*"))).size(),
+                "a pattern");
     }
 
     /** What's wrong with each {@code <suppress>}: it names one dependency and one CVE, and says why. */
@@ -147,12 +167,28 @@ class WorkflowRulesTest {
             Set<String> others = new TreeSet<>(names.keySet());
             others.removeAll(Set.of("notes", "cve"));
             others.removeAll(DEPENDENCY);
+            // A regex (<packageUrl regex="true">.*</packageUrl>) names any number of dependencies.
+            children(suppress).stream().filter(e -> e.hasAttribute("regex")).forEach(e -> others.add(e.getLocalName() + " regex"));
             boolean oneDependency = names.keySet().stream().filter(DEPENDENCY::contains).mapToInt(names::get).sum() == 1;
             if (notes.isBlank() || names.getOrDefault("cve", 0) != 1 || !oneDependency || !others.isEmpty()) {
                 problems.add(names + " notes \"" + notes.strip() + "\": one dependency, one <cve> and its <notes>");
             }
         }
         return problems;
+    }
+
+    /** Where a job or one of its steps carries on after an error ({@code continue-on-error} that isn't false). */
+    private static List<String> errorsLetThrough(JsonNode job) {
+        List<String> found = new ArrayList<>();
+        List<JsonNode> places = new ArrayList<>(List.of(job));
+        job.path("steps").forEach(places::add);
+        for (JsonNode place : places) {
+            JsonNode carryOn = place.path("continue-on-error");
+            if (!carryOn.isMissingNode() && !"false".equals(carryOn.asText())) {
+                found.add(place.path("uses").asText(place.path("run").asText("the job")));
+            }
+        }
+        return found;
     }
 
     private static List<Path> workflows() throws IOException {

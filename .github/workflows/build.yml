@@ -47,7 +47,7 @@ jobs:
 
   dependency-check:
     # OWASP Dependency-Check: no dependency with a known CVE of CVSS 7 or more (NVD). CI only: its database is ~2 GB
-    # and takes long to build, so it's cached one day at a time, each run starting from the latest and bringing it up
+    # and takes long to build, so it's cached a week at a time, each run starting from the latest and bringing it up
     # to date. False positives go in dependency-check-suppressions.xml, each with its reason.
     runs-on: ubuntu-latest
     steps:
@@ -60,12 +60,14 @@ jobs:
         with:
           distribution: temurin
           java-version: "25"
-      - id: day
-        run: echo "day=$(date -u +%Y-%m-%d)" >> "$GITHUB_OUTPUT"
-      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # One cache a week (GitHub keeps 10 GB a repository, and the database is ~2 GB), restored from the latest one.
+      - id: week
+        run: echo "week=$(date -u +%G-W%V)" >> "$GITHUB_OUTPUT"
+      - id: nvd
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ~/.dependency-check
-          key: dependency-check-${{ steps.day.outputs.day }}
+          key: dependency-check-${{ steps.week.outputs.week }}
           restore-keys: dependency-check-
       # NVD's own data feeds (no API key needed). OSS Index is off: Sonatype now asks for an account, and without one
       # its analyzer fails the run.
@@ -77,6 +79,12 @@ jobs:
           -DdataDirectory="$HOME/.dependency-check"
           -DnvdDatafeedUrl='https://nvd.nist.gov/feeds/json/cve/2.0/nvdcve-2.0-{0}.json.gz'
           -DossIndexAnalyzerEnabled=false
+      # Saved when the scan fails too (a CVE found): the next run starts from what this one downloaded.
+      - uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        if: always() && steps.nvd.outputs.cache-hit != 'true'
+        with:
+          path: ~/.dependency-check
+          key: dependency-check-${{ steps.week.outputs.week }}
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         if: failure()
         with:
