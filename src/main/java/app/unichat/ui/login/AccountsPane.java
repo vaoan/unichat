@@ -31,11 +31,11 @@ import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import org.jspecify.annotations.Nullable;
+import app.unichat.login.BridgeLogin;
 
 import java.time.Instant;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.Objects;
 
 /**
  * The settings page "accounts": every connected account one per row, "Agregar cuenta" (add account) → pick a network (one per row,
@@ -319,9 +319,12 @@ public final class AccountsPane extends VBox {
                 m.prepareBridge(n);
                 Platform.runLater(() -> {
                     if (getScene() == null) return;
-                    BridgeLoginPane pane = new BridgeLoginPane(n,
-                            Objects.requireNonNull(m.bridgeLogin(n), "startLogin saw the bridge's own login before preparing it"),
-                            () -> Nodes.window(this),
+                    BridgeLogin api = m.bridgeLogin(n);
+                    if (api == null) { // gone once prepared: said as a failed login step says it
+                        loading.fail(I18n.t("login.pane.failed", n.displayName()));
+                        return;
+                    }
+                    BridgeLoginPane pane = new BridgeLoginPane(n, api, () -> Nodes.window(this),
                             () -> {
                                 m.loginFinished(n);
                                 dispose();

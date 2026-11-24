@@ -65,7 +65,7 @@ class NotifierUiTest {
         List<String> opened = new CopyOnWriteArrayList<>();
         Notifier n = FxWait.fx(() -> new Notifier(shown::incrementAndGet, () -> { }, opened::add, () -> { }));
         try {
-            n.openLast();
+            n.openLast(); // what the tray's click runs: no TrayIcon can be built headless to click
             assertEquals(1, shown.get(), "the window comes");
             assertEquals(List.of(), opened, "no chat to open");
         } finally {
