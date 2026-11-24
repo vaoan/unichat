@@ -95,6 +95,53 @@ class WorkflowRulesTest {
     }
 
     @Test
+    void theBuildJobsRunTheWholeVerifyAndNothingTurnsAChecksOff() throws IOException {
+        JsonNode jobs = read(WORKFLOWS.resolve("build.yml")).path("jobs");
+        assertEquals(List.of("./mvnw -B verify"), mvnw(jobs.path("test")), "the tests job runs the whole verify, as it is");
+        assertEquals(List.of("./mvnw -B verify -Pheadless-ui"), mvnw(jobs.path("ui-headless")),
+                "the UI job runs verify with the profile, as it is");
+        for (Path file : workflows()) {
+            for (String name : envNames(read(file))) {
+                assertFalse(name.startsWith("MAVEN_"), file + ": " + name + " would add options to every build (MAVEN_ARGS, MAVEN_OPTS)");
+            }
+        }
+    }
+
+    @Test
+    void aMavenVariableInAnyEnvIsCaught() {
+        assertEquals(List.of("MAVEN_ARGS"), envNames(yamlTree("jobs: {a: {env: {MAVEN_ARGS: -Dpmd.skip}, steps: [{run: x}]}}")));
+        assertEquals(List.of("MAVEN_OPTS"), envNames(yamlTree("jobs: {a: {steps: [{run: x, env: {MAVEN_OPTS: y}}]}}")));
+        assertEquals(List.of("MAVEN_OPTS"), envNames(yamlTree("env: {MAVEN_OPTS: y}\njobs: {}")));
+    }
+
+    private static JsonNode yamlTree(String yaml) {
+        try {
+            return YAML.readTree(yaml);
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** The {@code run:} lines of a job that start a build ({@code ./mvnw}). */
+    private static List<String> mvnw(JsonNode job) {
+        return values(job, "run").stream().filter(r -> r.contains("mvnw")).map(String::strip).toList();
+    }
+
+    /** The names of every variable an {@code env:} sets, at the top of a workflow, in a job or in a step. */
+    private static List<String> envNames(JsonNode node) {
+        List<String> names = new ArrayList<>();
+        if (node.isObject()) {
+            node.properties().forEach(p -> {
+                if (p.getKey().equals("env") && p.getValue().isObject()) p.getValue().properties().forEach(e -> names.add(e.getKey()));
+                names.addAll(envNames(p.getValue()));
+            });
+        } else if (node.isArray()) {
+            node.forEach(n -> names.addAll(envNames(n)));
+        }
+        return names;
+    }
+
+    @Test
     void codeqlRunsSecurityAndQualityAndFailsOnAResult() {
         JsonNode workflow = read(WORKFLOWS.resolve("codeql.yml"));
         assertTrue(workflow.path("on").has("push") && workflow.path("on").has("pull_request"), "on push and on pull requests");

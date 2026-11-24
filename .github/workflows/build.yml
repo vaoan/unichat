@@ -21,6 +21,8 @@ jobs:
           distribution: temurin
           java-version: "25"
           cache: maven
+      # VoiceEnhancerTest and VoiceRecordingTest skip without ffmpeg, and voice's coverage floor counts on them.
+      - run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg
       - run: ./mvnw -B verify
 
   ui-headless:

@@ -5,6 +5,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.function.Function;
+import app.unichat.support.Folders;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -43,20 +44,11 @@ final class CookieDbCopy {
 
     /** Removes the copy and the files SQLite left beside it. */
     private static void delete(@Nullable Path tmp, @Nullable Path wal) {
-        deleteQuietly(wal);
+        Folders.deleteQuietly(wal);
         if (tmp != null) {
-            deleteQuietly(tmp);
-            deleteQuietly(tmp.resolveSibling(tmp.getFileName() + "-shm"));
-            deleteQuietly(tmp.resolveSibling(tmp.getFileName() + "-journal"));
-        }
-    }
-
-    private static void deleteQuietly(@Nullable Path p) {
-        if (p == null) return;
-        try {
-            Files.deleteIfExists(p);
-        } catch (IOException ignored) {
-            // best effort
+            Folders.deleteQuietly(tmp);
+            Folders.deleteQuietly(tmp.resolveSibling(tmp.getFileName() + "-shm"));
+            Folders.deleteQuietly(tmp.resolveSibling(tmp.getFileName() + "-journal"));
         }
     }
 }
