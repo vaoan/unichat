@@ -115,6 +115,21 @@ class MediaUploadTest {
         assertEquals(Set.of(remote("a.jpg")), acc.files.keySet(), "the texts' copy stays here: it grows, and its source goes up");
     }
 
+    /** A WebDAV server whose size isn't a number: the file failed, and is tried again, never taken as backed up. */
+    @Test
+    void aFileWhoseSizeThereIsntANumberIsNeverTakenAsBackedUp() throws Exception {
+        try (FakeDav cloud = new FakeDav("u", "p")) {
+            WebDav dav = new WebDav(cloud.url(), "u", "p");
+            Path c = chat("a.jpg");
+            dav.mkdirs(CloudAccount.MEDIA + "/Ana");
+            dav.put(remote("a.jpg"), "otra cosa".getBytes(StandardCharsets.UTF_8));
+            cloud.sizeSaid = "doce";
+            MediaUpload up = uploader(c);
+            assertEquals(0, up.run(dav, (d, t, n) -> { }, () -> true));
+            assertEquals(1, up.retrying(), "it failed: tried again later, not marked as up there");
+        }
+    }
+
     @Test
     void aFailureWaitsItsTurnWithoutHoldingTheOthersBackAndNeverGivesUp() throws Exception {
         Account acc = new Account();

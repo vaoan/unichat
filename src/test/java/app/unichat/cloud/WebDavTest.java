@@ -105,14 +105,14 @@ class WebDavTest {
         }
     }
 
-    /** A size that isn't a number is no size said (-1, as when there's none), never an error that isn't an IOException. */
+    /** A size that isn't a number is a broken answer: an IOException, which the callers handle and try again. */
     @Test
-    void aSizeThatIsntANumberIsNoSize() throws Exception {
+    void aSizeThatIsntANumberIsAnIoError() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             WebDav dav = new WebDav(cloud.url(), "u", "p");
             dav.put("a.jpg", "12345".getBytes(StandardCharsets.UTF_8));
             cloud.sizeSaid = "cinco";
-            assertEquals(new Storage.RemoteFile(-1, null, null), dav.info("a.jpg"));
+            assertThrows(IOException.class, () -> dav.info("a.jpg"));
         }
     }
 

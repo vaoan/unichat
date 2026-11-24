@@ -37,7 +37,7 @@ class WorkflowRulesTest {
     private static final Path WORKFLOWS = Path.of(".github/workflows");
     private static final Path SUPPRESSIONS = Path.of("dependency-check-suppressions.xml");
     /** CodeQL's suppression queries, run beside security-and-quality so that a suppression in the code counts. */
-    private static final Path CODEQL_SUPPRESSIONS = Path.of(".github/codeql/alert-suppression.qls");
+    private static final String CODEQL_SUPPRESSIONS = ".github/codeql/alert-suppression.qls";
     private static final ObjectMapper YAML = new ObjectMapper(new YAMLFactory());
     /** A {@code uses:} line: an action at its commit's full SHA, the tag it was in a comment after it. */
     private static final Pattern PINNED = Pattern.compile("\\s*(?:- )?uses: [\\w.-]+/[\\w./-]+@[0-9a-f]{40} # v\\d+(?:\\.\\d+)*");
@@ -154,9 +154,12 @@ class WorkflowRulesTest {
                 List.of(init.path("with").path("queries").asText().split(",")),
                 "security-and-quality, and the suppression queries beside it (nothing else, nothing in their place)");
         assertFalse(init.path("with").has("config"), "a rule left out goes in a config file, where each says why");
-        String suite = readText(CODEQL_SUPPRESSIONS);
-        assertTrue(suite.contains("query: AlertSuppression.ql") && suite.contains("query: AlertSuppressionAnnotations.ql")
-                && suite.contains("from: codeql/java-queries"), "both of CodeQL's own suppression queries: " + suite);
+        assertEquals(yamlTree("""
+                - query: AlertSuppression.ql
+                  from: codeql/java-queries
+                - query: AlertSuppressionAnnotations.ql
+                  from: codeql/java-queries
+                """), read(Path.of(CODEQL_SUPPRESSIONS)), "exactly CodeQL's own two suppression queries");
         String config = init.path("with").path("config-file").asText("");
         if (!config.isEmpty()) {
             assertEquals(List.of(), leftOutWithoutReason(readText(Path.of(config.replaceFirst("^\\./", "")))), config);

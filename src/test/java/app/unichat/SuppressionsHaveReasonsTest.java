@@ -48,7 +48,8 @@ class SuppressionsHaveReasonsTest {
     @Test
     void everySuppressionInTheSourcesSaysWhy() throws IOException {
         List<String> found = new ArrayList<>();
-        for (Path root : List.of(Path.of("src/main/java"), Path.of("src/test/java"))) {
+        // tools/ too: CodeQL reads every Java file in the repo (tools/IconGen.java), not only the build's.
+        for (Path root : List.of(Path.of("src/main/java"), Path.of("src/test/java"), Path.of("tools"))) {
             try (Stream<Path> files = Files.walk(root)) {
                 for (Path f : files.filter(p -> p.toString().endsWith(".java")).sorted().toList()) {
                     found.addAll(unexplained(f.toString(), Files.readString(f)));
