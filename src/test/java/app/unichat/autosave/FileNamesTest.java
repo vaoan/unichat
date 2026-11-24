@@ -77,7 +77,7 @@ class FileNamesTest {
         Files.writeString(dir.resolve(".IMG_3944 [AbC_d-9_ejemplo.org].MOV.part"), "half");
         org.junit.jupiter.api.Assertions.assertFalse(FileNames.savedIn(dir, m), "half-written doesn't count");
         Files.writeString(dir.resolve("IMG_3944 [AbC_d-9_ejemplo.org] (2).MOV"), "whole");
-        org.junit.jupiter.api.Assertions.assertTrue(FileNames.savedIn(dir, m));
+        assertTrue(FileNames.savedIn(dir, m));
     }
 
     @Test
@@ -101,9 +101,9 @@ class FileNamesTest {
         String saved = FileNames.forSaving(m, java.time.ZoneOffset.UTC);
         assertEquals("profile [id]", saved);
         Files.writeString(dir.resolve(saved), "x");
-        org.junit.jupiter.api.Assertions.assertTrue(FileNames.savedIn(dir, m), "a hidden one was saved again on every explore");
+        assertTrue(FileNames.savedIn(dir, m), "a hidden one was saved again on every explore");
         m.setFileName("...");
-        org.junit.jupiter.api.Assertions.assertTrue(FileNames.forMessage(m, java.time.ZoneOffset.UTC).startsWith("file-20261103"),
+        assertTrue(FileNames.forMessage(m, java.time.ZoneOffset.UTC).startsWith("file-20261103"),
                 "nothing left: the made-up name");
     }
 
@@ -131,7 +131,7 @@ class FileNamesTest {
         old.setType(app.unichat.model.MessageType.IMAGE);
         old.setMimeType("image/jpeg");
         Files.writeString(dir.resolve("imagen-20261103-100000 [viejo].jpg"), "x");
-        org.junit.jupiter.api.Assertions.assertTrue(FileNames.savedIn(dir, old), "found by its [id]: not saved again");
+        assertTrue(FileNames.savedIn(dir, old), "found by its [id]: not saved again");
     }
 
     @Test
@@ -148,7 +148,7 @@ class FileNamesTest {
             int dot = name.lastIndexOf('.');
             assertEquals(name.substring(0, dot) + " [id]" + name.substring(dot) + ".txt", saved, name);
             Path file = Files.writeString(dir.resolve(saved), "x");
-            org.junit.jupiter.api.Assertions.assertTrue(FileNames.savedIn(dir, m), "known again, never saved twice: " + name);
+            assertTrue(FileNames.savedIn(dir, m), "known again, never saved twice: " + name);
             Files.delete(file);
         }
         app.unichat.model.Message ok = new app.unichat.model.Message("$id", "!c", "@a", "Ana", false,
