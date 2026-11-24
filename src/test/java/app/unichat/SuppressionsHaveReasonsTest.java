@@ -89,6 +89,18 @@ class SuppressionsHaveReasonsTest {
     }
 
     @Test
+    void theSizeLimitsAreNeverSuppressed() {
+        for (String name : List.of("checkstyle:MethodLength", "MethodLength", "checkstyle:methodlength")) {
+            assertEquals(1, unexplained("A.java", "class A {\n@" + "SuppressWarnings(\"" + name + "\") // long on purpose\n    void f() {}\n}\n")
+                    .size(), name + ": a method over 100 lines is split, never let through");
+        }
+        for (String name : List.of("checkstyle:FileLength", "FileLength", "CHECKSTYLE:FILELENGTH")) {
+            assertEquals(1, unexplained("A.java", "class A {\n@" + "SuppressWarnings({\"x\", \"" + name + "\"}) // big on purpose\n    int a;\n}\n")
+                    .size(), name + ": a file over 800 lines is split, never let through");
+        }
+    }
+
+    @Test
     void checkstyleSuppressionsSitOnOneMemberNeverTheFilesType() {
         for (String name : List.of("checkstyle:MethodName", "HiddenField", "CHECKSTYLE:hiddenfield")) {
             String ok = "@" + "SuppressWarnings(\"" + name + "\") // why\n";
@@ -137,9 +149,11 @@ class SuppressionsHaveReasonsTest {
             int close = closing(code, w.end() - 1);
             String args = text.substring(w.end(), close);
             boolean blanket = args.matches("(?s).*\"\\s*(PMD|all|checkstyle|checkstyle:all)\\s*\".*");
-            boolean wholeFile = namesCheckstyle(args) && depth(code, w.start()) == 0
+            List<String> checks = checkstyleChecks(args);
+            boolean sizes = checks.stream().anyMatch(SIZES::contains);
+            boolean wholeFile = !checks.isEmpty() && depth(code, w.start()) == 0
                     && TYPE.matcher(declarationAfter(code, close + 1)).find();
-            if (blanket || wholeFile || !lineComment(text, kinds, lineOf(text, close)).matches("//\\s*\\S.*")) {
+            if (blanket || sizes || wholeFile || !lineComment(text, kinds, lineOf(text, close)).matches("//\\s*\\S.*")) {
                 out.add(at(name, lines, lineOf(text, w.start())));
             }
         }
@@ -234,14 +248,19 @@ class SuppressionsHaveReasonsTest {
         }
     }
 
-    /** Whether the annotation's arguments name one of Checkstyle's checks. */
-    private static boolean namesCheckstyle(String args) {
+    /** The size limits (docs/ARCHITECTURE.md): a file or method over them is split, never suppressed. */
+    private static final List<String> SIZES = List.of("filelength", "methodlength");
+
+    /** The Checkstyle checks the annotation's arguments name, in lower case without "checkstyle:" (with it, any name is one). */
+    private static List<String> checkstyleChecks(String args) {
+        List<String> out = new ArrayList<>();
         Matcher q = QUOTED.matcher(args);
         while (q.find()) {
             String name = q.group(1).strip().toLowerCase(Locale.ROOT);
-            if (name.startsWith("checkstyle:") || CHECKSTYLE.contains(name)) return true;
+            if (name.startsWith("checkstyle:")) out.add(name.substring("checkstyle:".length()));
+            else if (CHECKSTYLE.contains(name)) out.add(name);
         }
-        return false;
+        return out;
     }
 
     /** How many braces are open in {@code code} (comments and strings blanked) before {@code index}: 0 is the file's top. */
