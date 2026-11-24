@@ -21,12 +21,7 @@ public final class CookieLogin {
 
     /** True for networks that log in with browser cookies. */
     public static boolean isCookieNetwork(Network network) {
-        try {
-            CookieSpec.forNetwork(network);
-            return true;
-        } catch (IllegalArgumentException e) {
-            return false;
-        }
+        return CookieSpec.find(network).isPresent();
     }
 
     /**
