@@ -12,11 +12,14 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.TreeMap;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -327,14 +330,19 @@ class BuildRulesTest {
         assertEquals("error", property(checker, "severity"), "every finding is an error");
         assertEquals("800", property(module(checks, "FileLength"), "max"), "files stay under 800 lines");
         assertEquals("100", property(module(checks, "MethodLength"), "max"), "methods stay under 100 lines");
-        for (String check : List.of("EqualsHashCode", "FallThrough", "ModifierOrder", "RedundantModifier", "UnusedImports",
-                "AvoidStarImport", "OneStatementPerLine", "MultipleVariableDeclarations", "StringLiteralEquality",
-                "SimplifyBooleanExpression", "SimplifyBooleanReturn", "InnerAssignment", "EmptyCatchBlock", "HiddenField",
-                "TypeName", "MethodName", "MemberName", "ConstantName", "ParameterName", "LocalVariableName", "PackageName",
-                "SuppressWarningsHolder", "SuppressWarningsFilter")) {
-            module(checks, check);
+        Map<String, Map<String, String>> actual = new TreeMap<>();
+        NodeList modules = checks.getElementsByTagName("module");
+        for (int i = 0; i < modules.getLength(); i++) {
+            Element m = (Element) modules.item(i);
+            Map<String, String> props = new TreeMap<>();
+            for (Element p : elements(m, "property")) {
+                if (!p.getAttribute("name").equals("severity")) props.put(p.getAttribute("name"), p.getAttribute("value"));
+            }
+            assertNull(actual.put(m.getAttribute("name"), props), m.getAttribute("name") + " is in checkstyle.xml once");
         }
-        assertEquals("true", property(module(checks, "HiddenField"), "ignoreConstructorParameter"));
+        assertEquals(new TreeMap<>(CHECKSTYLE_MODULES), actual,
+                "checkstyle.xml runs these modules with exactly these options: none taken out, none loosened (a wider format, an"
+                        + " ignore, fewer tokens); a change here is a decision, made in this test too");
         // Left out with its reason: Error Prone forbids the default MissingSwitchDefault wants (an enum switch that
         // names every constant), and PMD's NonExhaustiveSwitch catches the switch that misses a value without one.
         assertTrue(allComments(checks).contains("MissingSwitchDefault is left out"), "MissingSwitchDefault's reason is in checkstyle.xml");
@@ -352,6 +360,35 @@ class BuildRulesTest {
             String severity = property(m, "severity");
             assertTrue(severity == null || severity.equals("error"), name + " fails the build (severity " + severity + ")");
         }
+    }
+
+    /** Naming as the code writes it: Checkstyle's default formats, none widened. */
+    private static final Map<String, String> DEFAULTS = Map.of();
+
+    /** Every module checkstyle.xml has, with its options (severity apart, always error), exactly. */
+    private static final Map<String, Map<String, String>> CHECKSTYLE_MODULES = checkstyleModules();
+
+    private static Map<String, Map<String, String>> checkstyleModules() {
+        Map<String, Map<String, String>> m = new TreeMap<>();
+        m.put("Checker", DEFAULTS);
+        m.put("TreeWalker", DEFAULTS);
+        m.put("FileLength", Map.of("max", "800", "fileExtensions", "java"));
+        m.put("MethodLength", Map.of("max", "100", "tokens", "METHOD_DEF, CTOR_DEF, COMPACT_CTOR_DEF"));
+        m.put("EmptyCatchBlock", Map.of("exceptionVariableName", "expected|ignored|_"));
+        m.put("HiddenField", Map.of("ignoreConstructorParameter", "true", "ignoreSetter", "true", "setterCanReturnItsClass", "true",
+                "ignoreAbstractMethods", "true"));
+        m.put("CatchParameterName", Map.of("format", "^(_|[a-z][a-zA-Z0-9]*)$"));
+        for (String plain : List.of("SuppressWarningsFilter", "SuppressWarningsHolder", "EqualsHashCode", "CovariantEquals",
+                "StringLiteralEquality", "FallThrough", "DefaultComesLast", "InnerAssignment", "OneStatementPerLine",
+                "MultipleVariableDeclarations", "EmptyStatement", "SimplifyBooleanExpression", "SimplifyBooleanReturn", "NoFinalizer",
+                "UpperEll", "ArrayTypeStyle", "ModifierOrder", "RedundantModifier", "UnusedImports", "AvoidStarImport",
+                "RedundantImport", "OneTopLevelClass", "OuterTypeFilename", "PackageDeclaration", "PackageName", "TypeName",
+                "MethodName", "MemberName", "StaticVariableName", "ConstantName", "ParameterName", "LambdaParameterName",
+                "LocalVariableName", "LocalFinalVariableName", "PatternVariableName", "RecordComponentName", "ClassTypeParameterName",
+                "MethodTypeParameterName", "InterfaceTypeParameterName", "RecordTypeParameterName", "IllegalIdentifierName")) {
+            m.put(plain, DEFAULTS);
+        }
+        return m;
     }
 
     /** checkstyle.xml's one module named {@code name}. */
