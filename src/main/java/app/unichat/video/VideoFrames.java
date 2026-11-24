@@ -68,7 +68,7 @@ public final class VideoFrames {
         List<String> c = new java.util.ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-loglevel", "error",
                 "-protocol_whitelist", "file", "-f", src.format()));
         if (src.libvpx()) c.addAll(List.of("-c:v", "libvpx-vp9"));
-        c.addAll(List.of("-i", in.toString(), "-an",
+        c.addAll(List.of("-i", in.toString(), "-an", // lesson-ok: ffmpeg-raw-input (-f forced above)
                 "-vf", String.format(java.util.Locale.ROOT, "fps=%.3f,scale=%d:%d:flags=lanczos", fps, width, height),
                 "-frames:v", Integer.toString(maxFrames), "-f", "rawvideo", "-pix_fmt", "rgba", "pipe:1"));
         return c;

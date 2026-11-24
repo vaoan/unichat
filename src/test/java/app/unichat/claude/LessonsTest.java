@@ -40,6 +40,7 @@ class LessonsTest {
             Map.entry("fx-coalesce-by-hand", new String[] {"src/main/java/app/unichat/ui/X.java",
                     "        if (scheduled.compareAndSet(false, true)) Platform.runLater(() -> {"}),
             Map.entry("script-spanish", new String[] {"native/x.sh", "  echo \"Descargando $asset $tag...\""}),
+            Map.entry("ffmpeg-raw-input", new String[] {"src/main/java/X.java", "        List.of(ffmpeg, \"-i\", picture.toString(), out)"}),
             Map.entry("bounded-map", new String[] {"src/main/java/X.java", "        @Override protected boolean removeEldestEntry(Map.Entry<K, V> e) {"}),
             Map.entry("atomic-move",new String[] {"src/main/java/X.java", "        Files.move(tmp, file, REPLACE_EXISTING, ATOMIC_MOVE);"}));
 

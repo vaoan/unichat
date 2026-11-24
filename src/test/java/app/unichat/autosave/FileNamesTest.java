@@ -63,6 +63,8 @@ class FileNamesTest {
     @Test
     void aNameStartingWithADotIsntHiddenAndIsKnownAgain(@TempDir Path dir) throws Exception {
         assertEquals("profile", FileNames.safe(".profile"));
+        assertEquals("IMG__04d.JPG", FileNames.safe("IMG_%04d.JPG"), "ffmpeg reads a %d as a number pattern: another file");
+        assertEquals("d_d", FileNames.folder("d%d"), "folders too");
         assertEquals("Trash", FileNames.folder(".Trash"), "nor a chat's folder");
         assertEquals("_", FileNames.folder("..."));
         app.unichat.model.Message m = new app.unichat.model.Message("$id", "!c", "@a", "Ana", false,

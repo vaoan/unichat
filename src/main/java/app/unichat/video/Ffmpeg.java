@@ -58,9 +58,13 @@ public final class Ffmpeg {
      * The input options for a file from other people: only it may be read. ffmpeg tells the format by the content, and
      * an HLS playlist, a concat list or a DASH manifest names other files, which {@code -protocol_whitelist file} still
      * lets it read (a "video" could carry ~/.ssh/id_rsa into what is saved and uploaded): those are refused here by how
-     * they begin, and by ffmpeg itself through {@link #FORMATS}, which also covers one that begins otherwise.
+     * they begin, and by ffmpeg itself through {@link #FORMATS}, which also covers one that begins otherwise. A path
+     * with a number pattern ({@code %d}) is refused too: image2 would read another file in its place.
      */
     public static List<String> input(Path file) throws IOException {
+        // image2 reads a "%d" (or "%04d") anywhere in the path as a number: "a%d.jpg" is a1.jpg, "d%d/x.jpg" is d1/x.jpg,
+        // so a stranger's IMG_%04d.JPG beside the person's IMG_0001.JPG would be made of theirs.
+        if (NUMBER_PATTERN.matcher(file.toAbsolutePath().toString()).find()) throw new IOException(I18n.t("video.notAVideo"));
         byte[] head;
         try (var in = Files.newInputStream(file)) {
             head = in.readNBytes(64);
@@ -69,7 +73,7 @@ public final class Ffmpeg {
         for (String list : LISTS) {
             if (start.regionMatches(true, 0, list, 0, list.length())) throw new IOException(I18n.t("video.notAVideo"));
         }
-        return List.of("-protocol_whitelist", "file", "-format_whitelist", FORMATS, "-i", file.toString());
+        return List.of("-protocol_whitelist", "file", "-format_whitelist", FORMATS, "-i", file.toString()); // lesson-ok: ffmpeg-raw-input (the one place, after its checks)
     }
 
     /**
@@ -80,6 +84,9 @@ public final class Ffmpeg {
      */
     static final String FORMATS = "mov,matroska,avi,flv,mpegts,mpeg,asf,ogg,mp3,wav,w64,flac,aac,amr,caf,"
             + "gif,apng,image2,png_pipe,jpeg_pipe,webp_pipe,tiff_pipe,bmp_pipe,gif_pipe";
+
+    /** What image2 takes for a numbered sequence in a path. */
+    private static final java.util.regex.Pattern NUMBER_PATTERN = java.util.regex.Pattern.compile("%\\d*d");
 
     /** How the formats that name other files begin: HLS, ffmpeg's concat list, a DASH manifest (XML). */
     private static final List<String> LISTS = List.of("#EXTM3U", "ffconcat", "<?xml", "<MPD");

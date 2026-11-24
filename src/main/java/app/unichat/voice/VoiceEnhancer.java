@@ -100,7 +100,7 @@ public final class VoiceEnhancer {
 
     private static List<String> pass(Path ffmpeg, Path in, int rate, String filters, Path out) {
         return List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error", "-protocol_whitelist", "file",
-                "-f", "s16le", "-ar", Integer.toString(rate), "-ac", "1", "-i", in.toString(),
+                "-f", "s16le", "-ar", Integer.toString(rate), "-ac", "1", "-i", in.toString(), // lesson-ok: ffmpeg-raw-input (-f forced)
                 "-af", filters, "-f", "s16le", "-ar", Integer.toString(OUTPUT_RATE), "-ac", "1", out.toString());
     }
 

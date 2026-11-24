@@ -91,7 +91,7 @@ public final class FileNames {
      * and leading dots too: a hidden file was skipped by {@link #savedIn} and folder moves, so saved again each time.
      */
     public static String safe(String name) {
-        String n = name.replaceAll("\\p{Cf}", "").replaceAll("[<>:\"|?*/\\\\\\x00-\\x1F]", "_")
+        String n = name.replaceAll("\\p{Cf}", "").replaceAll("[<>:\"|?*/\\\\\\x00-\\x1F%]", "_")
                 .replaceAll("[. ]+$", "").replaceAll("^[. ]+", "").strip();
         if (RESERVED.matcher(n).matches()) n = "_" + n;
         if (n.length() > 200) {

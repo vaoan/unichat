@@ -62,7 +62,7 @@ public final class WebmStickers {
     static List<String> fromGifCommand(Path ffmpeg, Path gif, Path out) {
         return List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error",
                 // The file comes from other people: only itself may be read, as what it claims to be.
-                "-protocol_whitelist", "file", "-f", "gif", "-i", gif.toString(), "-t", TELEGRAM_SECONDS, "-an",
+                "-protocol_whitelist", "file", "-f", "gif", "-i", gif.toString(), "-t", TELEGRAM_SECONDS, "-an", // lesson-ok: ffmpeg-raw-input (-f forced)
                 "-vf", "scale=" + TELEGRAM_SIDE + ":" + TELEGRAM_SIDE + ":force_original_aspect_ratio=decrease,fps=" + TELEGRAM_FPS,
                 "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "40", "-f", "webm", out.toString());
     }

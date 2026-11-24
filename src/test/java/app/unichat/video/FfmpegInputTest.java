@@ -102,4 +102,31 @@ class FfmpegInputTest {
     private static Processes.Result make(List<String> command) throws IOException, InterruptedException {
         return Processes.capture(new ProcessBuilder(command).redirectErrorStream(true), Long.MAX_VALUE);
     }
+
+    @Test
+    void aNumberPatternInThePathIsRefusedSoFfmpegNeverReadsAnotherFile() throws IOException {
+        // ffmpeg's image2 reads "a%d.jpg" as a1.jpg, a2.jpg…, and "d%d/x.jpg" as d1/x.jpg (measured on 9.0.2): a stranger's
+        // IMG_%04d.JPG saved beside the person's IMG_0001.JPG, then sent as a photo, would send theirs instead.
+        Files.writeString(dir.resolve("a1.jpg"), "someone else's");
+        Files.writeString(dir.resolve("IMG_0001.JPG"), "the person's own");
+        Files.createDirectories(dir.resolve("d1"));
+        Files.writeString(dir.resolve("d1/x.jpg"), "another folder's");
+        Files.createDirectories(dir.resolve("d%d"));
+        for (String name : List.of("a%d.jpg", "IMG_%04d.JPG", "d%d/x.jpg", "b%3d.png")) {
+            Path f = Files.writeString(dir.resolve(name), "picture");
+            assertThrows(IOException.class, () -> Ffmpeg.input(f), name);
+        }
+        for (String name : List.of("50%.jpg", "100% real.mp4", "a%%d.jpg")) {
+            Path f = Files.write(dir.resolve(name), new byte[] {0, 0, 0, 0x18, 'f', 't', 'y', 'p', 'm', 'p', '4', '2'});
+            if (!name.contains("%%")) assertEquals(f.toString(), Ffmpeg.input(f).getLast(), "a % that isn't a pattern is fine: " + name);
+        }
+    }
+
+    @Test
+    void aPhotoWithAPatternInItsNameIsNeverMadeOfAnotherFile() throws IOException {
+        Files.writeString(dir.resolve("IMG_0001.JPG"), "the person's own");
+        Path stranger = Files.writeString(dir.resolve("IMG_%04d.JPG"), "a stranger's");
+        assertThrows(IOException.class, () -> SendablePhotos.ffmpeg(dir.resolve("ffmpeg"), stranger, dir.resolve("out.jpg")),
+                "the ffmpeg way isn't there for it: the photo goes as it is");
+    }
 }

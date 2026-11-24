@@ -127,7 +127,7 @@ public final class AnimatedWebp {
         List<String> c = new ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error",
                 "-protocol_whitelist", "file", "-f", src.format()));
         if (src.libvpx()) c.addAll(List.of("-c:v", "libvpx-vp9"));
-        c.addAll(List.of("-i", in.toString(), "-an"));
+        c.addAll(List.of("-i", in.toString(), "-an")); // lesson-ok: ffmpeg-raw-input (-f forced above)
         if (!filters.isEmpty()) c.addAll(List.of("-vf", String.join(",", filters)));
         // As it comes: a variable rate keeps each frame once (no copies to fill a fixed rate).
         c.addAll(List.of("-fps_mode", "passthrough", "-frames:v", Integer.toString(MAX_FRAMES),
@@ -155,7 +155,7 @@ public final class AnimatedWebp {
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "ffmpeg with -protocol_whitelist file and -f before -i, our own path, as a list, no shell")
     public static Probe probe(Path ffmpeg, Path in, Source src) throws IOException, InterruptedException {
         Processes.Result r = Processes.capture(new ProcessBuilder(ffmpeg.toString(), "-nostdin", "-hide_banner",
-                "-protocol_whitelist", "file", "-f", src.format(), "-i", in.toString()).redirectErrorStream(true), 60);
+                "-protocol_whitelist", "file", "-f", src.format(), "-i", in.toString()).redirectErrorStream(true), 60); // lesson-ok: ffmpeg-raw-input (-f forced)
         return parse(r.out());
     }
 

@@ -20,7 +20,8 @@ import java.util.stream.Stream;
  * SpotBugs has no cache of its own and took a minute on every build. Run by the pom with exec:java, on the tests'
  * classpath. {@code check} hashes all SpotBugs reads (the classes, the tests' classes, {@code pom.xml}, the filter, the
  * libraries and the JDK) and writes {@code spotbugs.skip}, true only when that hash is the one {@code passed} wrote
- * after SpotBugs last passed; {@code passed} runs after SpotBugs, so a run that fails never marks anything.
+ * after SpotBugs last passed; {@code passed} runs after SpotBugs and marks only a run where it really analysed these
+ * inputs and found nothing (its own report, newer than the check, with no finding and no error).
  */
 public final class SpotBugsCache {
     /** The hash of this run's inputs, and the one a pass then marks. */
@@ -45,7 +46,7 @@ public final class SpotBugsCache {
         switch (args[0]) {
             case "check" -> System.out.println("SpotBugs " + (check(project, cache, classpath(), run) ? "skipped: nothing it reads changed since"
                     + " it last passed" : "runs: what it reads changed, or it hasn't passed on it yet"));
-            case "passed" -> passed(cache);
+            case "passed" -> passed(project, cache, run);
             default -> throw new IllegalArgumentException("check|passed, not " + args[0]);
         }
     }
@@ -65,11 +66,26 @@ public final class SpotBugsCache {
         return skip;
     }
 
-    /** After SpotBugs passed: the inputs this run checked are the ones a repeat may skip on. */
-    static void passed(Path cache) throws IOException {
-        Path inputs = cache.resolve(INPUTS);
-        if (Files.isRegularFile(inputs)) Files.copy(inputs, cache.resolve(PASSED), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+    /**
+     * After SpotBugs, in verify: the inputs this run checked are the ones a repeat may skip on, only when SpotBugs really
+     * analysed them here and found nothing. A run that skipped by hand ({@code -Dspotbugs.skip}), went on past findings
+     * ({@code -Dspotbugs.failOnError=false}) or had analysis errors marks nothing; neither does one that skipped as
+     * cached (its mark is already these inputs').
+     */
+    static void passed(Path project, Path cache, String run) throws IOException {
+        Path inputs = cache.resolve(INPUTS), decision = cache.resolve(decision(run));
+        if (!Files.isRegularFile(inputs) || !Files.isRegularFile(decision)) return;
+        if (!Files.readString(decision).equals("spotbugs.skip=false\n")) return;
+        Path report = project.resolve("target/spotbugsXml.xml");
+        if (!Files.isRegularFile(report)) return;
+        if (Files.getLastModifiedTime(report).compareTo(Files.getLastModifiedTime(inputs)) <= 0) return; // an earlier run's
+        String xml = Files.readString(report);
+        if (xml.contains("<BugInstance") || !NO_ERRORS.matcher(xml).find()) return;
+        Files.copy(inputs, cache.resolve(PASSED), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
     }
+
+    /** SpotBugs' report saying its analysis had no errors. */
+    private static final java.util.regex.Pattern NO_ERRORS = java.util.regex.Pattern.compile("<Errors\\b[^>]*\\serrors=['\"]0['\"]");
 
     /** SHA-256 over every file SpotBugs reads (by its path and content), the libraries by name and the JDK's version. */
     static String hash(Path project, List<String> classpath) throws IOException {

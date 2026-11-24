@@ -38,11 +38,35 @@ class SpotBugsCacheTest {
         Files.writeString(f, text);
     }
 
-    /** A whole build: the check, then SpotBugs passing (or not), then the mark of the pass. */
+    /** As SpotBugs 4.10 writes it, single quotes and all. */
+    private static final String CLEAN = "<BugCollection><Errors missingClasses='0' errors='0'></Errors></BugCollection>";
+
+    /**
+     * A whole build: the check; SpotBugs, which (unless skipped) writes its report and stops the build when it found
+     * something; then the mark. {@code passes}: SpotBugs found nothing.
+     */
     private boolean build(boolean passes) throws IOException {
         boolean skipped = check(classpath);
-        if (passes) SpotBugsCache.passed(cache);
+        if (passes) {
+            if (!skipped) report(CLEAN);
+            SpotBugsCache.passed(project, cache, "run" + run);
+        }
         return skipped;
+    }
+
+    /** SpotBugs' report of this run: written after the check, as SpotBugs runs after it. */
+    private void report(String xml) throws IOException {
+        Path f = project.resolve("target/spotbugsXml.xml");
+        Files.writeString(f, xml);
+        Files.setLastModifiedTime(f, java.nio.file.attribute.FileTime.fromMillis(
+                Files.getLastModifiedTime(cache.resolve(SpotBugsCache.INPUTS)).toMillis() + 1000));
+    }
+
+    /** A run that went on to the mark whatever SpotBugs did: what it wrote, if anything, then the mark. */
+    private void buildGoingOn(String report) throws IOException {
+        assertFalse(check(classpath));
+        if (report != null) report(report);
+        SpotBugsCache.passed(project, cache, "run" + run);
     }
 
     private boolean check(List<String> cp) throws IOException {
@@ -120,7 +144,7 @@ class SpotBugsCacheTest {
 
     @Test
     void theMarkOfAPassNeedsACheckBeforeIt() throws IOException {
-        SpotBugsCache.passed(cache);
+        SpotBugsCache.passed(project, cache, "run0");
         assertFalse(Files.exists(cache.resolve(SpotBugsCache.PASSED)), "no check, nothing to mark");
         assertFalse(build(true));
     }
@@ -140,5 +164,46 @@ class SpotBugsCacheTest {
                     .filter(n -> n.startsWith("skip-")).toList(), "an earlier run's \"skip\" is gone: a run whose check didn't run"
                     + " finds no decision, and the build stops there");
         }
+    }
+
+    @Test
+    void aRunWithSpotBugsSkippedByHandIsNeverMarked() throws IOException {
+        // verify -Dspotbugs.skip=true: SpotBugs writes nothing, the build goes on to the mark.
+        buildGoingOn(null);
+        assertFalse(build(true), "the next plain verify analyses");
+        assertTrue(build(true));
+    }
+
+    @Test
+    void aReportFromAnEarlierRunIsNotThisRunsPass() throws IOException {
+        build(true);
+        write("target/classes/app/A.class", "b");
+        assertFalse(check(classpath));
+        Files.setLastModifiedTime(project.resolve("target/spotbugsXml.xml"), java.nio.file.attribute.FileTime.fromMillis(
+                Files.getLastModifiedTime(cache.resolve(SpotBugsCache.INPUTS)).toMillis() - 1000));
+        SpotBugsCache.passed(project, cache, "run" + run); // SpotBugs skipped by hand: its report is the last run's
+        assertFalse(build(true), "never taken as a pass of these classes");
+    }
+
+    @Test
+    void aRunThatFoundBugsWithoutFailingIsNeverMarked() throws IOException {
+        // verify -Dspotbugs.failOnError=false: SpotBugs reports, the build goes on to the mark.
+        buildGoingOn("<BugCollection><BugInstance type=\"X\"/><Errors errors=\"0\"></Errors></BugCollection>");
+        assertFalse(build(true), "the next plain verify analyses");
+    }
+
+    @Test
+    void aRunWhoseAnalysisHadErrorsIsNeverMarked() throws IOException {
+        buildGoingOn("<BugCollection><Errors errors=\"2\" missingClasses=\"0\"></Errors></BugCollection>");
+        assertFalse(build(true));
+    }
+
+    @Test
+    void aRunThatSkippedAsCachedLeavesTheMarkAsItWas() throws IOException {
+        build(true);
+        String mark = Files.readString(cache.resolve(SpotBugsCache.PASSED));
+        assertTrue(build(true), "skipped: no report of its own");
+        assertEquals(mark, Files.readString(cache.resolve(SpotBugsCache.PASSED)));
+        assertTrue(build(true));
     }
 }
