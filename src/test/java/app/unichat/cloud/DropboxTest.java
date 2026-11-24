@@ -194,12 +194,26 @@ class DropboxTest {
         // Nothing listens on port 9: the exchange fails with a ConnectException, which has no message.
         CompletableFuture<CloudAccount> login = DropboxLogin.start("APP", u -> opened[0] = u, 0, "http://127.0.0.1:9/token", NO_LIMIT);
         Map<String, String> asked = query(opened[0]);
-        HttpResponse<String> back = HTTP.send(HttpRequest.newBuilder(URI.create(asked.get("redirect_uri")
-                + "?code=the-code&state=" + asked.get("state"))).build(), HttpResponse.BodyHandlers.ofString());
-        assertEquals(200, back.statusCode(), "the browser is told, not left with a dropped connection");
-        assertTrue(back.body().contains(app.unichat.support.I18n.t("cloud.dropbox.failed", "ConnectException")), back.body());
-        var e = assertThrows(java.util.concurrent.ExecutionException.class, login::get);
-        assertInstanceOf(java.net.ConnectException.class, e.getCause());
+        try {
+            HttpResponse<String> back = HTTP.send(HttpRequest.newBuilder(URI.create(asked.get("redirect_uri")
+                    + "?code=the-code&state=" + asked.get("state"))).build(), HttpResponse.BodyHandlers.ofString());
+            assertEquals(200, back.statusCode(), "the browser is told, not left with a dropped connection");
+            String unreachable = app.unichat.support.I18n.t("cloud.dropbox.unreachable", "ConnectException");
+            assertTrue(back.body().contains(unreachable.replace("&", "&amp;").replace("<", "&lt;")), back.body());
+            var e = assertThrows(java.util.concurrent.ExecutionException.class, login::get);
+            assertEquals(unreachable, Present.message(e), "couldn't reach Dropbox, not a refusal");
+            assertInstanceOf(java.net.ConnectException.class, Present.of(e.getCause()).getCause());
+        } finally {
+            login.cancel(false);
+        }
+        PCloudTest.portIsFree(Present.of(asked.get("redirect_uri")));
+    }
+
+    @Test
+    void aFailureWithABlankMessageStillSaysWhatFailed() {
+        assertTrue(DropboxLogin.page(new IOException("")).contains("IOException"), "never an empty page");
+        assertTrue(DropboxLogin.page(new IOException(" \n")).contains("IOException"));
+        assertTrue(DropboxLogin.page(new IOException("Sin red")).contains("Sin red"), "a message there is the one shown");
     }
 
     @Test
