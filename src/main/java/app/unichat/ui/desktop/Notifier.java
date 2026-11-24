@@ -92,7 +92,9 @@ public final class Notifier {
     /** Null until built, and without a display. AWT thread. */
     private PopupMenu menu;
     /** The menu's own items, by name: the cloud's lines go above them, so their places change. AWT thread. */
-    private MenuItem windowItem, notificationsItem, quitItem;
+    private MenuItem windowItem;
+    private MenuItem notificationsItem;
+    private MenuItem quitItem;
     /** The cloud's lines shown at the menu's top (and their separator), and what they say. AWT thread. */
     private final java.util.List<MenuItem> cloudItems = new java.util.ArrayList<>();
     private java.util.List<String> cloudLines = java.util.List.of();
@@ -371,7 +373,9 @@ public final class Notifier {
         g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
         g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC);
         g.drawImage(icon, 0, 0, BADGED_SIZE, BADGED_SIZE, null);
-        int d = 14, x = 1, y = BADGED_SIZE - d - 1;
+        int d = 14;
+        int x = 1;
+        int y = BADGED_SIZE - d - 1;
         g.setColor(new java.awt.Color(0, 0, 0, 150));
         g.fillOval(x - 1, y - 1, d + 2, d + 2);
         g.setStroke(new java.awt.BasicStroke(3f, java.awt.BasicStroke.CAP_ROUND, java.awt.BasicStroke.JOIN_ROUND));

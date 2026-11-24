@@ -133,7 +133,7 @@ class SeenTimelineAnimationsUiTest {
         SendQueueView view = FxWait.fx(() -> new SendQueueView(queue, () -> "!family:demo"));
         after.add(() -> Platform.runLater(view::dispose));
         window(view);
-        FxWait.fx(() -> { queue.submit("!family:demo", "ola", null); return null; });
+        FxWait.onFx(() -> queue.submit("!family:demo", "ola", null));
         restsWhileUnseen("the waiting text's wheel", () -> view.lookupAll(".message-fixing-wheel").stream()
                 .anyMatch(n -> ((javafx.scene.control.ProgressIndicator) n).isIndeterminate()));
     }

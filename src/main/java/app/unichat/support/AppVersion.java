@@ -39,14 +39,16 @@ public final class AppVersion {
     }
 
     /** True when {@code candidate} is a later version than {@code current}. Anything unreadable on either side: false. */
-    public static boolean isNewer(String candidate, String current) {
-        Parsed a = parse(candidate), b = parse(current);
+    public static boolean isNewer(String candidate, String than) {
+        Parsed a = parse(candidate);
+        Parsed b = parse(than);
         return a != null && b != null && compare(a, b) > 0;
     }
 
     /** True when both name the same version ("v1.2" and "1.2.0"). */
     public static boolean same(String a, String b) {
-        Parsed x = parse(a), y = parse(b);
+        Parsed x = parse(a);
+        Parsed y = parse(b);
         return x != null && y != null && compare(x, y) == 0;
     }
 
@@ -85,9 +87,11 @@ public final class AppVersion {
 
     /** As semver: dot by dot, numbers by value and below words; a longer list wins a tie ("beta.1" &gt; "beta"). */
     private static int comparePre(String a, String b) {
-        String[] x = a.split("\\."), y = b.split("\\.");
+        String[] x = a.split("\\.");
+        String[] y = b.split("\\.");
         for (int i = 0; i < Math.min(x.length, y.length); i++) {
-            boolean xn = x[i].matches("\\d{1,9}"), yn = y[i].matches("\\d{1,9}");
+            boolean xn = x[i].matches("\\d{1,9}");
+            boolean yn = y[i].matches("\\d{1,9}");
             int c = xn && yn ? Integer.compare(Integer.parseInt(x[i]), Integer.parseInt(y[i]))
                     : xn != yn ? (xn ? -1 : 1) : x[i].compareTo(y[i]);
             if (c != 0) return c;

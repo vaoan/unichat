@@ -68,11 +68,11 @@ class AiReplyUiTest {
     }
 
     private void writer(AiReplyButton.Writer w) throws InterruptedException {
-        fx(() -> { composer.useAiWriter(() -> w); return null; });
+        FxWait.onFx(() -> composer.useAiWriter(() -> w));
     }
 
     private void press() throws InterruptedException {
-        fx(() -> { button().fire(); return null; });
+        FxWait.onFx(() -> button().fire());
     }
 
     private Button button() { return (Button) composer.lookup(".ai-button"); }
@@ -85,9 +85,12 @@ class AiReplyUiTest {
     void replyingWithAiToAnOlderMessageAnswersThatOneAndBuildsOnWhatWasWritten() throws Exception {
         app.unichat.model.Message older = svc.messages(CHAT).stream().filter(m -> !m.outgoing() && m.body() != null && !m.body().isBlank())
                 .findFirst().orElseThrow();
-        writer(p -> { prompts.add(p); return "Claro, el sábado sí"; });
+        writer(p -> {
+            prompts.add(p);
+            return "Claro, el sábado sí";
+        });
         write("sí pero el sábado");
-        fx(() -> { composer.replyWithAi(older); return null; });
+        FxWait.onFx(() -> composer.replyWithAi(older));
         FxWait.until("the draft in the box", () -> text().equals("Claro, el sábado sí"));
         String draft = prompts.stream().filter(p -> p.startsWith("Draft the message")).reduce((a, b) -> b).orElseThrow();
         String ask = draft.substring(draft.lastIndexOf("</chat-"));
@@ -102,9 +105,15 @@ class AiReplyUiTest {
         List<Boolean> searched = new ArrayList<>();
         AiReplyButton.Writer plain = new AiReplyButton.Writer() {
             // Learning how the person writes calls the program too: only the drafts count here.
-            @Override public String write(String p) { if (p.startsWith("Draft the message")) searched.add(false); return "listo"; }
+            @Override public String write(String p) {
+                if (p.startsWith("Draft the message")) searched.add(false);
+                return "listo";
+            }
             @Override public AiReplyButton.Writer searching() {
-                return p -> { if (p.startsWith("Draft the message")) searched.add(true); return "listo, buscado"; };
+                return p -> {
+                    if (p.startsWith("Draft the message")) searched.add(true);
+                    return "listo, buscado";
+                };
             }
         };
         writer(plain);
@@ -130,8 +139,11 @@ class AiReplyUiTest {
     @Test
     void theDraftLandsInTheBoxAndIsNotSent() throws Exception {
         int before = svc.messages(CHAT).size();
-        writer(p -> { prompts.add(p); return "Claro, voy"; });
-        fx(() -> { ((TextArea) composer.lookup(".text-area")).setText("dile que sí"); return null; });
+        writer(p -> {
+            prompts.add(p);
+            return "Claro, voy";
+        });
+        FxWait.onFx(() -> ((TextArea) composer.lookup(".text-area")).setText("dile que sí"));
         press();
         FxWait.until("the draft in the box", () -> text().equals("Claro, voy"));
         assertEquals(before, svc.messages(CHAT).size(), "only a draft");
@@ -158,7 +170,10 @@ class AiReplyUiTest {
             }
 
             @Override public AiReplyButton.Writer searching() {
-                return p -> { searched.add(true); return "buscado"; };
+                return p -> {
+                    searched.add(true);
+                    return "buscado";
+                };
             }
         });
         write("Sí, nos vemos el sábado [+]");
@@ -173,7 +188,7 @@ class AiReplyUiTest {
         assertTrue(prompts.getLast().contains("Condense it"));
         assertEquals(List.of(false, false), searched, "a mark isn't a gap: no web");
         assertEquals(before, svc.messages(CHAT).size(), "never sent");
-        fx(() -> { ((TextArea) composer.lookup(".text-area")).undo(); return null; });
+        FxWait.onFx(() -> ((TextArea) composer.lookup(".text-area")).undo());
         assertEquals("Sí, nos vemos el sábado. Llevo algo de comer, ¿te parece? [-]", text(), "⌘Z brings back what was there");
     }
 
@@ -182,30 +197,36 @@ class AiReplyUiTest {
     void theEmptyBoxSaysWhatTheMarksDoWhileTheAiIsOn() throws Exception {
         String on = fx(() -> ((TextArea) composer.lookup(".text-area")).getPromptText());
         assertTrue(on.contains("[+]") && on.contains("[-]"), on);
-        fx(() -> { AiReplyButton.SHOWN.set(false); return null; });
+        FxWait.onFx(() -> AiReplyButton.SHOWN.set(false));
         assertEquals("Escribe un mensaje", fx(() -> ((TextArea) composer.lookup(".text-area")).getPromptText()));
     }
 
     private Button fixButton() { return (Button) composer.lookup(".ai-fix-button"); }
 
     private void pressFix(AiReplyButton.Writer w) throws InterruptedException {
-        fx(() -> { composer.useFixWriter(() -> w); fixButton().fire(); return null; });
+        FxWait.onFx(() -> {
+            composer.useFixWriter(() -> w);
+            fixButton().fire();
+        });
     }
 
     private void write(String text) throws InterruptedException {
-        fx(() -> { ((TextArea) composer.lookup(".text-area")).setText(text); return null; });
+        FxWait.onFx(() -> ((TextArea) composer.lookup(".text-area")).setText(text));
     }
 
     @Test
     void correctingSendsOnlyTheTextAndCanBeUndone() throws Exception {
         int before = svc.messages(CHAT).size();
         write("como estas 5€ 😀");
-        pressFix(p -> { prompts.add(p); return "¿Cómo estás? 5€ 😀"; });
+        pressFix(p -> {
+            prompts.add(p);
+            return "¿Cómo estás? 5€ 😀";
+        });
         FxWait.until("the corrected text in the box", () -> text().equals("¿Cómo estás? 5€ 😀"));
         assertEquals(before, svc.messages(CHAT).size(), "never sent");
         assertTrue(prompts.get(0).contains("como estas 5€ 😀"));
         assertFalse(prompts.get(0).contains(svc.messages(CHAT).get(before - 1).preview()), "the chat stays here");
-        fx(() -> { ((TextArea) composer.lookup(".text-area")).undo(); return null; });
+        FxWait.onFx(() -> ((TextArea) composer.lookup(".text-area")).undo());
         assertEquals("como estas 5€ 😀", text());
     }
 
@@ -306,11 +327,11 @@ class AiReplyUiTest {
             }
             return "Hola";
         });
-        fx(() -> { composer.setChat("!otro:demo"); return null; });
+        FxWait.onFx(() -> composer.setChat("!otro:demo"));
         release.countDown();
         FxWait.until("a message about how it went", () -> !errors.isEmpty()); // it says it went to the other chat
         assertEquals("", text());
-        fx(() -> { composer.setChat(CHAT); return null; });
+        FxWait.onFx(() -> composer.setChat(CHAT));
         assertEquals("Hola", text());
     }
 
@@ -326,11 +347,11 @@ class AiReplyUiTest {
             return "Para familia";
         });
         press();
-        fx(() -> { composer.setChat("!otro:demo"); return null; });
+        FxWait.onFx(() -> composer.setChat("!otro:demo"));
         release.countDown();
         FxWait.until("a message about how it went", () -> !errors.isEmpty()); // it says it went to the other chat
         assertEquals("", text());
-        fx(() -> { composer.setChat(CHAT); return null; });
+        FxWait.onFx(() -> composer.setChat(CHAT));
         assertEquals("Para familia", text());
     }
 
@@ -497,7 +518,7 @@ class AiReplyUiTest {
     }
 
     private void send() throws InterruptedException {
-        fx(() -> { ((Button) composer.lookup(".send-button")).fire(); return null; });
+        FxWait.onFx(() -> ((Button) composer.lookup(".send-button")).fire());
     }
 
     @Test
@@ -529,7 +550,7 @@ class AiReplyUiTest {
     @Test
     void itsHiddenUnlessTurnedOn() throws Exception {
         assertTrue(fx(() -> button().isVisible()));
-        fx(() -> { AiReplyButton.SHOWN.set(false); return null; });
+        FxWait.onFx(() -> AiReplyButton.SHOWN.set(false));
         assertFalse(fx(() -> button().isVisible()));
     }
 

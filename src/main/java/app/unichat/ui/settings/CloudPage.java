@@ -87,7 +87,8 @@ public final class CloudPage {
                 redraw.run();
             }));
         };
-        Node pcloud = signInForm(PCLOUD, status, tryIt), dropbox = signInForm(DROPBOX, status, tryIt);
+        Node pcloud = signInForm(PCLOUD, status, tryIt);
+        Node dropbox = signInForm(DROPBOX, status, tryIt);
         Node dav = davForm(chosen, status, tryIt);
         Node services = chips(I18n.t("settings.cloud.service"), List.of(Service.values()),
                 s -> I18n.t("settings.cloud.service." + s.name()), Service.PCLOUD, s -> {

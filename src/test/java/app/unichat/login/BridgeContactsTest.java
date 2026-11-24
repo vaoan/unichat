@@ -45,7 +45,10 @@ class BridgeContactsTest {
                 out = "{\"results\":[{\"id\":\"333\",\"name\":\"Ana María\",\"identifiers\":[],\"mxid\":\"@telegram_333:x\"}]}";
             } else if (path.contains("/v3/resolve_identifier/")) {
                 out = path.endsWith("nadie") ? "{}" : "{\"id\":\"444\",\"name\":\"Carla\",\"mxid\":\"@telegram_444:x\"}";
-                if (path.endsWith("nadie")) { status = 404; out = "{\"errcode\":\"M_NOT_FOUND\",\"error\":\"not found\"}"; }
+                if (path.endsWith("nadie")) {
+                    status = 404;
+                    out = "{\"errcode\":\"M_NOT_FOUND\",\"error\":\"not found\"}";
+                }
             } else if (path.contains("/v3/create_dm/")) {
                 out = "{\"id\":\"222\",\"dm_room_mxid\":\"!nuevo:x\"}";
             } else {

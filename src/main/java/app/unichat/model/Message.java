@@ -118,7 +118,10 @@ public final class Message {
     public void setFileSize(long fileSize) { this.fileSize = fileSize; }
     public int width() { return width; }
     public int height() { return height; }
-    public void setSize(int width, int height) { this.width = width; this.height = height; }
+    public void setSize(int w, int h) {
+        this.width = w;
+        this.height = h;
+    }
     public String replyToId() { return replyToId; }
     public void setReplyToId(String replyToId) { this.replyToId = replyToId; }
     public boolean edited() { return edited; }
@@ -250,7 +253,8 @@ public final class Message {
         Map<String, Set<String>> all = new LinkedHashMap<>(reactions);
         Set<String> users = new LinkedHashSet<>(had);
         users.remove(userId);
-        if (users.isEmpty()) all.remove(emoji); else all.put(emoji, Collections.unmodifiableSet(users));
+        if (users.isEmpty()) all.remove(emoji);
+        else all.put(emoji, Collections.unmodifiableSet(users));
         reactions = Collections.unmodifiableMap(all);
     }
 
@@ -259,7 +263,8 @@ public final class Message {
     /** Adds or removes {@code userId}'s reaction; returns true if it is now present. */
     public boolean toggleReaction(String emoji, String userId) {
         boolean add = !reactions.getOrDefault(emoji, Set.of()).contains(userId);
-        if (add) addReaction(emoji, userId); else removeReaction(emoji, userId);
+        if (add) addReaction(emoji, userId);
+        else removeReaction(emoji, userId);
         return add;
     }
 

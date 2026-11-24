@@ -33,7 +33,11 @@ class GifFilesTest {
         CountDownLatch hang = new CountDownLatch(1); // the server answers only once the test is over
         HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext("/", ex -> {
-            try { hang.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            try {
+                hang.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             ex.sendResponseHeaders(200, -1);
             ex.close();
         });

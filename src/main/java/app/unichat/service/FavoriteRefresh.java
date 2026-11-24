@@ -28,7 +28,8 @@ public final class FavoriteRefresh {
             if (set != null && MediaLibrary.bridgeId(i) != null) bySet.computeIfAbsent(set, k -> new ArrayList<>()).add(i);
         }
         List<MediaLibrary.Replacement> replacements = new ArrayList<>();
-        int[] missing = {0}, failed = {0};
+        int[] missing = {0};
+        int[] failed = {0};
         CompletableFuture<Void> chain = CompletableFuture.completedFuture(null);
         for (Map.Entry<String, List<MediaLibrary.Item>> e : bySet.entrySet()) {
             chain = chain.thenCompose(v -> sets.freshStickerPack(e.getKey()).handle((pack, err) -> {

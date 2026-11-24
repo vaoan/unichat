@@ -33,7 +33,8 @@ final class VaultNames {
      * Tests: each runs once, on the migrating thread holding what it holds: right before {@link Vault#INFO} is written
      * (every file and slot copied), and right after the old one is deleted (before the old files go).
      */
-    static volatile Runnable beforeSwitch, afterSwitch; // NOPMD: MutableStaticState, a seam tests swap
+    static volatile Runnable beforeSwitch; // NOPMD: MutableStaticState, a seam tests swap
+    static volatile Runnable afterSwitch; // NOPMD: MutableStaticState, a seam tests swap
 
     private VaultNames() {}
 
@@ -143,7 +144,8 @@ final class VaultNames {
      * switch, written only while the old names are still the vault's (another computer may have switched them).
      */
     private static boolean file(Storage dav, byte[] vk, String stored, boolean before, Set<String> made) throws IOException {
-        String old = CloudAccount.ROOT + stored.substring(CloudNames.OLD_VAULT.length()), logical = CloudNames.renamed(old);
+        String old = CloudAccount.ROOT + stored.substring(CloudNames.OLD_VAULT.length());
+        String logical = CloudNames.renamed(old);
         String target = CloudNames.newStored(stored);
         byte[] plain;
         try {
@@ -181,7 +183,8 @@ final class VaultNames {
     private static void slots(Storage dav, boolean finishing, Map<String, String> copied) throws IOException {
         for (String name : dav.list(CloudNames.OLD_SLOTS)) {
             if (!name.endsWith(".json") || !Ids.ours(name.substring(0, name.length() - ".json".length()))) continue;
-            String from = CloudNames.OLD_SLOTS + "/" + name, to = Vault.SLOTS + "/" + name;
+            String from = CloudNames.OLD_SLOTS + "/" + name;
+            String to = Vault.SLOTS + "/" + name;
             String stamp = dav.stamp(from);
             if (stamp == null) continue;
             boolean again = copied.containsKey(from) && !stamp.equals(copied.get(from));

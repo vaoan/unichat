@@ -491,16 +491,16 @@ public final class Cloud {
 
     /** What the vault left or replaced this round; null when nothing. */
     private Notice notice(Storage dav, VaultParts.Round vault) {
-        java.util.Set<String> texts = vault.open() ? this.texts.damaged() : java.util.Set.of();
+        java.util.Set<String> damagedTexts = vault.open() ? this.texts.damaged() : java.util.Set.of();
         Map<String, String> named = new java.util.TreeMap<>();
-        if (!texts.isEmpty()) {
+        if (!damagedTexts.isEmpty()) {
             Map<String, String> labels;
             try {
                 labels = Vault.computers(dav);
             } catch (IOException e) {
                 labels = Map.of(); // named by machine alone this round
             }
-            for (String machine : texts) named.put(machine, labels.getOrDefault(machine, ""));
+            for (String machine : damagedTexts) named.put(machine, labels.getOrDefault(machine, ""));
         }
         Notice n = new Notice(parts(vault.replaced()), parts(vault.damaged()), named);
         return n.none() ? null : n;
@@ -621,7 +621,8 @@ public final class Cloud {
                     if (a == null) throw new IOException(I18n.t("cloud.error.vaultNotOpen"));
                     keyLock.lock();
                     try {
-                        Storage dav = a.storage(), at = writes ? renames.forJob(dav) : VaultNames.at(dav);
+                        Storage dav = a.storage();
+                        Storage at = writes ? renames.forJob(dav) : VaultNames.at(dav);
                         T done = job.run(at);
                         if (writes) renames.afterJob(dav, at);
                         return done;

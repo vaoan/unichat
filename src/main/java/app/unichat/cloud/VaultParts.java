@@ -27,7 +27,9 @@ import java.util.stream.Stream;
  */
 final class VaultParts {
     /** This computer's hold on the vault (machine-only, as every {@code cloud.} key): its id, its slot's key, its X25519 key. */
-    static final String ID = "cloud.vault.id", KEY = "cloud.vault.key", PRIVATE = "cloud.vault.private";
+    static final String ID = "cloud.vault.id";
+    static final String KEY = "cloud.vault.key";
+    static final String PRIVATE = "cloud.vault.private";
     /** "Seguir sin la bóveda en este equipo": never asked again, nothing personal sent, everything entered by hand. */
     static final String DECLINED = "cloud.vault.declined";
     /**
@@ -35,8 +37,9 @@ final class VaultParts {
      * (declined, or never opened) is no sign it was turned off either, so nothing goes plain until the person says.
      */
     static final String SEEN = "cloud.vault.seen";
-    static final String SECRETS_FILE = Cloud.Part.SECRETS.path(), PINNED_FILE = Cloud.Part.PINNED.path(),
-        TRANSCRIPTS_FILE = Cloud.Part.TRANSCRIPTS.path();
+    static final String SECRETS_FILE = Cloud.Part.SECRETS.path();
+    static final String PINNED_FILE = Cloud.Part.PINNED.path();
+    static final String TRANSCRIPTS_FILE = Cloud.Part.TRANSCRIPTS.path();
     private static final String PINNED = "pinned-messages.json";
     /** A transcript's file as {@code stt.Transcripts} names it (the audio's SHA-256): no other name from the account becomes a path. */
     private static final Pattern TRANSCRIPT = Pattern.compile("[0-9a-f]{64}\\.txt");
@@ -99,8 +102,8 @@ final class VaultParts {
         private final byte[] vk;
         private final Vault.Info vault;
         /** The vault's parts that didn't open this round (their logical paths), and those of them that went up anew from here. */
-        private final Set<String> damaged = new java.util.concurrent.CopyOnWriteArraySet<>(),
-            replaced = new java.util.concurrent.CopyOnWriteArraySet<>();
+        private final Set<String> damaged = new java.util.concurrent.CopyOnWriteArraySet<>();
+        private final Set<String> replaced = new java.util.concurrent.CopyOnWriteArraySet<>();
 
         private Round(Cloud.VaultState state, byte[] vk) {
             this(state, vk, null);

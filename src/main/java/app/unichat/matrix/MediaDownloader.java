@@ -34,7 +34,8 @@ final class MediaDownloader {
     private final Map<String, CompletableFuture<Path>> mediaInFlight = new ConcurrentHashMap<>();
     /** When each folder was last trimmed. */
     private final Map<String, java.util.concurrent.atomic.AtomicLong> lastTrim = new ConcurrentHashMap<>();
-    private static final String MEDIA = "media", STICKERS = "sticker-cache";
+    private static final String MEDIA = "media";
+    private static final String STICKERS = "sticker-cache";
 
     private volatile java.util.Set<String> pinned = java.util.Set.of();
     private final SavedMedia saved;
@@ -225,7 +226,8 @@ final class MediaDownloader {
     /** At most once a minute per folder: listing thousands of files after every thumbnail would cost more than it saves. */
     private void trim(String folder, Path dir) {
         var at = lastTrim.computeIfAbsent(folder, f -> new java.util.concurrent.atomic.AtomicLong());
-        long now = System.currentTimeMillis(), last = at.get();
+        long now = System.currentTimeMillis();
+        long last = at.get();
         if (now - last < 60_000 || !at.compareAndSet(last, now)) return;
         Settings s = Settings.get();
         if (folder.equals(STICKERS)) {

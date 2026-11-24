@@ -39,7 +39,9 @@ import javafx.scene.layout.StackPane;
  * chat). A chosen GIF is downloaded and sent flagged as a GIF; recents keep it for any other chat or network.
  */
 public final class GifGrid extends VBox {
-    private static final int TILE_W = 132, TILE_H = 100, LIMIT = 24;
+    private static final int TILE_W = 132;
+    private static final int TILE_H = 100;
+    private static final int LIMIT = 24;
 
     private final Supplier<String> takeReply;
     private final ChatService svc;

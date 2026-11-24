@@ -128,7 +128,10 @@ class DiscordRestSyncTest {
     void aLiveMessageInAnotherChatDuringAWakeStillNotifies() throws Exception {
         List<String> told = new java.util.concurrent.CopyOnWriteArrayList<>();
         svc.addListener(new app.unichat.service.ChatService.Listener() {
-            @Override public void incomingMessage(Chat chat, app.unichat.model.Message m) { told.add(m.id()); server.changes.changed(); }
+            @Override public void incomingMessage(Chat chat, app.unichat.model.Message m) {
+                told.add(m.id());
+                server.changes.changed();
+            }
         });
         svc.setArchived("!s:x", true).get();
         server.changes.until("resting", () -> server.notRoomsPosted().size() == 1);

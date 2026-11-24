@@ -25,7 +25,8 @@ import java.util.stream.Stream;
  */
 final class TextSync {
     static final String ROOT = CloudAccount.ROOT + "/Texts";
-    private static final String HERE = "here", INDEX = TextIndex.NAME;
+    private static final String HERE = "here";
+    private static final String INDEX = TextIndex.NAME;
     /** Names of ours only (machines are {@link Ids}): anything else in the account never becomes a path here. */
     private static final Pattern FILE = TextIndex.FILE;
     private static final ObjectMapper JSON = new ObjectMapper();

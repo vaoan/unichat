@@ -11,7 +11,9 @@ import java.util.Arrays;
 @SuppressWarnings("ArrayRecordComponent") // equals and hashCode below compare the bytes
 record RecoveryCode(byte[] bits) {
     private static final String ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
-    private static final int BYTES = 20, CHARS = 32, GROUP = 4;
+    private static final int BYTES = 20;
+    private static final int CHARS = 32;
+    private static final int GROUP = 4;
     /** Groups in a code. */
     static final int GROUPS = CHARS / GROUP;
     private static final String DASHES = "-\u2010\u2011\u2012\u2013\u2014\u2015\u2212";
@@ -69,7 +71,9 @@ record RecoveryCode(byte[] bits) {
             }
             if (n != CHARS) return null;
             byte[] bits = new byte[BYTES];
-            int acc = 0, have = 0, at = 0;
+            int acc = 0;
+            int have = 0;
+            int at = 0;
             for (char c : chars) {
                 int v = ALPHABET.indexOf(c);
                 if (v < 0) return null;
@@ -106,7 +110,8 @@ record RecoveryCode(byte[] bits) {
 
     private String plain() {
         StringBuilder out = new StringBuilder();
-        int acc = 0, have = 0;
+        int acc = 0;
+        int have = 0;
         for (byte b : bits) {
             acc = (acc << 8) | (b & 0xff);
             have += 8;

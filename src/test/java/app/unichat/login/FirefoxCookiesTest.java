@@ -16,7 +16,9 @@ import java.sql.Statement;
 import java.time.Instant;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FirefoxCookiesTest {
     private static final Instant NOW = Instant.parse("2026-10-26T00:00:00Z");
@@ -44,8 +46,12 @@ class FirefoxCookiesTest {
     }
 
     private static void row(PreparedStatement ps, String n, String v, String h, long exp) throws SQLException {
-        ps.setString(1, n); ps.setString(2, v); ps.setString(3, h);
-        ps.setString(4, "/"); ps.setLong(5, exp); ps.setInt(6, 1);
+        ps.setString(1, n);
+        ps.setString(2, v);
+        ps.setString(3, h);
+        ps.setString(4, "/");
+        ps.setLong(5, exp);
+        ps.setInt(6, 1);
         ps.executeUpdate();
     }
 

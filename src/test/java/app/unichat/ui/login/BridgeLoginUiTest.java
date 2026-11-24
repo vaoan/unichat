@@ -121,7 +121,7 @@ class BridgeLoginUiTest {
         assertTrue(text(scene).contains("¿Cómo quieres conectar WhatsApp?"));
         shot(scene, "1-elegir");
         assertTrue(text(scene).indexOf("Escanear un código QR") < text(scene).indexOf("Usar tu número de teléfono"), "QR first");
-        fx(() -> { buttonNow(scene, "Escanear un código QR").fire(); return null; });
+        FxWait.onFx(() -> buttonNow(scene, "Escanear un código QR").fire());
 
         await("the QR", () -> fx0(() -> scene.getRoot().lookupAll("*").stream().anyMatch(n -> n instanceof ImageView)));
         assertTrue(text(scene).contains("Escanea el código con tu teléfono"));
@@ -132,7 +132,7 @@ class BridgeLoginUiTest {
         await("connected", () -> button(scene, "Listo") != null);
         assertTrue(text(scene).contains("WhatsApp está conectado"));
         shot(scene, "3-listo");
-        fx(() -> { buttonNow(scene, "Listo").fire(); return null; });
+        FxWait.onFx(() -> buttonNow(scene, "Listo").fire());
         assertTrue(connected.get());
     }
 
@@ -140,13 +140,19 @@ class BridgeLoginUiTest {
     void phoneFlowValidatesThenShowsTheCode() throws Exception {
         Scene scene = open(new AtomicBoolean());
         await("the choice of methods", () -> button(scene, "Usar tu número de teléfono") != null);
-        fx(() -> { buttonNow(scene, "Usar tu número de teléfono").fire(); return null; });
+        FxWait.onFx(() -> buttonNow(scene, "Usar tu número de teléfono").fire());
         await("the phone field", () -> fx0(() -> field(scene) != null));
-        fx(() -> { field(scene).setText("300 123 4567"); buttonNow(scene, "Continuar").fire(); return null; });
+        FxWait.onFx(() -> {
+            field(scene).setText("300 123 4567");
+            buttonNow(scene, "Continuar").fire();
+        });
         await("the country code asked for", () -> text(scene).contains("código de país"));
         shot(scene, "4-telefono-error");
         assertNull(submitted, "nothing sent while invalid");
-        fx(() -> { field(scene).setText("+57 300 123 4567"); buttonNow(scene, "Continuar").fire(); return null; });
+        FxWait.onFx(() -> {
+            field(scene).setText("+57 300 123 4567");
+            buttonNow(scene, "Continuar").fire();
+        });
         await("the pairing code", () -> text(scene).contains("ABCD-1234"));
         assertTrue(submitted.contains("\"phone_number\":\"+573001234567\""), submitted);
         assertTrue(text(scene).contains("Escribe este código en tu teléfono"));

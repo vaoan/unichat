@@ -98,7 +98,8 @@ final class SyncEvents {
                 && app.unichat.model.Mxc.parse(text(content, "url")) != null;
     }
 
-    static final String VOICE = "org.matrix.msc3245.voice", AUDIO = "org.matrix.msc1767.audio";
+    static final String VOICE = "org.matrix.msc3245.voice";
+    static final String AUDIO = "org.matrix.msc1767.audio";
     /** As many bars as any network draws: a stranger's longer list goes no further. */
     private static final int MAX_BARS = 1000;
 

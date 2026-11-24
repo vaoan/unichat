@@ -210,7 +210,7 @@ final class MessageSelection {
     }
 
     /** Picks or unpicks {@code m}; {@code range}: picks every message from the last one picked to it. */
-    private void toggle(Message m, boolean range) {
+    private void toggle(Message m, boolean extend) {
         if (!purpose.pickable().test(m)) return;
         if (purpose.range()) { // a stretch: the click moves an end (or puts one back), never leaves one out
             this.range.click(m.id(), ids());
@@ -220,8 +220,9 @@ final class MessageSelection {
         }
         List<Message> all = list.getItems().stream().filter(r -> r instanceof ThreadRows.MessageRow)
                 .map(r -> ((ThreadRows.MessageRow) r).message()).toList();
-        int from = last == null ? -1 : indexOf(all, last), to = indexOf(all, m.id());
-        if (range && from >= 0 && to >= 0) {
+        int from = last == null ? -1 : indexOf(all, last);
+        int to = indexOf(all, m.id());
+        if (extend && from >= 0 && to >= 0) {
             for (int i = Math.min(from, to); i <= Math.max(from, to); i++) if (purpose.pickable().test(all.get(i))) picked.add(all.get(i).id());
         } else if (!picked.remove(m.id())) {
             picked.add(m.id());

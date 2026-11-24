@@ -99,17 +99,22 @@ public final class PreferencesFile {
         final ObjectNode extra = JSON.createObjectNode();
         boolean favorite;
 
-        MutableFolder(String id, String name) { this.id = id; this.name = name; }
+        MutableFolder(String id, String name) {
+            this.id = id;
+            this.name = name;
+        }
     }
 
-    private final Path file, seenFile;
+    private final Path file;
+    private final Path seenFile;
     private final Map<String, Entry> chats = new LinkedHashMap<>();
     private final List<MutableFolder> folders = new ArrayList<>();
     private final ServerSeen seen;
     private final PreferencesRecovery recovery;
     private final ObjectNode extraRoot = JSON.createObjectNode();
     private final BackgroundWriter writer = new BackgroundWriter("preferences-save", this, this::writeOnce);
-    private boolean dirty, saveFailing;
+    private boolean dirty;
+    private boolean saveFailing;
     private Runnable onSaveFailure;
     private int announcements;
     private int batching;
@@ -524,7 +529,8 @@ public final class PreferencesFile {
 
     /** A copy under the lock, the disk outside it, the outcome under it again. A change made meanwhile asks for another round. */
     private void writeOnce() {
-        ObjectNode main = null, seenNow = null;
+        ObjectNode main = null;
+        ObjectNode seenNow = null;
         boolean keepPrevious = false;
         synchronized (this) {
             recovery.retry();

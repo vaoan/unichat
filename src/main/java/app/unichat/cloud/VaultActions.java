@@ -121,7 +121,8 @@ final class VaultActions {
         VaultSlot own = vault.id().equals(s.getString(VaultParts.ID, null)) ? Vault.slot(dav, vault, Cloud.machine()) : null;
         String key = s.getString(VaultParts.KEY, null);
         if (own == null || own.method() != VaultSlot.Method.COMPUTER || key == null) return null;
-        byte[] slotKey = null, held = null;
+        byte[] slotKey = null;
+        byte[] held = null;
         try {
             slotKey = Base64.getDecoder().decode(key);
             held = own.unwrap(slotKey);

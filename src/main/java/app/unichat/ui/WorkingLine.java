@@ -39,12 +39,12 @@ public final class WorkingLine {
 
     public Node node() { return node; }
 
-    public void start(String what) {
+    public void start(String doing) {
         running++;
-        this.what = what;
+        this.what = doing;
         since = System.currentTimeMillis();
-        text.setText(what + "…");
-        text.setAccessibleText(what);
+        text.setText(doing + "…");
+        text.setAccessibleText(doing);
         ticking.stop(); // counts again from this start
         tick.want(true);
         Nodes.show(node, true);

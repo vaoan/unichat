@@ -46,8 +46,9 @@ class ReplyAlignUiTest {
             VBox bubble = (VBox) w.list().lookup(".bubble.out.sticker");
             Node quote = bubble.lookup(".reply-quote");
             Node sticker = bubble.getChildren().get(bubble.getChildren().indexOf(quote) + 1);
-            Bounds b = bubble.localToScene(bubble.getLayoutBounds()), s = sticker.localToScene(sticker.getLayoutBounds()),
-                    q = quote.localToScene(quote.getLayoutBounds());
+            Bounds b = bubble.localToScene(bubble.getLayoutBounds());
+            Bounds s = sticker.localToScene(sticker.getLayoutBounds());
+            Bounds q = quote.localToScene(quote.getLayoutBounds());
             return new double[] {b.getMaxX() - bubble.getInsets().getRight(), s.getMaxX(), s.getWidth(), q.getWidth()};
         });
         org.junit.jupiter.api.Assertions.assertTrue(edges[3] > edges[2] + 20, "the quote is wider than the sticker: " + edges[3] + " vs " + edges[2]);

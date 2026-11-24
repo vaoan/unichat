@@ -36,7 +36,9 @@ final class VaultMove {
      * Machine-only markers: when this computer's move was done, since when no stray changed, and what the strays' files
      * were then (their stamps' hash): kept here, so a restart doesn't make them look new.
      */
-    static final String MOVED_AT = "cloud.vault.movedAt", QUIET_SINCE = "cloud.vault.strayQuietSince", STRAYS_SEEN = "cloud.vault.straySeen";
+    static final String MOVED_AT = "cloud.vault.movedAt";
+    static final String QUIET_SINCE = "cloud.vault.strayQuietSince";
+    static final String STRAYS_SEEN = "cloud.vault.straySeen";
     static final Duration QUIET = Duration.ofDays(1);
     /**
      * The machines sending plain texts when the move started, one list inside the vault (sealed: only a key holder writes
@@ -175,7 +177,9 @@ final class VaultMove {
             // Only the parts' own files: no other name there is moved or deleted.
             if (Cloud.Part.of(name) != null) settings.add(SETTINGS_DIR + "/" + name);
         }
-        Map<String, List<String>> texts = new TreeMap<>(), ofTheVault = new TreeMap<>(), unknown = new TreeMap<>();
+        Map<String, List<String>> texts = new TreeMap<>();
+        Map<String, List<String>> ofTheVault = new TreeMap<>();
+        Map<String, List<String>> unknown = new TreeMap<>();
         for (String machine : plain.list(TextSync.ROOT)) {
             if (!Ids.ours(machine)) continue;
             List<String> names = new ArrayList<>();
@@ -245,7 +249,8 @@ final class VaultMove {
 
     /** One pass over what's plain; whether all of it was done. */
     private static boolean carry(Storage plain, Storage sealed, Found found, Pass pass, Tally t) {
-        boolean all = true, delete = pass != Pass.TAKE;
+        boolean all = true;
+        boolean delete = pass != Pass.TAKE;
         for (String path : found.settings()) {
             if (pass == Pass.TAKE) continue;
             try {
@@ -286,21 +291,25 @@ final class VaultMove {
      * computer sent it, reads back as long; its plain index last, once all of them went. Whether all of them went.
      */
     private static boolean letGo(Storage plain, Storage sealed, String machine, List<String> names, Tally t) throws IOException {
-        String folder = TextSync.ROOT + "/" + machine, indexPath = folder + "/" + TextIndex.NAME;
+        String folder = TextSync.ROOT + "/" + machine;
+        String indexPath = folder + "/" + TextIndex.NAME;
         String indexStamp = plain.stamp(indexPath);
         Map<String, Long> theirs = TextIndex.read(indexStamp == null ? null : plain.get(indexPath));
         Map<String, Long> held = TextIndex.read(sealed.get(indexPath));
         boolean all = true;
         for (String name : names) {
             if (name.equals(TextIndex.NAME)) continue;
-            Long size = theirs.get(name), have = held.get(name);
+            Long size = theirs.get(name);
+            Long have = held.get(name);
             if (have == null || (size != null && have < size)) { // not sent sealed yet: nothing is read until it is
                 all = false;
                 continue;
             }
             try {
-                String path = folder + "/" + name, stamp = plain.stamp(path);
-                byte[] mine = stamp == null ? null : plain.get(path), kept = mine == null ? null : sealed.get(path);
+                String path = folder + "/" + name;
+                String stamp = plain.stamp(path);
+                byte[] mine = stamp == null ? null : plain.get(path);
+                byte[] kept = mine == null ? null : sealed.get(path);
                 all &= kept != null && kept.length >= mine.length && deleteIfSame(plain, path, stamp, t);
             } catch (IOException e) {
                 all = t.failed(e);
@@ -316,7 +325,8 @@ final class VaultMove {
      */
     private static boolean textsIn(Storage plain, Storage sealed, String machine, List<String> names, boolean delete, Tally t)
         throws IOException {
-        String folder = TextSync.ROOT + "/" + machine, indexPath = folder + "/" + TextIndex.NAME;
+        String folder = TextSync.ROOT + "/" + machine;
+        String indexPath = folder + "/" + TextIndex.NAME;
         String indexStamp = plain.stamp(indexPath);
         Map<String, Long> theirs = TextIndex.read(indexStamp == null ? null : plain.get(indexPath));
         Map<String, Long> held = TextIndex.read(sealed.get(indexPath));
@@ -324,7 +334,8 @@ final class VaultMove {
         boolean all = true;
         for (String name : names) {
             if (name.equals(TextIndex.NAME)) continue;
-            Long size = theirs.get(name), have = held.get(name);
+            Long size = theirs.get(name);
+            Long have = held.get(name);
             if (!delete && size != null && have != null && have >= size) continue; // the vault already has as much
             try {
                 long length = textIn(plain, sealed, folder + "/" + name, delete, t);

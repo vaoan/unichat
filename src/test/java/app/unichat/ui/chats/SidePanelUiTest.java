@@ -50,11 +50,11 @@ class SidePanelUiTest {
         FxWait.settled();
         assertFalse(fx(() -> panel(scene) != null), "closed at first");
 
-        fx(() -> { view[0].togglePanel(SidePanel.Tab.PROFILE); return null; });
+        FxWait.onFx(() -> view[0].togglePanel(SidePanel.Tab.PROFILE));
         assertEquals(SidePanel.Tab.PROFILE, fx(() -> panel(scene).current()));
         assertTrue(fx(() -> panel(scene).lookup(".info-pane") != null), "Perfil shows the chat info");
 
-        fx(() -> { view[0].showPanel(SidePanel.Tab.EMOJIS); return null; });
+        FxWait.onFx(() -> view[0].showPanel(SidePanel.Tab.EMOJIS));
         assertEquals(SidePanel.Tab.EMOJIS, fx(() -> panel(scene).current()), "switches tab without closing");
         FxWait.until("the list builds its emojis", () -> panel(scene).lookupAll(".emoji-button").stream()
                 .anyMatch(n -> n.isVisible() && n.getProperties().containsKey("emoji")));
@@ -69,12 +69,15 @@ class SidePanelUiTest {
         String typed = fx(() -> ((TextArea) scene.getRoot().lookup(".composer-input")).getText());
         assertFalse(typed.isEmpty(), "the emoji went into the message box");
 
-        fx(() -> { view[0].togglePanel(SidePanel.Tab.EMOJIS); return null; });
+        FxWait.onFx(() -> view[0].togglePanel(SidePanel.Tab.EMOJIS));
         assertFalse(fx(() -> panel(scene) != null), "same button closes it");
 
         // The composer's one button (the face) opens the media tab used last; Perfil doesn't count.
-        fx(() -> { view[0].showPanel(SidePanel.Tab.STICKERS); view[0].showPanel(SidePanel.Tab.PROFILE); return null; });
-        fx(() -> { view[0].togglePanel(SidePanel.Tab.PROFILE); return null; });
+        FxWait.onFx(() -> {
+            view[0].showPanel(SidePanel.Tab.STICKERS);
+            view[0].showPanel(SidePanel.Tab.PROFILE);
+        });
+        FxWait.onFx(() -> view[0].togglePanel(SidePanel.Tab.PROFILE));
         assertEquals(SidePanel.Tab.STICKERS, SidePanel.lastMediaTab());
         fx(() -> {
             scene.getRoot().lookupAll(".icon-button").stream()
@@ -113,7 +116,7 @@ class SidePanelUiTest {
             return sc;
         });
         FxWait.until("the chat opens", () -> scene.getRoot().lookup(".composer-input") != null);
-        fx(() -> { view[0].showPanel(SidePanel.Tab.STICKERS); return null; });
+        FxWait.onFx(() -> view[0].showPanel(SidePanel.Tab.STICKERS));
         FxWait.until("the stickers tab lists its tiles", () -> panel(scene).lookup(".sticker-tile") != null);
         int before = fx(() -> svc.chat("!family:demo").lastPreview().length());
         fx(() -> {
@@ -143,14 +146,17 @@ class SidePanelUiTest {
                 .flatMap(m -> m.getItems().stream()).filter(i -> "Ver en grande".equals(i.getText())).findFirst().orElse(null));
         assertNotNull(enlarge, "the menu offers Ver en grande");
         long windows = fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage).count());
-        fx(() -> { enlarge.fire(); enlarge.getParentPopup().hide(); return null; }); // as a real click on it does
+        FxWait.onFx(() -> {
+            enlarge.fire();
+            enlarge.getParentPopup().hide();
+        });  // as a real click on it does
         FxWait.until("the sticker's window opens", () -> javafx.stage.Window.getWindows().stream()
                 .anyMatch(w -> w instanceof Stage s && "Sticker".equals(s.getTitle())));
         Stage big = fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage s && "Sticker".equals(s.getTitle()))
                 .map(Stage.class::cast).findFirst().orElse(null));
         assertTrue(big != null && fx(() -> javafx.stage.Window.getWindows().stream().filter(w -> w instanceof Stage).count()) > windows,
                 "a window shows the sticker");
-        fx(() -> { big.close(); return null; });
+        FxWait.onFx(big::close);
 
         // A network that rejects stickers: shown dimmed, with the reason, and nothing is sent.
         fx(() -> {
@@ -190,7 +196,7 @@ class SidePanelUiTest {
             return sc;
         });
         FxWait.until("the chat opens", () -> scene.getRoot().lookup(".composer-input") != null);
-        fx(() -> { view[0].showPanel(SidePanel.Tab.GIFS); return null; });
+        FxWait.onFx(() -> view[0].showPanel(SidePanel.Tab.GIFS));
         FxWait.until("the GIFs tab explains how to turn on a provider", () -> panel(scene).lookupAll(".label").stream()
                 .anyMatch(n -> ((javafx.scene.control.Label) n).getText() != null
                         && ((javafx.scene.control.Label) n).getText().contains("Ajustes → GIFs")));

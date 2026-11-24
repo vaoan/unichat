@@ -25,7 +25,8 @@ class MediaPruneTest {
     @SuppressFBWarnings(value = {"SQL_INJECTION_JDBC", "SQL_NONCONSTANT_STRING_PASSED_TO_EXECUTE"}, justification = "builds or reads a fixture database with the test's own SQL")
     private Path bridgeDb() throws SQLException {
         Path db = dir.resolve("discord.db");
-        long old = now.minus(Duration.ofDays(30)).toEpochMilli(), recent = now.minus(Duration.ofDays(1)).toEpochMilli();
+        long old = now.minus(Duration.ofDays(30)).toEpochMilli();
+        long recent = now.minus(Duration.ofDays(1)).toEpochMilli();
         try (Connection c = DriverManager.getConnection("jdbc:sqlite:" + db); Statement s = c.createStatement()) {
             s.execute("CREATE TABLE discord_file (url TEXT, encrypted BOOLEAN, mxc TEXT NOT NULL, id TEXT, emoji_name TEXT,"
                     + " size BIGINT NOT NULL, mime_type TEXT NOT NULL, timestamp BIGINT NOT NULL)");

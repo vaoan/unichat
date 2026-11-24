@@ -63,7 +63,8 @@ public final class WebDav implements Storage {
     public String stamp(String path) throws IOException {
         String xml = properties(path);
         if (xml == null) return null;
-        String etag = prop(xml, "getetag"), date = prop(xml, "getlastmodified");
+        String etag = prop(xml, "getetag");
+        String date = prop(xml, "getlastmodified");
         return etag != null ? etag : date != null ? date : xml;
     }
 

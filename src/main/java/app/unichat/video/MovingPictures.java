@@ -21,9 +21,10 @@ public final class MovingPictures {
     static final int SIDE = 480;
     /** Every frame is written whole before the WebP is made: 30 s at 15 a second is ~230 MB at most at 480 px. */
     static final int MAX_SECONDS = 30;
-    private static final int FPS = 15, QUALITY = 75;
-    private static final AnimatedWebp.Source GIF = new AnimatedWebp.Source("gif", false, true),
-            MATROSKA = new AnimatedWebp.Source("matroska", false, false);
+    private static final int FPS = 15;
+    private static final int QUALITY = 75;
+    private static final AnimatedWebp.Source GIF = new AnimatedWebp.Source("gif", false, true);
+    private static final AnimatedWebp.Source MATROSKA = new AnimatedWebp.Source("matroska", false, false);
 
     private MovingPictures() {}
 

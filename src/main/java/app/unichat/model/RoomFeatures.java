@@ -19,7 +19,9 @@ import java.util.Set;
  */
 public final class RoomFeatures {
     /** Pseudo message types used in the {@code file} map besides m.image/m.video/m.audio/m.file. */
-    public static final String STICKER = "m.sticker", GIF = "fi.mau.gif", VOICE = "org.matrix.msc3245.voice";
+    public static final String STICKER = "m.sticker";
+    public static final String GIF = "fi.mau.gif";
+    public static final String VOICE = "org.matrix.msc3245.voice";
 
     public static final RoomFeatures UNKNOWN = new RoomFeatures(true, 2, 0, 2, 0, false, 2, 2, 0, null, null, true, null,
             java.util.EnumSet.allOf(TextFormat.class));
@@ -126,7 +128,8 @@ public final class RoomFeatures {
      */
     public record VoiceSend(String mime, boolean voice) {}
 
-    private static final String OPUS_WITH_CODEC = "audio/ogg; codecs=opus", OGG = "audio/ogg";
+    private static final String OPUS_WITH_CODEC = "audio/ogg; codecs=opus";
+    private static final String OGG = "audio/ogg";
 
     public VoiceSend voiceSend() {
         if (anyFile) return new VoiceSend(OGG, true);

@@ -40,7 +40,10 @@ class BigPicturesTest {
     void whenNothingElseCanFfmpegIsFetchedAndNoneMeansItCant() throws Exception {
         Path notAPicture = Files.writeString(dir.resolve("roto.png"), "no es una foto");
         AtomicInteger fetched = new AtomicInteger();
-        assertThrows(IOException.class, () -> BigPictures.shrunk(notAPicture, () -> { fetched.incrementAndGet(); return null; }));
+        assertThrows(IOException.class, () -> BigPictures.shrunk(notAPicture, () -> {
+            fetched.incrementAndGet();
+            return null;
+        }));
         assertEquals(1, fetched.get());
         try (var left = Files.list(dir)) {
             assertEquals(1, left.count(), "no half-written copy is left beside it");

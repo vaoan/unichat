@@ -18,7 +18,8 @@ import javafx.util.Duration;
  * screen: this sits in list rows that come and go, and there can be several at once. Reduced motion: still dots.
  */
 public final class TypingDots extends HBox {
-    static final double BRIGHT = 1, DIM = 0.3;
+    static final double BRIGHT = 1;
+    static final double DIM = 0.3;
     private static final int DOTS = 3;
     /** One step per dot and one with all of them dim: a beat of rest before it starts over. */
     private static final int STEPS = DOTS + 1;

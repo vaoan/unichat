@@ -13,7 +13,9 @@ public enum CloakLevel {
     LIGHT(10, 12, 0.15, 0.3), MEDIUM(30, 12, 0.7, 0.3), STRONG(100, 16, 1.0, 1.0);
 
     private final int steps;
-    private final double eps, smoothShare, colour;
+    private final double eps;
+    private final double smoothShare;
+    private final double colour;
 
     /**
      * @param eps the largest change per channel, 0..255, where texture hides it

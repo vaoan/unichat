@@ -34,16 +34,19 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * opens with the new key and no longer with the old; removing a computer; forgetting the vault on this one.
  */
 class VaultRotateTest {
-    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55",
-        OTHER = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
+    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44";
+    private static final String LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
+    private static final String OTHER = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
     private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl";
 
     @TempDir
     Path dir;
     private FakeDav cloud;
-    private Map<String, String> portableWere, keysWere;
+    private Map<String, String> portableWere;
+    private Map<String, String> keysWere;
     private Vault.Created made;
-    private VaultComputer desk, laptop;
+    private VaultComputer desk;
+    private VaultComputer laptop;
     private Vault.Computer laptopWay;
 
     @BeforeEach
@@ -283,7 +286,8 @@ class VaultRotateTest {
 
     @Test
     void aTextForgedInAComputersFolderWithTheOldKeyIsLeftAndNeverSpread() throws Exception {
-        String mine = "{\"mio\":12345}\n", forged = "{\"forjado\":1}\n"; // the same size: only what it says differs
+        String mine = "{\"mio\":12345}\n";
+        String forged = "{\"forjado\":1}\n"; // the same size: only what it says differs
         assertNull(laptop.write("texts/here/" + TEXT, mine).round().error());
         assertNull(desk.round().error());
         rotate(desk);
@@ -529,9 +533,11 @@ class VaultRotateTest {
 
     @Test
     void aFileSentAnewWhileItsSealedAgainIsLeftForWhoSentIt() throws Exception {
-        String logical = VaultParts.PINNED_FILE, stored = Vault.ROOT + "/Settings/unichat-pinned.json";
+        String logical = VaultParts.PINNED_FILE;
+        String stored = Vault.ROOT + "/Settings/unichat-pinned.json";
         new SealedStorage(dav(), () -> made.vk().clone()).put(logical, "viejo".getBytes(StandardCharsets.UTF_8));
-        byte[] newVk = VaultCrypto.randomKey(), sentMeanwhile = VaultCrypto.seal(newVk, logical, "nuevo".getBytes(StandardCharsets.UTF_8));
+        byte[] newVk = VaultCrypto.randomKey();
+        byte[] sentMeanwhile = VaultCrypto.seal(newVk, logical, "nuevo".getBytes(StandardCharsets.UTF_8));
         Storage racing = (Storage) java.lang.reflect.Proxy.newProxyInstance(
             Storage.class.getClassLoader(), new Class<?>[] {Storage.class}, (proxy, m, args) -> { // NOPMD: UseProperClassLoader, the proxy is made where its interface was loaded
                 Object out = m.invoke(dav(), args);
@@ -545,8 +551,10 @@ class VaultRotateTest {
 
     @Test
     void aForgedTextNeverHoldsBackTheNextOnesAndItsWriterSendsItsOwnAgain() throws Exception {
-        String first = "3f2a9c1b2d4e 2026-10.jsonl", second = TEXT; // October sorts first
-        String real = "{\"mio\":12345}\n", forged = "{\"forjado\":1}\n"; // the same size
+        String first = "3f2a9c1b2d4e 2026-10.jsonl";
+        String second = TEXT; // October sorts first
+        String real = "{\"mio\":12345}\n";
+        String forged = "{\"forjado\":1}\n"; // the same size
         assertNull(laptop.write("texts/here/" + first, "{}\n").write("texts/here/" + second, "{}\n").round().error());
         assertNull(desk.round().error());
         assertNull(laptop.write("texts/here/" + first, "{}\n" + real).write("texts/here/" + second, "{}\n{\"b\":1}\n").round().error());

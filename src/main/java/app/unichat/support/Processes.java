@@ -146,7 +146,8 @@ public final class Processes {
     /** Whether it ended within {@code limit}. */
     private static boolean waitFor(Process p, Limit limit, AtomicLong heard) throws InterruptedException {
         long start = System.nanoTime();
-        long all = TimeUnit.SECONDS.toNanos(limit.seconds()), silence = TimeUnit.SECONDS.toNanos(limit.silentSeconds());
+        long all = TimeUnit.SECONDS.toNanos(limit.seconds());
+        long silence = TimeUnit.SECONDS.toNanos(limit.silentSeconds());
         while (true) {
             long now = System.nanoTime();
             long left = Math.min(all - (now - start), silence - (now - heard.get()));

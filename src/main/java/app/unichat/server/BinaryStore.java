@@ -57,7 +57,8 @@ public final class BinaryStore {
         Path target = path(c.name());
         if (isInstalled(c)) return target;
         Files.createDirectories(bin);
-        String asset = c.asset(platform), want = pinned.apply(c);
+        String asset = c.asset(platform);
+        String want = pinned.apply(c);
         if (want == null) throw new IOException(asset + " " + c.tag() + " has no pinned SHA-256 (native/pin-hashes.sh)");
 
         Downloads.fetch(releaseBase.apply(c) + "/" + asset, 0, want, target, asset, p -> { }, part -> part.toFile().setExecutable(true, true));
@@ -67,14 +68,14 @@ public final class BinaryStore {
     }
 
     /** Copies the homeserver shipped inside the app when it's missing or another version. */
-    public Path installBundled(String name, Path source, String version) throws IOException {
+    public Path installBundled(String name, Path source, String bundledVersion) throws IOException {
         Path target = path(name);
-        if (Files.isExecutable(target) && version.equals(installedVersion(name))) return target;
+        if (Files.isExecutable(target) && bundledVersion.equals(installedVersion(name))) return target;
         Files.createDirectories(bin);
         try (var in = Files.newInputStream(source)) {
             SafeFile.at(target, ".part").beforeMove(part -> part.toFile().setExecutable(true, true)).copy(in);
         }
-        Files.writeString(bin.resolve(name + ".version"), version);
+        Files.writeString(bin.resolve(name + ".version"), bundledVersion);
         return target;
     }
 

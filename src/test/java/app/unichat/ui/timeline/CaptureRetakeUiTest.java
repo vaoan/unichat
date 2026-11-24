@@ -39,7 +39,9 @@ class CaptureRetakeUiTest {
 
     @AfterEach
     void close() throws Exception {
-        FxWait.fx(() -> { if (stage != null) stage.close(); return null; });
+        FxWait.onFx(() -> {
+            if (stage != null) stage.close();
+        });
     }
 
     private static ConversationShot.Shot shot(int height) {
@@ -66,7 +68,7 @@ class CaptureRetakeUiTest {
         });
         FxWait.until("the sheet is drawn", () -> FxWait.fx(() -> overlay.lookup(".check-box") != null)); // a scroll pane's content comes with its skin
         CheckBox footer = FxWait.fx(() -> (CheckBox) overlay.lookup(".check-box"));
-        FxWait.fx(() -> { footer.fire(); return null; }); // a second take, while the first is still being made
+        FxWait.onFx(footer::fire);  // a second take, while the first is still being made
         assertEquals(2, takes.size());
         takes.get(1).complete(shot(500)); // the newer one first
         takes.get(0).complete(shot(900)); // then the older

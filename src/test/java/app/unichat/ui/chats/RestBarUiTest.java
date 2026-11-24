@@ -90,11 +90,11 @@ class RestBarUiTest {
         toolkit();
         RestBar bar = show(13);
         assertEquals(List.of(false), told, "where the window starts");
-        FxWait.fx(() -> { archiveOpen.set(true); return null; });
-        FxWait.fx(() -> { archiveOpen.set(false); return null; });
+        FxWait.onFx(() -> archiveOpen.set(true));
+        FxWait.onFx(() -> archiveOpen.set(false));
         assertEquals(List.of(false, true, false), told);
         close(bar);
-        FxWait.fx(() -> { archiveOpen.set(true); return null; });
+        FxWait.onFx(() -> archiveOpen.set(true));
         assertEquals(3, told.size(), "a bar gone tells nothing");
         assertTrue(listeners.isEmpty(), "and stops listening");
     }
@@ -120,7 +120,7 @@ class RestBarUiTest {
         assertTrue(FxWait.fx(bar::isVisible), "said for a moment");
         assertTrue(FxWait.fx(() -> bar.getAccessibleText().contains("Al día")));
         assertEquals(1, later.size());
-        FxWait.fx(() -> { later.getFirst().run(); return null; });
+        FxWait.onFx(() -> later.getFirst().run());
         assertFalse(FxWait.fx(bar::isVisible), "then it goes");
         close(bar);
     }
@@ -147,10 +147,15 @@ class RestBarUiTest {
         app.unichat.model.Chat archived = new app.unichat.model.Chat("!c1:x");
         archived.setArchived(true);
         app.unichat.model.Chat inbox = new app.unichat.model.Chat("!n:x");
-        FxWait.fx(() -> { bar.chatOpened(archived); return null; });
+        FxWait.onFx(() -> bar.chatOpened(archived));
         assertTrue(opened.isEmpty(), "outside the archive: no server comes back");
         assertEquals(List.of("!c1:x"), shown, "but the chat shown never rests, however it was opened");
-        FxWait.fx(() -> { archiveOpen.set(true); bar.chatOpened(inbox); bar.chatOpened(archived); bar.serverOpened(archived); return null; });
+        FxWait.onFx(() -> {
+            archiveOpen.set(true);
+            bar.chatOpened(inbox);
+            bar.chatOpened(archived);
+            bar.serverOpened(archived);
+        });
         assertEquals(List.of("!c1:x", "!c1:x"), opened, "only the archived one, in the archive, as a chat or a server");
         assertEquals(List.of("!c1:x", "!n:x", "!c1:x"), shown, "a server's channels showing isn't a chat shown");
         close(bar);

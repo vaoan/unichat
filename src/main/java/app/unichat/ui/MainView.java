@@ -552,8 +552,8 @@ public final class MainView extends StackPane {
     }
 
     /** The gear among the profile's actions: the chat's own options, what it saves of what arrives among them. */
-    private void offerChatOptions(ChatService svc) {
-        ChatOptions options = new ChatOptions(svc, this::showOverlay, this::hideOverlay, this::toast);
+    private void offerChatOptions(ChatService service) {
+        ChatOptions options = new ChatOptions(service, this::showOverlay, this::hideOverlay, this::toast);
         chatOptions = chat -> options.open(chat, () -> thread.composer().focus());
         info.setOnOptions(chatOptions);
         info.setOnJump(thread::jumpToMessage);
@@ -565,8 +565,8 @@ public final class MainView extends StackPane {
     }
 
     /** The clip's "Foto protegida contra IA": asks how hard, then protects and sends ({@link CloakSend}). */
-    private void offerProtectedPhotos(ChatService svc) {
-        CloakSend cloak = new CloakSend(svc, this::showOverlay, this::hideOverlay, this::toast);
+    private void offerProtectedPhotos(ChatService service) {
+        CloakSend cloak = new CloakSend(service, this::showOverlay, this::hideOverlay, this::toast);
         protectPhoto = () -> {
             if (thread.chat() != null) cloak.open(thread.chat().id(), () -> thread.composer().focus());
         };
@@ -599,10 +599,10 @@ public final class MainView extends StackPane {
     }
 
     /** The chat's questions and sheets, in the window's overlay: forwarding, deleting, capturing, what a message said. */
-    private void sheets(ChatService svc) {
-        thread.setForwardSheet(new app.unichat.ui.timeline.ForwardSheet(svc, this::showOverlay, this::hideOverlay, forwards::show));
+    private void sheets(ChatService service) {
+        thread.setForwardSheet(new app.unichat.ui.timeline.ForwardSheet(service, this::showOverlay, this::hideOverlay, forwards::show));
         thread.setDeleteSheet(new app.unichat.ui.timeline.DeleteSheet(this::showOverlay, this::hideOverlay));
-        thread.setCaptureSheet(new app.unichat.ui.timeline.CaptureSheet(svc, this::showOverlay, this::hideOverlay, this::toast));
+        thread.setCaptureSheet(new app.unichat.ui.timeline.CaptureSheet(service, this::showOverlay, this::hideOverlay, this::toast));
         thread.setSavedTextSheet(new app.unichat.ui.timeline.SavedTextSheet(this::showOverlay, this::hideOverlay, this::toast));
     }
 

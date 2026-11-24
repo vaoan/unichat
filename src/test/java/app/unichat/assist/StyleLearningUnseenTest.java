@@ -69,7 +69,10 @@ class StyleLearningUnseenTest {
     void onlyTheLatestPerChatIsKept() throws Exception {
         StyleLearning learning = learning();
         List<String> prompts = new CopyOnWriteArrayList<>();
-        StyleLearner.Program program = p -> { prompts.add(p); return "- tutea"; };
+        StyleLearner.Program program = p -> {
+            prompts.add(p);
+            return "- tutea";
+        };
         Seen.reset(false);
         CompletableFuture<Void> first = learning.request("!a", mine("!a", "$1", "mensaje viejo"), program);
         CompletableFuture<Void> second = learning.request("!a", mine("!a", "$2", "mensaje nuevo"), program);
@@ -85,7 +88,10 @@ class StyleLearningUnseenTest {
     void eachChatKeepsItsOwnLatest() throws Exception {
         StyleLearning learning = learning();
         List<String> prompts = new CopyOnWriteArrayList<>();
-        StyleLearner.Program program = p -> { prompts.add(p); return "- tutea"; };
+        StyleLearner.Program program = p -> {
+            prompts.add(p);
+            return "- tutea";
+        };
         Seen.reset(false);
         CompletableFuture<Void> a = learning.request("!a", mine("!a", "$1", "del chat a"), program);
         CompletableFuture<Void> b = learning.request("!b", mine("!b", "$2", "del chat b"), program);

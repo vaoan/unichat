@@ -49,7 +49,10 @@ public final class ProfileMedia {
         static final int MAX = 60;
 
         static Contents of(List<Message> messages) {
-            List<Message> photos = new ArrayList<>(), videos = new ArrayList<>(), audios = new ArrayList<>(), files = new ArrayList<>();
+            List<Message> photos = new ArrayList<>();
+            List<Message> videos = new ArrayList<>();
+            List<Message> audios = new ArrayList<>();
+            List<Message> files = new ArrayList<>();
             List<Link> links = new ArrayList<>();
             for (int i = messages.size() - 1; i >= 0; i--) {
                 Message m = messages.get(i);
@@ -107,8 +110,8 @@ public final class ProfileMedia {
     }
 
     /** "Ir al mensaje": shows in the chat the message a thing was shared in. */
-    public void setOnJump(Consumer<Message> jump) {
-        this.jump = jump;
+    public void setOnJump(Consumer<Message> onJump) {
+        this.jump = onJump;
     }
 
     /** The section for {@code c}; nothing when nothing was shared or the chat hides it. */

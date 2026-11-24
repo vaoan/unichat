@@ -61,7 +61,8 @@ public final class GifFrames {
             try {
                 r.setInput(in, false);
                 int count = r.getNumImages(true);
-                int w = 0, h = 0;
+                int w = 0;
+                int h = 0;
                 Node screen = child(r.getStreamMetadata() == null ? null : tree(r.getStreamMetadata()), "LogicalScreenDescriptor");
                 if (screen != null) {
                     w = intAttr(screen, "logicalScreenWidth", 0);
@@ -76,7 +77,8 @@ public final class GifFrames {
                 for (int i = 0; i < count; i++) {
                     BufferedImage patch = i == 0 ? first : r.read(i);
                     Node meta = tree(r.getImageMetadata(i));
-                    Node desc = child(meta, "ImageDescriptor"), gce = child(meta, "GraphicControlExtension");
+                    Node desc = child(meta, "ImageDescriptor");
+                    Node gce = child(meta, "GraphicControlExtension");
                     int x = desc == null ? 0 : intAttr(desc, "imageLeftPosition", 0);
                     int y = desc == null ? 0 : intAttr(desc, "imageTopPosition", 0);
                     int delay = gce == null ? 0 : intAttr(gce, "delayTime", 0) * 10;

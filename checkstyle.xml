@@ -1,16 +1,104 @@
 <?xml version="1.0"?>
 <!DOCTYPE module PUBLIC "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN" "https://checkstyle.org/dtds/configuration_1_3.dtd">
-<!-- Size limits only: see docs/ARCHITECTURE.md. -->
+<!-- Size limits (docs/ARCHITECTURE.md) and the checks that catch defects or unclear code, on main and test code.
+     No layout check (indentation, whitespace, line length, braces, blank lines): the code has no formatting style to
+     force. Every finding fails the build. A finding kept on purpose is one member's
+     @SuppressWarnings("checkstyle:name") // why (SuppressionsHaveReasonsTest); no file or package is left out
+     (BuildRulesTest). -->
 <module name="Checker">
   <property name="severity" value="error"/>
+  <!-- Reads @SuppressWarnings("checkstyle:...") from SuppressWarningsHolder: one member at a time. -->
+  <module name="SuppressWarningsFilter"/>
   <module name="FileLength">
     <property name="max" value="800"/>
     <property name="fileExtensions" value="java"/>
   </module>
   <module name="TreeWalker">
+    <module name="SuppressWarningsHolder"/>
     <module name="MethodLength">
       <property name="max" value="100"/>
       <property name="tokens" value="METHOD_DEF, CTOR_DEF, COMPACT_CTOR_DEF"/>
     </module>
+
+    <!-- equals and hashCode: one without the other breaks every hash set and map. -->
+    <module name="EqualsHashCode"/>
+    <!-- equals(Foo) overloads equals(Object) instead of overriding it. -->
+    <module name="CovariantEquals"/>
+    <!-- == on strings compares identity. -->
+    <module name="StringLiteralEquality"/>
+
+    <!-- switch: a case that falls into the next one by mistake, a default lost in the middle.
+         MissingSwitchDefault is left out: it wants a default even in a switch over every constant of an enum, which
+         Error Prone's UnnecessaryDefaultInEnumSwitch (an error here) forbids, since the default would hide the next
+         constant added; a switch that can miss a value without a default is PMD's NonExhaustiveSwitch, which knows
+         an enum switch that names every constant. -->
+    <module name="FallThrough"/>
+    <module name="DefaultComesLast"/>
+
+    <!-- Statements that read as something else. -->
+    <module name="InnerAssignment"/>
+    <module name="OneStatementPerLine"/>
+    <module name="MultipleVariableDeclarations"/>
+    <module name="EmptyStatement"/>
+    <module name="SimplifyBooleanExpression"/>
+    <module name="SimplifyBooleanReturn"/>
+    <!-- A catch that swallows the exception silently; a name or comment says it's on purpose. -->
+    <module name="EmptyCatchBlock">
+      <property name="exceptionVariableName" value="expected|ignored|_"/>
+    </module>
+    <!-- A local or parameter named as a field hides it. Constructors, setters and builders (a setter returning its
+         own class) take the field's name on purpose, and so do a record's withers (RecordComponent). -->
+    <module name="HiddenField">
+      <property name="ignoreConstructorParameter" value="true"/>
+      <property name="ignoreSetter" value="true"/>
+      <property name="setterCanReturnItsClass" value="true"/>
+      <property name="ignoreAbstractMethods" value="true"/>
+    </module>
+    <!-- finalize() is deprecated and never runs reliably. -->
+    <module name="NoFinalizer"/>
+    <!-- IllegalInstantiation is left out: new Boolean/Integer/Long(...) are deprecated for removal, so javac's
+         -Xlint:all -Werror already fails on them, and the other classes it would name (String) have constructors
+         the code needs (new String(bytes, charset)). -->
+    <!-- 1l reads as 11. -->
+    <module name="UpperEll"/>
+    <!-- int a[]: the type is split from its name. -->
+    <module name="ArrayTypeStyle"/>
+
+    <!-- Modifiers: in the JLS order, none that says nothing (public in an interface, final in a record, ...). -->
+    <module name="ModifierOrder"/>
+    <module name="RedundantModifier"/>
+
+    <!-- Imports: none unused, none with a star (where a name comes from stays readable). -->
+    <module name="UnusedImports"/>
+    <module name="AvoidStarImport"/>
+    <module name="RedundantImport"/>
+
+    <!-- One top-level class per file, named as the file, in a package. -->
+    <module name="OneTopLevelClass"/>
+    <module name="OuterTypeFilename"/>
+    <module name="PackageDeclaration"/>
+
+    <!-- Naming, as the code writes it. -->
+    <module name="PackageName"/>
+    <module name="TypeName"/>
+    <module name="MethodName"/>
+    <module name="MemberName"/>
+    <module name="StaticVariableName"/>
+    <module name="ConstantName"/>
+    <module name="ParameterName"/>
+    <module name="LambdaParameterName"/>
+    <!-- Any name a local could have: the code names a second catch's exception after the first (e, f, g; ie). -->
+    <module name="CatchParameterName">
+      <property name="format" value="^(_|[a-z][a-zA-Z0-9]*)$"/>
+    </module>
+    <module name="LocalVariableName"/>
+    <module name="LocalFinalVariableName"/>
+    <module name="PatternVariableName"/>
+    <module name="RecordComponentName"/>
+    <module name="ClassTypeParameterName"/>
+    <module name="MethodTypeParameterName"/>
+    <module name="InterfaceTypeParameterName"/>
+    <module name="RecordTypeParameterName"/>
+    <module name="IllegalIdentifierName"/>
   </module>
 </module>

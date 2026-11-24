@@ -83,11 +83,19 @@ class ChatFilterTest {
     @Test
     void inboxBadgeCountMatchesNoLeidosFilterForEveryFlagMix() {
         // The bug: badge said "1" but "No leídos" was empty. Badge and the filter must count the same chats.
-        Chat plain = chat("plain", Network.WHATSAPP, 10); plain.setUnreadCount(1);
-        Chat low = chat("low", Network.WHATSAPP, 20); low.setUnreadCount(1); low.setLowPriority(true);
-        Chat muted = chat("muted", Network.WHATSAPP, 30); muted.setUnreadCount(1); muted.setMuted(true);
-        Chat archived = chat("archived", Network.WHATSAPP, 40); archived.setUnreadCount(1); archived.setArchived(true);
-        Chat marked = chat("marked", Network.TELEGRAM, 50); marked.setMarkedUnread(true);
+        Chat plain = chat("plain", Network.WHATSAPP, 10);
+        plain.setUnreadCount(1);
+        Chat low = chat("low", Network.WHATSAPP, 20);
+        low.setUnreadCount(1);
+        low.setLowPriority(true);
+        Chat muted = chat("muted", Network.WHATSAPP, 30);
+        muted.setUnreadCount(1);
+        muted.setMuted(true);
+        Chat archived = chat("archived", Network.WHATSAPP, 40);
+        archived.setUnreadCount(1);
+        archived.setArchived(true);
+        Chat marked = chat("marked", Network.TELEGRAM, 50);
+        marked.setMarkedUnread(true);
         Chat read = chat("read", Network.WHATSAPP, 60);
         List<Chat> all = List.of(plain, low, muted, archived, marked, read);
 
@@ -99,10 +107,17 @@ class ChatFilterTest {
 
     @Test
     void inboxUnreadExcludesLowPriorityMutedArchivedAndBots() {
-        Chat low = chat("low", Network.WHATSAPP, 10); low.setUnreadCount(1); low.setLowPriority(true);
-        Chat muted = chat("muted", Network.WHATSAPP, 10); muted.setUnreadCount(1); muted.setMuted(true);
-        Chat bot = chat("bot", Network.WHATSAPP, 10); bot.setUnreadCount(1); bot.setBridgeBot(true);
-        Chat ok = chat("ok", Network.WHATSAPP, 10); ok.setUnreadCount(1);
+        Chat low = chat("low", Network.WHATSAPP, 10);
+        low.setUnreadCount(1);
+        low.setLowPriority(true);
+        Chat muted = chat("muted", Network.WHATSAPP, 10);
+        muted.setUnreadCount(1);
+        muted.setMuted(true);
+        Chat bot = chat("bot", Network.WHATSAPP, 10);
+        bot.setUnreadCount(1);
+        bot.setBridgeBot(true);
+        Chat ok = chat("ok", Network.WHATSAPP, 10);
+        ok.setUnreadCount(1);
         assertFalse(ChatFilter.inboxUnread(low));
         assertFalse(ChatFilter.inboxUnread(muted));
         assertFalse(ChatFilter.inboxUnread(bot));

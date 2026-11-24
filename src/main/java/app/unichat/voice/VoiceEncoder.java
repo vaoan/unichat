@@ -98,7 +98,9 @@ final class VoiceEncoder implements AutoCloseable {
         int bars = Math.min(WAVEFORM_BARS, peaks.size());
         List<Integer> out = new ArrayList<>(bars);
         for (int b = 0; b < bars; b++) {
-            int from = b * peaks.size() / bars, to = (b + 1) * peaks.size() / bars, max = 0;
+            int from = b * peaks.size() / bars;
+            int to = (b + 1) * peaks.size() / bars;
+            int max = 0;
             for (int i = from; i < to; i++) max = Math.max(max, peaks.get(i));
             out.add(max * 1024 / 32767);
         }

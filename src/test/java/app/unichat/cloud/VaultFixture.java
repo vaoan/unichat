@@ -21,7 +21,8 @@ import static java.nio.charset.StandardCharsets.UTF_8;
  * on this computer is put back on {@link #close}.
  */
 public final class VaultFixture implements AutoCloseable {
-    public static final String HERE = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", OTHER = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
+    public static final String HERE = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44";
+    public static final String OTHER = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
     private static final List<String> ACCOUNT = List.of("cloud.service", "cloud.url", "cloud.user", "cloud.secret", "cloud.settingsBase");
 
     private final FakeDav dav;

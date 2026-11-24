@@ -24,9 +24,12 @@ import java.util.UUID;
  * the account is untrusted: what isn't a vault or a slot reads as none.
  */
 final class Vault {
-    static final String ROOT = CloudAccount.ROOT + "/Vault", SLOTS = ROOT + "/keys", INFO = ROOT + "/vault.json";
+    static final String ROOT = CloudAccount.ROOT + "/Vault";
+    static final String SLOTS = ROOT + "/keys";
+    static final String INFO = ROOT + "/vault.json";
     static final int MIN_PASSWORD = 12;
-    private static final String JSON_FILE = ".json", VOUCH = "vouch";
+    private static final String JSON_FILE = ".json";
+    private static final String VOUCH = "vouch";
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private Vault() {}

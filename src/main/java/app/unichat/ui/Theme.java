@@ -105,7 +105,8 @@ public final class Theme {
 
     /** WCAG contrast ratio between two #RRGGBB colors. */
     static double contrast(String a, String b) {
-        double la = luminance(a), lb = luminance(b);
+        double la = luminance(a);
+        double lb = luminance(b);
         return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
     }
 
@@ -122,7 +123,9 @@ public final class Theme {
     /** Darkens {@code hex} until white text on it reaches 4.5:1 (WCAG AA). */
     static String accessibleAccent(String hex) {
         int rgb = Integer.parseInt(hex.substring(1), 16);
-        int r = (rgb >> 16) & 255, g = (rgb >> 8) & 255, b = rgb & 255;
+        int r = (rgb >> 16) & 255;
+        int g = (rgb >> 8) & 255;
+        int b = rgb & 255;
         String cur = hex;
         for (int i = 0; i < 40 && contrast(cur, "#FFFFFF") < 4.5; i++) {
             r = (int) (r * 0.93);

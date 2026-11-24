@@ -93,19 +93,22 @@ class VaultPageUiTest extends VaultPageTestBase {
                 SettingsWindow.show(o, svc, () -> { }, () -> { }, id -> { }, t -> { });
                 return o;
             });
-            FxWait.fx(() -> { SettingsWindow.select("networks"); return null; });
+            FxWait.onFx(() -> SettingsWindow.select("networks"));
             FxWait.until("Telegram's keys", () -> SettingsWindow.current().getScene().getRoot().lookup(".telegram-api-id") != null);
             TextField id = FxWait.fx(() -> (TextField) SettingsWindow.current().getScene().getRoot().lookup(".telegram-api-id"));
             assertTrue(FxWait.fx(() -> id.isEditable() && !id.isDisabled()), where + ": Telegram's keys typed here");
-            FxWait.fx(() -> { SettingsWindow.select("gifs"); return null; });
+            FxWait.onFx(() -> SettingsWindow.select("gifs"));
             String keyOf = I18n.t("settings.gifs.keyOf", gif.name());
             FxWait.until("the GIF key's field", () -> SettingsWindow.current().getScene().getRoot().lookupAll(".password-field").stream()
                 .anyMatch(p -> keyOf.equals(p.getAccessibleText())));
             PasswordField key = FxWait.fx(() -> SettingsWindow.current().getScene().getRoot().lookupAll(".password-field").stream()
                 .map(n -> (PasswordField) n).filter(p -> keyOf.equals(p.getAccessibleText())).findFirst().orElseThrow());
-            FxWait.fx(() -> { key.setText("clave-" + where); return null; });
+            FxWait.onFx(() -> key.setText("clave-" + where));
             assertEquals("clave-" + where, Settings.get().getString("gif." + gif.id() + ".key", null), where + ": kept here as before");
-            FxWait.fx(() -> { SettingsWindow.current().close(); owner.close(); return null; });
+            FxWait.onFx(() -> {
+                SettingsWindow.current().close();
+                owner.close();
+            });
         } finally {
             svc.stop();
         }
@@ -136,7 +139,7 @@ class VaultPageUiTest extends VaultPageTestBase {
         typeGroups(code, false);
         waitFor(I18n.t("settings.vault.code.wrongGroups"));
         assertTrue(account.cloud().vault().vaultView().get().codeUnconfirmed(), "not taken as kept");
-        FxWait.fx(() -> { button(I18n.t("settings.vault.code.showAgain")).fire(); return null; });
+        FxWait.onFx(() -> button(I18n.t("settings.vault.code.showAgain")).fire());
         assertEquals(code, clip, "still copied while it's being kept");
         typeGroups(code, true);
         waitOpen();
@@ -159,7 +162,8 @@ class VaultPageUiTest extends VaultPageTestBase {
     void aVaultMadeWhileMediaGoesUpIsntReadAgainAtEachProgressTick() throws Exception {
         account.cloud().syncNow().get(); // connected: the page follows the rounds
         account.photos(6);
-        VaultFixture.Held first = account.holdPhoto(0), last = account.holdPhoto(5);
+        VaultFixture.Held first = account.holdPhoto(0);
+        VaultFixture.Held last = account.holdPhoto(5);
         var media = account.cloud().syncNow();
         first.arrived();
         page();
@@ -246,7 +250,7 @@ class VaultPageUiTest extends VaultPageTestBase {
         page();
         waitFor(I18n.t("settings.vault.locked"));
         type(I18n.t("settings.vault.open.field.RECOVERY"), code.toLowerCase(java.util.Locale.ROOT).replace('-', ' '));
-        FxWait.fx(() -> { field(I18n.t("settings.vault.open.field.RECOVERY")).fireEvent(new ActionEvent()); return null; }); // Enter
+        FxWait.onFx(() -> field(I18n.t("settings.vault.open.field.RECOVERY")).fireEvent(new ActionEvent()));  // Enter
         waitOpen();
         assertEquals(Cloud.VaultState.OPEN, round());
     }
@@ -387,7 +391,7 @@ class VaultPageUiTest extends VaultPageTestBase {
         String before = I18n.t("settings.cloud.notYet");
         FxWait.until("the status line", () -> s.getScene().getRoot().lookupAll(".label").stream()
             .anyMatch(n -> before.equals(((Labeled) n).getText())));
-        FxWait.fx(() -> { s.close(); return null; });
+        FxWait.onFx(s::close);
         account.cloud().syncNow().get();
         FxWait.settled();
         assertTrue(FxWait.fx(() -> s.getScene().getRoot().lookupAll(".label").stream().anyMatch(n -> before.equals(((Labeled) n).getText()))),
@@ -415,7 +419,7 @@ class VaultPageUiTest extends VaultPageTestBase {
         assertTrue(FxWait.fx(saysBefore::call), "unseen: nothing heard");
         app.unichat.support.Seen.reset(true);
         FxWait.until("seen again: the round that went meanwhile", () -> !saysBefore.call());
-        FxWait.fx(() -> { s.close(); return null; });
+        FxWait.onFx(s::close);
     }
 
     @Test
@@ -717,7 +721,10 @@ class VaultPageUiTest extends VaultPageTestBase {
         }
         FxWait.settled();
         List<String> bad = FxWait.fx(() -> SettingsLayoutUiTest.squeezed(SettingsWindow.current().getScene().getRoot(), where));
-        FxWait.fx(() -> { SettingsWindow.current().close(); owner.close(); return null; });
+        FxWait.onFx(() -> {
+            SettingsWindow.current().close();
+            owner.close();
+        });
         return bad;
     }
 }

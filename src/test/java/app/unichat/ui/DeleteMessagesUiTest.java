@@ -89,7 +89,9 @@ class DeleteMessagesUiTest {
         w = TimelineWindow.open(4, "mensaje %d");
         w.svc.receive(CHAT, "esto lo escribió Andrés");
         List<Message> mine = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(m -> m.body().startsWith("mensaje")).toList());
-        Message first = mine.get(1), last = mine.get(3), theirs = w.newest();
+        Message first = mine.get(1);
+        Message last = mine.get(3);
+        Message theirs = w.newest();
         FxWait.until("they're listed", () -> w.cellOf(first) != null && w.cellOf(theirs) != null);
 
         TimelineWindow.fire(w.menuItem(first, "Eliminar varios…"));

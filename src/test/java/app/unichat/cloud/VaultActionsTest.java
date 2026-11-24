@@ -33,15 +33,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * with the key changed, and what the page is shown of it.
  */
 class VaultActionsTest {
-    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55",
-        OTHER = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
+    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44";
+    private static final String LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
+    private static final String OTHER = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
     private static final String PASSWORD = "una contraseña larga";
 
     @TempDir
     Path dir;
     private FakeDav cloud;
-    private Map<String, String> portableWere, keysWere;
-    private VaultComputer desk, laptop;
+    private Map<String, String> portableWere;
+    private Map<String, String> keysWere;
+    private VaultComputer desk;
+    private VaultComputer laptop;
 
     @BeforeEach
     void start() throws Exception {

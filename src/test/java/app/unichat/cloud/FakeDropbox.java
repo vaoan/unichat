@@ -24,11 +24,13 @@ final class FakeDropbox implements AutoCloseable {
     final Map<String, Integer> revs = new ConcurrentHashMap<>();
     final Set<String> folders = ConcurrentHashMap.newKeySet();
     final Map<String, ByteArrayOutputStream> sessions = new ConcurrentHashMap<>();
-    final AtomicInteger tokensMade = new AtomicInteger(), sessionCalls = new AtomicInteger();
+    final AtomicInteger tokensMade = new AtomicInteger();
+    final AtomicInteger sessionCalls = new AtomicInteger();
     /** The PKCE challenge the browser was sent with, and the code Dropbox gives back for it. */
     volatile String challenge;
     private final HttpServer server;
-    private final String appKey, refresh;
+    private final String appKey;
+    private final String refresh;
     private volatile String access = "none";
 
     FakeDropbox(String appKey, String refresh) throws IOException {
@@ -56,13 +58,17 @@ final class FakeDropbox implements AutoCloseable {
     private void list(HttpExchange x, String dir, boolean rest) throws IOException {
         Set<String> names = new java.util.TreeSet<>();
         boolean there = folders.contains(dir);
-        for (String f : files.keySet()) if (f.startsWith(dir + "/")) { names.add(f.substring(dir.length() + 1).split("/")[0]); there = true; }
+        for (String f : files.keySet()) if (f.startsWith(dir + "/")) {
+            names.add(f.substring(dir.length() + 1).split("/")[0]);
+            there = true;
+        }
         for (String d : folders) if (d.startsWith(dir + "/")) names.add(d.substring(dir.length() + 1).split("/")[0]);
         if (!there) {
             reply(x, 409, "{\"error_summary\": \"path/not_found/..\"}");
             return;
         }
-        List<String> all = List.copyOf(names), page = rest ? all.subList(Math.min(1, all.size()), all.size()) : all.subList(0, Math.min(1, all.size()));
+        List<String> all = List.copyOf(names);
+        List<String> page = rest ? all.subList(Math.min(1, all.size()), all.size()) : all.subList(0, Math.min(1, all.size()));
         com.fasterxml.jackson.databind.node.ObjectNode out = JSON.createObjectNode();
         com.fasterxml.jackson.databind.node.ArrayNode entries = out.putArray("entries");
         for (String n : page) entries.addObject().put("name", n);

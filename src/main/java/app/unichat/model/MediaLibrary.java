@@ -190,7 +190,8 @@ public final class MediaLibrary {
     static boolean same(Item a, Item b) {
         if (a.kind() != b.kind()) return false;
         if (a.url().equals(b.url())) return true;
-        String idA = bridgeId(a), idB = bridgeId(b);
+        String idA = bridgeId(a);
+        String idB = bridgeId(b);
         if (idA != null && idB != null) return idA.equals(idB);
         long size = size(a);
         return size > 0 && size == size(b) && a.width() == b.width() && a.height() == b.height()
@@ -219,7 +220,8 @@ public final class MediaLibrary {
 
     private void save() {
         ObjectNode root = JSON.createObjectNode();
-        ArrayNode fav = root.putArray("favorites"), rec = root.putArray("recents");
+        ArrayNode fav = root.putArray("favorites");
+        ArrayNode rec = root.putArray("recents");
         favorites.forEach(i -> fav.add(node(i)));
         recents.forEach(i -> rec.add(node(i)));
         ObjectNode react = root.putObject("reactions");

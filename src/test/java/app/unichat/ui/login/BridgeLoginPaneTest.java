@@ -39,7 +39,8 @@ class BridgeLoginPaneTest {
     void qrDecodesBackToTheBridgesData() throws Exception {
         String data = "2@AbCdEf,GhIj+kl/mn==,opQR,stUV==";
         WritableImage img = BridgeLoginPane.qr(data, 260);
-        int w = (int) img.getWidth(), h = (int) img.getHeight();
+        int w = (int) img.getWidth();
+        int h = (int) img.getHeight();
         int[] px = new int[w * h];
         for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) px[y * w + x] = img.getPixelReader().getArgb(x, y);
         LuminanceSource src = new RGBLuminanceSource(w, h, px);

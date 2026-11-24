@@ -24,11 +24,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** What was plain moving into the vault, each plain copy going only once its sealed copy reads back; and the strays after. */
 class VaultMoveTest {
-    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55",
-        OLD = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
-    private static final String SETTINGS = CloudAccount.SETTINGS_FILE, AI = "Unichat/Settings/unichat-ai.json",
-        PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg", NOTES = "Unichat/Settings/notas.txt";
-    private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl", NEXT = "3f2a9c1b2d4e 2026-12.jsonl", LATER = "3f2a9c1b2d4e 2027-01.jsonl";
+    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44";
+    private static final String LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
+    private static final String OLD = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
+    private static final String SETTINGS = CloudAccount.SETTINGS_FILE;
+    private static final String AI = "Unichat/Settings/unichat-ai.json";
+    private static final String PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg";
+    private static final String NOTES = "Unichat/Settings/notas.txt";
+    private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl";
+    private static final String NEXT = "3f2a9c1b2d4e 2026-12.jsonl";
+    private static final String LATER = "3f2a9c1b2d4e 2027-01.jsonl";
     private static final Instant T = Instant.parse("2026-11-19T08:00:00Z");
     private static final List<String> KEYS = List.of(VaultMove.MOVED_AT, VaultMove.QUIET_SINCE, VaultMove.STRAYS_SEEN, VaultMove.RECORD, VaultActions.UNCONFIRMED);
 
@@ -135,7 +140,8 @@ class VaultMoveTest {
     @Test
     void aPlainCopyGoesOnlyOnceItsSealedCopyReadsBack() throws Exception {
         plainTexts(LAPTOP, "{\"a\":1}\n");
-        String text = TextSync.ROOT + "/" + LAPTOP + "/" + TEXT, sealedText = Vault.ROOT + "/Texts/" + LAPTOP + "/" + TEXT;
+        String text = TextSync.ROOT + "/" + LAPTOP + "/" + TEXT;
+        String sealedText = Vault.ROOT + "/Texts/" + LAPTOP + "/" + TEXT;
         boolean[] failed = {false};
         beforeSealedGet = p -> {
             // The read-back after copying it in: the first time, the network drops.
@@ -194,7 +200,8 @@ class VaultMoveTest {
         assertTrue(opened(TextSync.ROOT + "/" + LAPTOP + "/index.json").contains(TEXT), "and its index says so, for the others");
         assertEquals(T.toString(), Settings.get().getString(VaultMove.MOVED_AT, null));
 
-        int puts = cloud.puts.get(), gets = cloud.gets.get();
+        int puts = cloud.puts.get();
+        int gets = cloud.gets.get();
         VaultMove.Result again = run(T.plusSeconds(60));
         assertEquals(List.of(), again.moved());
         assertEquals(List.of(), again.strays());
@@ -235,7 +242,9 @@ class VaultMoveTest {
 
     @Test
     void strayCopiesGoOnceItsQuietForADay() throws Exception {
-        String first = "{\"viejo\":1}\n", next = "{\"nuevo\":1}\n", later = "{\"luego\":1}\n";
+        String first = "{\"viejo\":1}\n";
+        String next = "{\"nuevo\":1}\n";
+        String later = "{\"luego\":1}\n";
         plainTexts(OLD, first);
         run(T);
         plainBundle(SETTINGS, LAPTOP, T, "DARK");
@@ -274,7 +283,8 @@ class VaultMoveTest {
 
     @Test
     void aLongerPlainFileNeverReplacesASealedOne() throws Exception {
-        String first = "{\"viejo\":1}\n", longer = "{\"viejo\":1}\n{\"puesto\":2}\n";
+        String first = "{\"viejo\":1}\n";
+        String longer = "{\"viejo\":1}\n{\"puesto\":2}\n";
         plainTexts(OLD, first);
         run(T);
         assertEquals(first, opened(TextSync.ROOT + "/" + OLD + "/" + TEXT));
@@ -288,7 +298,8 @@ class VaultMoveTest {
     @Test
     void aPlainFileRewrittenWhileItMovesStays() throws Exception {
         plainTexts(OLD, "{\"viejo\":1}\n");
-        String text = TextSync.ROOT + "/" + OLD + "/" + TEXT, longer = "{\"viejo\":1}\n{\"viejo\":2}\n";
+        String text = TextSync.ROOT + "/" + OLD + "/" + TEXT;
+        String longer = "{\"viejo\":1}\n{\"viejo\":2}\n";
         int[] stamps = {0};
         Storage plain = new Through(dav()) {
             @Override public String stamp(String path) throws IOException {
@@ -309,7 +320,8 @@ class VaultMoveTest {
     @Test
     void aComputerOfTheVaultIsTheOnlyWriterOfItsTextsAndOnlyItsCopyLetsThePlainGo() throws Exception {
         Vault.addComputer(dav(), vault.vk(), LAPTOP, "Portátil");
-        String text = TextSync.ROOT + "/" + LAPTOP + "/" + TEXT, longer = "{\"suyo\":1}\n{\"suyo\":2}\n";
+        String text = TextSync.ROOT + "/" + LAPTOP + "/" + TEXT;
+        String longer = "{\"suyo\":1}\n{\"suyo\":2}\n";
         plainTexts(LAPTOP, "{\"suyo\":1}\n");
         sealedTexts(LAPTOP, "{}\n"); // it hasn't sent all of it sealed yet
         int versions = cloud.versions.get(Vault.ROOT + "/Texts/" + LAPTOP + "/" + TEXT);

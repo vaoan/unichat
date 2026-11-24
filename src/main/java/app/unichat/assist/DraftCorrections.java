@@ -72,8 +72,10 @@ public final class DraftCorrections {
      * (people write shorter than the AI) still shares most of what's left.
      */
     static double similarity(String a, String b) {
-        String x = normal(a), y = normal(b);
-        Map<String, Integer> px = pairs(x), py = pairs(y);
+        String x = normal(a);
+        String y = normal(b);
+        Map<String, Integer> px = pairs(x);
+        Map<String, Integer> py = pairs(y);
         int total = Math.max(x.length() - 1, 0) + Math.max(y.length() - 1, 0);
         if (total == 0) return x.equals(y) ? 1 : 0;
         int shared = 0;

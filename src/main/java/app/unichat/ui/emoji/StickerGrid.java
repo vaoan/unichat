@@ -109,7 +109,8 @@ public final class StickerGrid extends ScrollPane {
             found(search.getText(), accepted);
             return;
         }
-        String favorite = I18n.t("library.stickerFavorite"), recent = I18n.t("library.stickerRecent");
+        String favorite = I18n.t("library.stickerFavorite");
+        String recent = I18n.t("library.stickerRecent");
         section(I18n.t("library.favorites"), library.favorites(MediaLibrary.Kind.STICKER), i -> favorite, accepted,
                 Icons.iconButton(Icons.REPLAY, I18n.t("library.rebuildFavorites"), () -> rebuild(false)));
         section(I18n.t("library.recents"), library.recents(MediaLibrary.Kind.STICKER), i -> recent, accepted, null);

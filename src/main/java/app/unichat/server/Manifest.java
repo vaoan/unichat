@@ -72,12 +72,14 @@ public final class Manifest {
             if (line.isEmpty() || line.startsWith("#")) continue;
             int eq = line.indexOf('=');
             if (eq < 1) throw new IllegalArgumentException("Bad manifest line: " + line);
-            String key = line.substring(0, eq), value = line.substring(eq + 1);
+            String key = line.substring(0, eq);
+            String value = line.substring(eq + 1);
             if (key.equals(key.toUpperCase(Locale.ROOT))) {
                 settings.put(key, value);
                 continue;
             }
-            int at = value.indexOf('@'), colon = value.lastIndexOf(':');
+            int at = value.indexOf('@');
+            int colon = value.lastIndexOf(':');
             if (at < 1 || colon < at) throw new IllegalArgumentException("Bad manifest line: " + line);
             bridges.put(key, new Component(key, value.substring(0, at), value.substring(at + 1, colon), value.substring(colon + 1)));
         }

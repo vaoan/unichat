@@ -68,7 +68,7 @@ public final class Composer extends VBox {
     private final PauseTransition typingStop = new PauseTransition(Duration.seconds(4));
     private final Consumer<String> onError;
     /** Where a file or a voice note goes in its chat's turn; by default at once. */
-    private InTurn inTurn = (chat, send) -> send.run();
+    private InTurn inTurn = (chat, go) -> go.run();
 
     /** Sending something in its chat's turn, behind what's waiting there (texts being corrected before they go). */
     @FunctionalInterface
@@ -144,11 +144,11 @@ public final class Composer extends VBox {
             if (onPanel != null) onPanel.accept(SidePanel.lastMediaTab());
             else EmojiPicker.show(emoji, this::insert);
         });
-        Button send = Icons.iconButton(Icons.SEND, I18n.t("composer.send"), this::send);
-        send.getStyleClass().add("send-button");
-        send.disableProperty().bind(input.textProperty().map(String::isBlank));
+        Button button = Icons.iconButton(Icons.SEND, I18n.t("composer.send"), this::send);
+        button.getStyleClass().add("send-button");
+        button.disableProperty().bind(input.textProperty().map(String::isBlank));
 
-        this.send = send;
+        this.send = button;
         voice = new VoiceRecording(svc, onError, new VoiceRecording.Box() {
             @Override public String chatId() { return chatId; }
 
@@ -160,7 +160,7 @@ public final class Composer extends VBox {
 
             @Override public void showInstead(Node bar) { Composer.this.showInstead(bar); }
 
-            @Override public void inTurn(String chat, Runnable send) { inTurn.send(chat, send); }
+            @Override public void inTurn(String chat, Runnable go) { inTurn.send(chat, go); }
         });
         ai = new ComposerAi(svc, input, drafts, onError, new ComposerAi.Box() {
             @Override public String chatId() { return chatId; }
@@ -375,7 +375,8 @@ public final class Composer extends VBox {
     /** {@code batch}: through the upload queue even if it's a single file. Only the first file answers the reply. */
     private void send(List<File> files, SendAs as, boolean batch) {
         if (chatId == null || files == null || files.isEmpty()) return;
-        String reply = replyTo == null ? null : replyTo.id(), chat = chatId;
+        String reply = replyTo == null ? null : replyTo.id();
+        String chat = chatId;
         // In its turn: behind texts still being corrected before they go, so a caption sent first arrives first.
         inTurn.send(chat, () -> {
             if (files.size() == 1 && !batch) {
@@ -527,7 +528,8 @@ public final class Composer extends VBox {
      * holding the same text, and not an edit; anything else typed or another chat open meanwhile stays.
      */
     public Runnable clearLater() {
-        String chat = chatId, text = input.getText();
+        String chat = chatId;
+        String text = input.getText();
         return () -> {
             if (editing == null && java.util.Objects.equals(chat, chatId) && text.equals(input.getText())) {
                 input.clear();

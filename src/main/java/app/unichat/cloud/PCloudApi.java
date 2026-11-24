@@ -193,7 +193,8 @@ public final class PCloudApi implements Storage {
             return null;
         }
         String scheme = host.startsWith("http://") ? "http://" : "https://"; // the same as the API's (a test's is plain)
-        String hostPart = link.path("hosts").path(0).asText(), file = link.path("path").asText();
+        String hostPart = link.path("hosts").path(0).asText();
+        String file = link.path("path").asText();
         try {
             // Encoded already ("%20") it goes as it is; otherwise each character that needs it is encoded.
             return file.contains("%") ? URI.create(scheme + hostPart + file)

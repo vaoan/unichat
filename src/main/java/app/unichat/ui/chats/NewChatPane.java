@@ -261,7 +261,8 @@ public final class NewChatPane extends VBox {
      * number's spaces and signs). It was exact where the network searches, and case-sensitive on usernames.
      */
     static List<Contact> matching(List<Contact> all, String q) {
-        String n = ChatFilter.normalize(q), digits = q.replaceAll("\\D", "");
+        String n = ChatFilter.normalize(q);
+        String digits = q.replaceAll("\\D", "");
         return all.stream().filter(c -> ChatFilter.normalize(c.name()).contains(n)
                 || c.identifiers().stream().anyMatch(i -> ChatFilter.normalize(i).contains(n)
                         || (digits.length() >= 3 && i.replaceAll("\\D", "").contains(digits)))).toList();

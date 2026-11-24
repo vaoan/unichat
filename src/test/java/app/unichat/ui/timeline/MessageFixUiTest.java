@@ -121,7 +121,7 @@ class MessageFixUiTest {
         FxWait.until("listed", () -> FxWait.fx(() -> !thread.lookupAll(".bubble").isEmpty()));
         MenuItem fix = FxWait.fx(() -> thread.actions().messageMenu(m).getItems().stream()
                 .filter(i -> "Corregir con IA".equals(i.getText())).findFirst().orElseThrow());
-        FxWait.fx(() -> { fix.fire(); return null; });
+        FxWait.onFx(fix::fire);
         FxWait.until("only that message says it's being corrected", () -> fixingNotes() == 1);
         assertFalse(menu(m).contains("Corregir con IA"), "not asked twice while going on");
 

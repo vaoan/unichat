@@ -10,7 +10,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 
 /** A bridge's com.beeper.message_send_status says whether a message reached the network: one it couldn't send shows as failed. */
 class SendStatusTest {
-    private static final String ME = "@me:example.org", BOT = "@telegrambot:example.org", ROOM = "!c:example.org";
+    private static final String ME = "@me:example.org";
+    private static final String BOT = "@telegrambot:example.org";
+    private static final String ROOM = "!c:example.org";
     private SyncProcessor proc;
 
     @BeforeEach

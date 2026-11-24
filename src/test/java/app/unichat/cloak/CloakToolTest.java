@@ -85,7 +85,8 @@ class CloakToolTest {
             int v = x < 150 ? 60 + x / 2 : 40 + random.nextInt(170);
             img.setRGB(x, y, v << 16 | (y / 2 + 40) << 8 | 90);
         }
-        Path in = dir.resolve("in.png"), out = dir.resolve("out.png");
+        Path in = dir.resolve("in.png");
+        Path out = dir.resolve("out.png");
         ImageIO.write(img, "png", in.toFile());
         List<Double> progress = new ArrayList<>();
         CloakJob.run(tool.protectCommand(in, out, CloakLevel.LIGHT), out, progress::add);
@@ -93,10 +94,13 @@ class CloakToolTest {
         assertEquals(300, got.getWidth(), "the photo's own size");
         assertEquals(200, got.getHeight());
         assertEquals(1.0, progress.get(progress.size() - 1), 1e-9);
-        long smooth = 0, rough = 0;
+        long smooth = 0;
+        long rough = 0;
         int changed = 0;
         for (int y = 0; y < 200; y++) for (int x = 0; x < 300; x++) {
-            int a = img.getRGB(x, y), b = got.getRGB(x, y), d = 0;
+            int a = img.getRGB(x, y);
+            int b = got.getRGB(x, y);
+            int d = 0;
             for (int shift = 0; shift <= 16; shift += 8) d += Math.abs((a >> shift & 255) - (b >> shift & 255));
             if (d > 0) changed++;
             if (x < 140) smooth += d;

@@ -54,6 +54,6 @@ class DraftUndoUiTest {
             return null;
         });
         assertEquals("¡Claro que sí! Nos vemos mañana.", FxWait.fx(box::getText), "and ⌘⇧Z: the draft again");
-        FxWait.fx(() -> { box.getScene().getWindow().hide(); return null; });
+        FxWait.onFx(() -> box.getScene().getWindow().hide());
     }
 }

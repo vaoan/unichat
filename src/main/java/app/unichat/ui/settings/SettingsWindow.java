@@ -141,7 +141,10 @@ public final class SettingsWindow {
                 case "gifs" -> gifsPage();
                 case "shortcuts" -> shortcutsPage();
                 case "about" -> AboutPage.build();
-                default -> accountPage(svc, () -> { stage.close(); onLogout.run(); });
+                default -> accountPage(svc, () -> {
+                    stage.close();
+                    onLogout.run();
+                });
             };
             ScrollPane sp = new ScrollPane(page);
             sp.setFitToWidth(true);
@@ -238,7 +241,8 @@ public final class SettingsWindow {
         Label intro = Labels.help(I18n.t("settings.gifs.intro"));
         groups.add(intro);
         for (GifProviders.Known k : GifProviders.known()) {
-            String enabledKey = "gif." + k.id() + ".enabled", keyKey = "gif." + k.id() + ".key";
+            String enabledKey = "gif." + k.id() + ".enabled";
+            String keyKey = "gif." + k.id() + ".key";
             PasswordField key = new PasswordField();
             key.setText(s.getString(keyKey, ""));
             key.setPromptText(I18n.t("settings.gifs.keyPrompt"));

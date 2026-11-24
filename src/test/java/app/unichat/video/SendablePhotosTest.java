@@ -54,7 +54,8 @@ class SendablePhotosTest {
 
     @Test
     void sipsOnlyShrinksNeverEnlarges() {
-        Path in = Path.of("a.webp"), out = Path.of("a.jpg");
+        Path in = Path.of("a.webp");
+        Path out = Path.of("a.jpg");
         assertTrue(SendablePhotos.sips(in, out, true).contains("-Z"));
         assertFalse(SendablePhotos.sips(in, out, false).contains("-Z"));
         assertEquals(List.of("a.webp", "--out", "a.jpg"), SendablePhotos.sips(in, out, false).subList(7, 10));

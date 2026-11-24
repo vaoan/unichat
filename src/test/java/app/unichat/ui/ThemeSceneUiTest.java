@@ -34,12 +34,15 @@ class ThemeSceneUiTest {
         });
         assertEquals(before + 1, FxWait.fx(Theme::registered), "followed while it shows");
 
-        FxWait.fx(() -> { stage[0].hide(); return null; });
+        FxWait.onFx(stage[0]::hide);
         assertEquals(before, FxWait.fx(Theme::registered), "let go when hidden");
-        FxWait.fx(() -> { stage[0].show(); return null; });
+        FxWait.onFx(stage[0]::show);
         assertEquals(before + 1, FxWait.fx(Theme::registered), "shown again (from the tray): followed again");
 
-        FxWait.fx(() -> { stage[0].close(); stage[0] = null; return null; });
+        FxWait.onFx(() -> {
+            stage[0].close();
+            stage[0] = null;
+        });
         FxWait.settled();
         FxWait.until("the closed window's scene is collected", () -> {
             System.gc(); // NOPMD: DoNotCallGarbageCollectionExplicitly, it measures what is kept after a collection

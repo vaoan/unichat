@@ -90,7 +90,9 @@ public final class AnimDump {
     /** A PAM file as libwebp writes it: RGB_ALPHA, 8 bits per sample. */
     static BufferedImage readPam(Path f) throws IOException {
         try (InputStream in = new BufferedInputStream(Files.newInputStream(f))) {
-            int width = -1, height = -1, depth = -1;
+            int width = -1;
+            int height = -1;
+            int depth = -1;
             for (String line = line(in); !"ENDHDR".equals(line); line = line(in)) {
                 if (line == null) throw new IOException("not a PAM file");
                 String[] kv = line.strip().split("\\s+", 2);

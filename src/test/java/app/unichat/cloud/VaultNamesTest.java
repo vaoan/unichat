@@ -30,16 +30,21 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the English ones, every file sealed again under its new path: it opens before, halfway and after, and nothing is lost.
  */
 class VaultNamesTest {
-    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55",
-        THIRD = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66", PLAIN = "4e9d6c6b-3a4f-4f3b-8d84-9c5a0f4b5e77";
-    private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl", TRANSCRIPT = "a".repeat(64) + ".txt";
+    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44";
+    private static final String LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
+    private static final String THIRD = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
+    private static final String PLAIN = "4e9d6c6b-3a4f-4f3b-8d84-9c5a0f4b5e77";
+    private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl";
+    private static final String TRANSCRIPT = "a".repeat(64) + ".txt";
 
     @TempDir
     Path dir;
     private FakeDav cloud;
-    private Map<String, String> portableWere, keysWere;
+    private Map<String, String> portableWere;
+    private Map<String, String> keysWere;
     private Vault.Created made;
-    private VaultComputer desk, laptop;
+    private VaultComputer desk;
+    private VaultComputer laptop;
 
     @BeforeEach
     void start() throws Exception {
@@ -166,7 +171,8 @@ class VaultNamesTest {
     @Test
     void aVaultMigrationInterruptedHalfwayStillOpensAndFinishes() throws Exception {
         Map<String, byte[]> held = anOldVault();
-        String settings = "Unichat/Vault/Settings/unichat-settings.json", drops = "Unichat/Vault/Texts/" + DESK + "/index.json";
+        String settings = "Unichat/Vault/Settings/unichat-settings.json";
+        String drops = "Unichat/Vault/Texts/" + DESK + "/index.json";
         cloud.failOnce.add(drops); // the network drops during the copies
         laptop.set("ui.theme", "LIGHT");
 
@@ -235,7 +241,8 @@ class VaultNamesTest {
     @Test
     void aKeyChangeAcrossTheSwitchKeepsTheRemovedComputerOut() throws Exception {
         anOldVault();
-        CountDownLatch read = new CountDownLatch(1), go = new CountDownLatch(1);
+        CountDownLatch read = new CountDownLatch(1);
+        CountDownLatch go = new CountDownLatch(1);
         cloud.arrived.put(CloudNames.OLD_INFO, read);
         cloud.holdReadOnce.put(CloudNames.OLD_INFO, go); // the job's first look at the vault, under the old names
         CompletableFuture<Cloud.KeyChanged> job = CompletableFuture.supplyAsync(() -> {
@@ -259,7 +266,8 @@ class VaultNamesTest {
     @Test
     void aLateCopyBetweenTheSwitchAndTheDeletesNeverLosesTheOldOne() throws Exception {
         Map<String, byte[]> held = anOldVault();
-        String text = "Unichat/Texts/" + DESK + "/" + TEXT, stored = Vault.ROOT + "/Texts/" + DESK + "/" + TEXT;
+        String text = "Unichat/Texts/" + DESK + "/" + TEXT;
+        String stored = Vault.ROOT + "/Texts/" + DESK + "/" + TEXT;
         AtomicReference<Vault.Info> oldNames = new AtomicReference<>();
         VaultNames.afterSwitch = () -> {
             try {

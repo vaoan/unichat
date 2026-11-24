@@ -98,15 +98,18 @@ class NotificationOpenUiTest {
         app.unichat.settings.Settings.get().setFontScale(1.6);
         try {
             open();
-            FxWait.fx(() -> { Theme.applyAll(); view.toggleInfo(); return null; });
+            FxWait.onFx(() -> {
+                Theme.applyAll();
+                view.toggleInfo();
+            });
             FxWait.settled();
             StringBuilder seen = new StringBuilder();
             for (int width = 1300; width >= 1000; width -= 25) {
                 int w = width;
-                FxWait.fx(() -> { stage.setWidth(w); return null; });
+                FxWait.onFx(() -> stage.setWidth(w));
                 FxWait.settled();
                 String before = box();
-                FxWait.fx(() -> { stage.hide(); return null; });
+                FxWait.onFx(stage::hide);
                 FxWait.settled();
                 clickNotification(view.currentChatId().equals("!mom:demo") ? "!family:demo" : "!mom:demo");
                 String after = box();
@@ -122,7 +125,7 @@ class NotificationOpenUiTest {
     void fromTheMenuBarTheBoxComesBackAsItWas() throws Exception {
         open();
         String before = box();
-        FxWait.fx(() -> { stage.hide(); return null; });
+        FxWait.onFx(stage::hide);
         FxWait.settled();
         clickNotification("!mom:demo");
         assertEquals(before, box());
@@ -132,7 +135,7 @@ class NotificationOpenUiTest {
     void fromMinimizedTheBoxComesBackAsItWas() throws Exception {
         open();
         String before = box();
-        FxWait.fx(() -> { stage.setIconified(true); return null; });
+        FxWait.onFx(() -> stage.setIconified(true));
         FxWait.settled();
         clickNotification("!mom:demo");
         assertEquals(before, box());
@@ -145,8 +148,8 @@ class NotificationOpenUiTest {
     @Test
     void theNotificationsChatOpensWithTheCursorInItsBox() throws Exception {
         open();
-        FxWait.fx(() -> { scene.getRoot().lookup(".list-view").requestFocus(); return null; });
-        FxWait.fx(() -> { stage.hide(); return null; });
+        FxWait.onFx(() -> scene.getRoot().lookup(".list-view").requestFocus());
+        FxWait.onFx(stage::hide);
         FxWait.settled();
         clickNotification("!mom:demo");
         assertEquals("!mom:demo", FxWait.fx(view::currentChatId));
@@ -162,10 +165,13 @@ class NotificationOpenUiTest {
     @Test
     void aChannelsNotificationOpensThatChannel() throws Exception {
         open();
-        FxWait.fx(() -> { stage.hide(); return null; });
+        FxWait.onFx(stage::hide);
         FxWait.settled();
         FxWait.fx(() -> {
-            Platform.runLater(() -> { stage.show(); stage.toFront(); });
+            Platform.runLater(() -> {
+                stage.show();
+                stage.toFront();
+            });
             Platform.runLater(() -> view.openChatId("!srv-memes:demo"));
             return null;
         });

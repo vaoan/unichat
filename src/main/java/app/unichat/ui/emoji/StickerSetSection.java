@@ -36,7 +36,8 @@ final class StickerSetSection {
     /** Sets opened from a sticker that aren't among yours, newest first. */
     private final List<StickerPack.Ref> others = new ArrayList<>();
     private final Map<String, StickerPack> packs = new HashMap<>();
-    private final Set<String> open = new HashSet<>(), loading = new HashSet<>();
+    private final Set<String> open = new HashSet<>();
+    private final Set<String> loading = new HashSet<>();
     /** Sets that couldn't be brought, and when: searching tries one again after {@link #ASK_AGAIN_MS} (the bridge wasn't ready). */
     private final Map<String, Long> failed = new HashMap<>();
     /** The clock failures are timed by (a test moves it). */

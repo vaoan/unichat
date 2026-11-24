@@ -18,7 +18,7 @@ class Through implements Storage {
     @Override public void mkdirs(String dir) throws IOException { to.mkdirs(dir); }
     @Override public List<String> list(String dir) throws IOException { return to.list(dir); }
     @Override public void delete(String path) throws IOException { to.delete(path); }
-    @Override public void move(String from, String to) throws IOException { this.to.move(from, to); }
+    @Override public void move(String from, String target) throws IOException { this.to.move(from, target); }
     @Override public void put(String path, Path file) throws IOException { to.put(path, file); }
     @Override public void put(String path, byte[] data) throws IOException { to.put(path, data); }
     @Override public byte[] get(String path) throws IOException { return to.get(path); }

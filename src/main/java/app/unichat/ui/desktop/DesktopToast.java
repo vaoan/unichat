@@ -26,7 +26,8 @@ import java.util.function.Consumer;
  * clicked. Clicking the card opens its chat. One card at a time: a newer message replaces it. FX thread only.
  */
 final class DesktopToast {
-    private static final double WIDTH = 340, MARGIN = 14;
+    private static final double WIDTH = 340;
+    private static final double MARGIN = 14;
     private static final Duration VISIBLE = Duration.seconds(6);
 
     private final Consumer<String> onOpen;
@@ -42,8 +43,8 @@ final class DesktopToast {
         timer.setOnFinished(e -> hide());
     }
 
-    void show(String titleText, String bodyText, String chatId) {
-        this.chatId = chatId;
+    void show(String titleText, String bodyText, String forChat) {
+        this.chatId = forChat;
         if (stage == null) stage = build();
         title.setText(titleText);
         body.setText(bodyText);

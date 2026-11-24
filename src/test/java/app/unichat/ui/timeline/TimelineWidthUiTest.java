@@ -87,11 +87,11 @@ class TimelineWidthUiTest {
         FxWait.until("the photo's row shows", () -> row(thread, id) != null);
         FxWait.settled();
         Node before = FxWait.fx(() -> row(thread, id));
-        FxWait.fx(() -> { stage[0].setWidth(900); return null; });
+        FxWait.onFx(() -> stage[0].setWidth(900));
         FxWait.settled();
         assertSame(before, FxWait.fx(() -> row(thread, id)), "the same row: not rebuilt, its photo not loaded again");
         assertNotNull(before);
-        FxWait.fx(() -> { stage[0].close(); return null; });
+        FxWait.onFx(stage[0]::close);
         svc.stop();
     }
 
@@ -112,11 +112,11 @@ class TimelineWidthUiTest {
         });
         Message target = photo(svc);
         FxWait.until("the timeline shows", () -> row(thread, target.id()) != null || !thread.lookupAll(".row-cell").isEmpty());
-        FxWait.fx(() -> { thread.jumpToMessage(target); return null; });
+        FxWait.onFx(() -> thread.jumpToMessage(target));
         FxWait.settled();
         Object selected = FxWait.fx(() -> ((javafx.scene.control.ListView<?>) thread.lookup(".timeline")).getSelectionModel().getSelectedItem());
         assertTrue(selected instanceof ThreadRows.MessageRow r && r.message() == target, "selected: " + selected);
-        FxWait.fx(() -> { stage[0].close(); return null; });
+        FxWait.onFx(stage[0]::close);
         svc.stop();
     }
 

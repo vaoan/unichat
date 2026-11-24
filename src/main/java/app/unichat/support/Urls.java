@@ -24,7 +24,8 @@ public final class Urls {
     @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "both hosts come from java.net.URI, ASCII only; it only tells whether two links are one page")
     public static boolean samePage(String a, String b) {
         try {
-            java.net.URI x = java.net.URI.create(a), y = java.net.URI.create(b);
+            java.net.URI x = java.net.URI.create(a);
+            java.net.URI y = java.net.URI.create(b);
             return x.getHost() != null && x.getHost().equalsIgnoreCase(y.getHost()) && path(x).equals(path(y));
         } catch (IllegalArgumentException e) {
             return false;

@@ -24,13 +24,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * day's check of every file uploaded, or a long video, takes hours).
  */
 class CloudVaultJobsTest {
-    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", TEXT = "3f2a9c1b2d4e 2026-11.jsonl";
+    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44";
+    private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl";
     private static final String PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg";
 
     @TempDir
     Path dir;
     private FakeDav account;
-    private Map<String, String> portableWere, keysWere;
+    private Map<String, String> portableWere;
+    private Map<String, String> keysWere;
     private final List<CountDownLatch> held = new java.util.ArrayList<>();
 
     @BeforeEach
@@ -110,7 +112,8 @@ class CloudVaultJobsTest {
     @Test
     void aJobAskedDuringTheRoundsVaultPartWaitsForItAndNotForItsMedia() throws Exception {
         VaultComputer desk = desk();
-        CountDownLatch inVaultPart = new CountDownLatch(1), inMedia = new CountDownLatch(1);
+        CountDownLatch inVaultPart = new CountDownLatch(1);
+        CountDownLatch inMedia = new CountDownLatch(1);
         CountDownLatch letSettingsGo = holdPut(CloudAccount.SETTINGS_FILE, inVaultPart);
         CountDownLatch letMediaGo = holdPut(PHOTO, inMedia);
         CompletableFuture<Cloud.Status> round = desk.cloud.syncNow();
@@ -136,7 +139,8 @@ class CloudVaultJobsTest {
     /** A round held on its first photo; once let go, it holds on the second, its progress told for it in between. */
     private CompletableFuture<Cloud.Status> roundHeldOnTwoPhotos(VaultComputer desk, CountDownLatch[] second) throws InterruptedException, IOException {
         desk.write("Ana/b.jpg", "otra foto");
-        CountDownLatch atFirst = new CountDownLatch(1), atSecond = new CountDownLatch(1);
+        CountDownLatch atFirst = new CountDownLatch(1);
+        CountDownLatch atSecond = new CountDownLatch(1);
         CountDownLatch first = holdPut(PHOTO, atFirst);
         second[0] = holdPut(CloudAccount.MEDIA + "/Ana/b.jpg", atSecond);
         CompletableFuture<Cloud.Status> round = desk.cloud.syncNow();

@@ -70,7 +70,8 @@ final class MediaCache {
     private static Listing list(Path dir, Set<String> pinned) {
         if (!Files.isDirectory(dir)) return null;
         List<Entry> entries = new ArrayList<>();
-        long total = 0, leftovers = 0;
+        long total = 0;
+        long leftovers = 0;
         int count = 0;
         long staleBefore = System.currentTimeMillis() - LEFTOVER_MILLIS;
         try (Stream<Path> files = Files.list(dir)) {

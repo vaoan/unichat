@@ -109,8 +109,10 @@ class MessageFixerTest {
         }, told::add, queued::add);
         List<Integer> changes = new CopyOnWriteArrayList<>();
         held.addListener(() -> changes.add(1));
-        Message a = sent("creo q sí"), b = sent("dijo q no");
-        CompletableFuture<Void> fa = held.fix(a), fb = held.fix(b);
+        Message a = sent("creo q sí");
+        Message b = sent("dijo q no");
+        CompletableFuture<Void> fa = held.fix(a);
+        CompletableFuture<Void> fb = held.fix(b);
         assertTrue(held.fixing(a.id()) && held.fixing(b.id()), "both going on, each its own");
         CompletableFuture<Void> again = held.fix(a);
         assertEquals(2, queued.size(), "asking again for one going on starts nothing");

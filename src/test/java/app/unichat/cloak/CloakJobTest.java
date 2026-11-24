@@ -77,7 +77,9 @@ class CloakJobTest {
      */
     @Test
     void anOldJobStoppingLateDoesntWriteOverTheNewOne() throws Exception {
-        CountDownLatch firstInstalling = new CountDownLatch(1), letFirstGo = new CountDownLatch(1), firstReported = new CountDownLatch(1);
+        CountDownLatch firstInstalling = new CountDownLatch(1);
+        CountDownLatch letFirstGo = new CountDownLatch(1);
+        CountDownLatch firstReported = new CountDownLatch(1);
         CountDownLatch secondInstalling = new CountDownLatch(1);
         java.util.concurrent.atomic.AtomicInteger installs = new java.util.concurrent.atomic.AtomicInteger();
         AtomicReference<Path> sent = new AtomicReference<>();

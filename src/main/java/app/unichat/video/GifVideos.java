@@ -71,9 +71,12 @@ public final class GifVideos {
 
     private static final String KEY = "video.gifVideosAsGif";
     /** Ajustes → Redes' choices: the longest one made a picture, the most a forwarded one may weigh, its largest side. */
-    public static final List<Integer> LONGEST_CHOICES = List.of(NO_LIMIT, 10, 15, 30),
-            MB_CHOICES = List.of(8, 10, 25, 50), SIDE_CHOICES = List.of(320, 480, 640, 720);
-    private static final String LONGEST_KEY = "video.gifLongestSeconds", MB_KEY = "video.gifMaxMb", SIDE_KEY = "video.gifLargestSide";
+    public static final List<Integer> LONGEST_CHOICES = List.of(NO_LIMIT, 10, 15, 30);
+    public static final List<Integer> MB_CHOICES = List.of(8, 10, 25, 50);
+    public static final List<Integer> SIDE_CHOICES = List.of(320, 480, 640, 720);
+    private static final String LONGEST_KEY = "video.gifLongestSeconds";
+    private static final String MB_KEY = "video.gifMaxMb";
+    private static final String SIDE_KEY = "video.gifLargestSide";
 
     /** The largest a GIF's longest side may be; past it, a real video ({@link #camera}). 720 px by default: a GIF can be that big. */
     public static int largestSide() { return chosen(SIDE_KEY, SIDE_CHOICES, 720); }

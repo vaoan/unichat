@@ -163,7 +163,8 @@ public final class AnimatedImage {
             double fit = Math.min(1.0, Math.min((double) maxW / probe.width(), (double) maxH / probe.height()));
             int count = probe.seconds() > 0 ? (int) Math.min(maxFrames, Math.ceil(probe.seconds() * (probe.fps() > 0 ? probe.fps() : 30))) : maxFrames;
             double s = fit * shrinkToKeep(count, (int) Math.round(probe.width() * fit), (int) Math.round(probe.height() * fit));
-            int w = Math.max(1, (int) Math.round(probe.width() * s)), h = Math.max(1, (int) Math.round(probe.height() * s));
+            int w = Math.max(1, (int) Math.round(probe.width() * s));
+            int h = Math.max(1, (int) Math.round(probe.height() * s));
             List<Image> images = new ArrayList<>();
             // Capped by bytes too: the probe is what ffmpeg read of the file, and a file can say less than it holds.
             int frames = (int) Math.max(1, Math.min(maxFrames, MAX_ANIMATION_BYTES / ((long) w * h * 4)));
@@ -284,7 +285,9 @@ public final class AnimatedImage {
      */
     public static Frames decode(Path given, int maxW, int maxH) throws IOException {
         Path file = drawable(given);
-        boolean webm = app.unichat.support.ImageHeaders.isVideo(file), webp = !webm && isWebp(file), gif = !webm && !webp && isGif(file);
+        boolean webm = app.unichat.support.ImageHeaders.isVideo(file);
+        boolean webp = !webm && isWebp(file);
+        boolean gif = !webm && !webp && isGif(file);
         if (!webm && !webp && !gif) return decodePlain(file, maxW, maxH);
         Frames hit = decoded(file, maxW, maxH);
         if (hit != null) return hit;
@@ -416,7 +419,8 @@ public final class AnimatedImage {
 
     /** Reads the RIFF chunk list. Pure function of the bytes (unit-tested). */
     static WebpLayout parseLayout(byte[] d) {
-        int canvasW = 0, canvasH = 0;
+        int canvasW = 0;
+        int canvasH = 0;
         List<AnimFrame> frames = new ArrayList<>();
         int i = 12;
         while (i + 8 <= d.length) {
@@ -452,9 +456,11 @@ public final class AnimatedImage {
         RawFrames raw = composeWebp(file, maxW, maxH);
         List<Image> images = new ArrayList<>();
         int count = raw.images().size();
-        int w = count == 0 ? 1 : raw.images().get(0).getWidth(), h = count == 0 ? 1 : raw.images().get(0).getHeight();
+        int w = count == 0 ? 1 : raw.images().get(0).getWidth();
+        int h = count == 0 ? 1 : raw.images().get(0).getHeight();
         double s = shrinkToKeep(count, w, h);
-        int sw = (int) Math.round(w * s), sh = (int) Math.round(h * s);
+        int sw = (int) Math.round(w * s);
+        int sh = (int) Math.round(h * s);
         int step = count == 0 ? 1 : step(count, sw, sh);
         for (int i = 0; i < count; i += step) images.add(toFx(s < 1 ? scale(raw.images().get(i), sw, sh) : raw.images().get(i)));
         return remember(key, new Frames(List.copyOf(images), sample(raw.durationsMs(), step), new Source(file, maxW, maxH)));
@@ -568,7 +574,8 @@ public final class AnimatedImage {
     /** Copy scaled to fit inside maxW x maxH (never upscaled). */
     static BufferedImage scale(BufferedImage src, int maxW, int maxH) {
         double s = Math.min(1.0, Math.min(maxW / (double) src.getWidth(), maxH / (double) src.getHeight()));
-        int w = Math.max(1, (int) Math.round(src.getWidth() * s)), h = Math.max(1, (int) Math.round(src.getHeight() * s));
+        int w = Math.max(1, (int) Math.round(src.getWidth() * s));
+        int h = Math.max(1, (int) Math.round(src.getHeight() * s));
         BufferedImage out = new BufferedImage(w, h, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = out.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BILINEAR);
@@ -622,7 +629,9 @@ public final class AnimatedImage {
         private final javafx.beans.value.ChangeListener<javafx.scene.transform.Transform> moved;
         private Frames frames;
         private Timeline timeline;
-        private boolean showing, loading, ended;
+        private boolean showing;
+        private boolean loading;
+        private boolean ended;
         /** Budget taken for frames being read again, not yet moving. */
         private boolean reserved;
         /** Whether it can be seen; cancelled when the view is handed another animation. */

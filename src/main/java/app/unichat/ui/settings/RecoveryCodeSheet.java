@@ -67,7 +67,8 @@ final class RecoveryCodeSheet extends VBox {
     private final String code;
     private final int[] asked = new int[2];
     private final Label said = Labels.help("");
-    private final Runnable kept, cancelled;
+    private final Runnable kept;
+    private final Runnable cancelled;
 
     /**
      * @param kept the person typed back the groups asked
@@ -133,7 +134,8 @@ final class RecoveryCodeSheet extends VBox {
 
     /** Two groups typed back, checked as the code is when typed (case, O for 0…). */
     private void askBack() {
-        TextField first = group(asked[0]), second = group(asked[1]);
+        TextField first = group(asked[0]);
+        TextField second = group(asked[1]);
         Label wrong = Labels.help(I18n.t("settings.vault.code.wrongGroups"));
         wrong.getStyleClass().add("login-error");
         Nodes.show(wrong, false);

@@ -146,7 +146,7 @@ class TimelineReadingUiTest {
     void writingInTheBox() throws Exception {
         TimelineWindow.Frames frames = readingOlder();
         w.type("pensando\nqué\nresponder");
-        FxWait.fx(() -> { w.input().clear(); return null; });
+        FxWait.onFx(() -> w.input().clear());
         frames.stop("the box growing and shrinking while reading older ones");
         assertTrue(FxWait.fx(w::jumpDownShown), "still reading older ones");
     }
@@ -156,7 +156,7 @@ class TimelineReadingUiTest {
         TimelineWindow.Frames frames = readingOlder();
         String read = FxWait.fx(w::readMessage);
         Message m = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(x -> x.id().equals(read)).findFirst().orElseThrow());
-        FxWait.fx(() -> { w.composer().reply(m); return null; });
+        FxWait.onFx(() -> w.composer().reply(m));
         FxWait.settled();
         w.key(KeyCode.ESCAPE, false);
         frames.stop("the reply banner opening and closing while reading older ones");
@@ -166,7 +166,7 @@ class TimelineReadingUiTest {
     void theWindowGetsShorterAndTaller() throws Exception {
         TimelineWindow.Frames frames = readingOlder();
         for (double h : new double[] {480, 620, 560}) {
-            FxWait.fx(() -> { w.stage.setHeight(h); return null; });
+            FxWait.onFx(() -> w.stage.setHeight(h));
             FxWait.settled();
         }
         frames.stop("the window resized while reading older ones");
@@ -175,9 +175,9 @@ class TimelineReadingUiTest {
     @Test
     void theSidePanelOpensAndCloses() throws Exception {
         TimelineWindow.Frames frames = readingOlder();
-        FxWait.fx(() -> { w.view.toggleInfo(); return null; });
+        FxWait.onFx(w.view::toggleInfo);
         FxWait.settled();
-        FxWait.fx(() -> { w.view.toggleInfo(); return null; });
+        FxWait.onFx(w.view::toggleInfo);
         frames.stop("the side panel opening and closing while reading older ones");
     }
 
@@ -291,7 +291,7 @@ class TimelineReadingUiTest {
         w.svc.sendText(CHAT, "y el mío", null).get();
         FxWait.until("three new below", () -> "3 nuevos".equals(w.jumpDown().getText()));
         assertTrue(FxWait.fx(() -> w.jumpDown().getAccessibleText()).contains("3"), "a screen reader hears how many");
-        FxWait.fx(() -> { w.jumpDown().fire(); return null; });
+        FxWait.onFx(() -> w.jumpDown().fire());
         w.untilAtBottom();
         assertTrue(FxWait.fx(w::followingShown), "down at the newest: up to date again");
     }
@@ -300,7 +300,7 @@ class TimelineReadingUiTest {
     void theJumpDownButton() throws Exception {
         w = TimelineWindow.open(30);
         w.scrollUp();
-        FxWait.fx(() -> { w.scene.getRoot().lookup(".jump-down").fireEvent(new javafx.event.ActionEvent()); return null; });
+        FxWait.onFx(() -> w.scene.getRoot().lookup(".jump-down").fireEvent(new javafx.event.ActionEvent()));
         double gap = w.untilAtBottom();
         assertFalse(FxWait.fx(w::jumpDownShown));
         followsFromHere(gap);
@@ -369,7 +369,7 @@ class TimelineReadingUiTest {
     void leavingTheChatAndComingBack() throws Exception {
         w = TimelineWindow.open(30);
         w.scrollUp();
-        FxWait.fx(() -> { w.view.openChatId("!family:demo"); return null; });
+        FxWait.onFx(() -> w.view.openChatId("!family:demo"));
         FxWait.settled();
         w.svc.receive(CHAT, "mientras no mirabas");
         w.openChat();

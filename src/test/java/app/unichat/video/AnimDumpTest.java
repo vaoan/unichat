@@ -69,7 +69,9 @@ class AnimDumpTest {
         for (int i = 0; i < 6; i++) {
             BufferedImage f = frames.get(i);
             assertEquals(96, f.getWidth());
-            int square = f.getRGB(22 + i * 10, 32), band = f.getRGB(48, 80), empty = f.getRGB(90, 5);
+            int square = f.getRGB(22 + i * 10, 32);
+            int band = f.getRGB(48, 80);
+            int empty = f.getRGB(90, 5);
             assertTrue((square >>> 24) > 200 && ((square >> 16) & 255) > 150 && (square & 255) < 100, "frame " + i + ": the red square, opaque");
             assertTrue((band >>> 24) > 200 && (band & 255) > 150, "frame " + i + ": the blue band");
             assertTrue((empty >>> 24) < 20, "frame " + i + ": transparent where nothing is, never black");

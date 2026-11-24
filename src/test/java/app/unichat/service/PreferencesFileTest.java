@@ -19,7 +19,14 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 class PreferencesFileTest {
@@ -202,7 +209,8 @@ class PreferencesFileTest {
     @Test
     void aChatCanBeInSeveralFolders() {
         var p = open();
-        String a = p.createFolder("A"), b = p.createFolder("B");
+        String a = p.createFolder("A");
+        String b = p.createFolder("B");
         p.setInFolder(a, K, true);
         p.setInFolder(b, K, true);
         assertTrue(p.folders().stream().allMatch(f -> f.chatKeys().contains(K)));

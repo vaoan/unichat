@@ -115,7 +115,8 @@ final class RoomFields {
 
     /** Children with an {@code order} first (lexicographic, as the spec says), then the rest in arrival order. */
     private static List<String> orderedChildren(MatrixRoom room) {
-        List<String> ordered = new ArrayList<>(), rest = new ArrayList<>();
+        List<String> ordered = new ArrayList<>();
+        List<String> rest = new ArrayList<>();
         room.spaceChildOrder.forEach((id, order) -> (order.isEmpty() ? rest : ordered).add(id));
         ordered.sort(java.util.Comparator.comparing(room.spaceChildOrder::get));
         ordered.addAll(rest);

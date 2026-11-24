@@ -76,8 +76,8 @@ final class PinnedBar {
     Node node() { return box; }
 
     /** The chat opened: its pins, from the newest. */
-    void show(String chatId) {
-        this.chatId = chatId;
+    void show(String shown) {
+        this.chatId = shown;
         index = 0;
         redraw();
     }

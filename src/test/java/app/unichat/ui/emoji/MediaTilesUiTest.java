@@ -83,7 +83,7 @@ class MediaTilesUiTest {
 
     @AfterEach
     void close() throws Exception {
-        fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 
     private List<Node> tiles() throws InterruptedException {
@@ -95,7 +95,7 @@ class MediaTilesUiTest {
     void refreshingKeepsTheTilesAndAsksForNothing() throws Exception {
         List<Node> before = tiles();
         int loads = asked.get();
-        fx(() -> { grid.refresh(); return null; });
+        FxWait.onFx(grid::refresh);
         assertEquals(loads, asked.get(), "nothing asked again");
         assertSame(before.get(0), tiles().get(0));
         assertSame(before.get(1), tiles().get(1));
@@ -106,7 +106,7 @@ class MediaTilesUiTest {
         List<Node> before = tiles();
         int loads = asked.get();
         MediaLibrary.Item tres = sticker("tres");
-        fx(() -> { library.toggleFavorite(tres); return null; });
+        FxWait.onFx(() -> library.toggleFavorite(tres));
         FxWait.until("a third tile", () -> tiles().size() >= 3);
         FxWait.settled(); // whatever the new favourite set off has run
         assertEquals(3, tiles().size());

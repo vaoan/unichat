@@ -83,7 +83,7 @@ class FileOpenUiTest {
             done.await();
             assertEquals(pdf, opened[0], "the downloaded file");
             assertTrue(onAwt[0], "opened on AWT's thread, not the download's");
-            FxWait.fx(() -> { stage[0].close(); return null; });
+            FxWait.onFx(stage[0]::close);
         } finally {
             Browser.opener = before;
         }

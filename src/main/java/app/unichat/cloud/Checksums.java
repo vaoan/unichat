@@ -15,7 +15,9 @@ import java.util.HexFormat;
  * SHA-256 (pCloud), or Dropbox's own content hash (SHA-256 of the SHA-256 of each 4 MB block).
  */
 final class Checksums {
-    static final String SHA1 = "sha1", SHA256 = "sha256", DROPBOX = "dropbox";
+    static final String SHA1 = "sha1";
+    static final String SHA256 = "sha256";
+    static final String DROPBOX = "dropbox";
     private static final int DROPBOX_BLOCK = 4 * 1024 * 1024;
 
     private Checksums() {}

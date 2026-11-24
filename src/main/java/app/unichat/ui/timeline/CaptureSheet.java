@@ -47,7 +47,9 @@ import java.util.function.Function;
  * done most), copy it, or save it to a folder. In the window's overlay.
  */
 public final class CaptureSheet {
-    private static final double WIDTH = 460, PREVIEW_WIDTH = 380, PREVIEW_HEIGHT = 420;
+    private static final double WIDTH = 460;
+    private static final double PREVIEW_WIDTH = 380;
+    private static final double PREVIEW_HEIGHT = 420;
 
     /** Where what's made for sending goes (swept after a day, `OutgoingPhotos.prune`): a folder for each capture. */
     private static Path sending() {

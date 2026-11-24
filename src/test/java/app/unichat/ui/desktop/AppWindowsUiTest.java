@@ -62,6 +62,9 @@ class AppWindowsUiTest {
             });
             org.junit.jupiter.api.Assertions.assertSame(expectedAndGot[0], expectedAndGot[1], "with two, either way is the other one");
         }
-        FxWait.fx(() -> { s[0].hide(); s[1].hide(); return null; });
+        FxWait.onFx(() -> {
+            s[0].hide();
+            s[1].hide();
+        });
     }
 }

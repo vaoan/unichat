@@ -271,7 +271,7 @@ class TimelineMediaUiTest {
         Path photo = Path.of(java.net.URI.create(still("png", 1000, 750)));
         int before = FxWait.fx(this::picturesShown);
         TimelineWindow.Frames frames = w.watch(w.atBottom(gap));
-        FxWait.fx(() -> { w.composer().sendFiles(List.of(photo.toFile())); return null; });
+        FxWait.onFx(() -> w.composer().sendFiles(List.of(photo.toFile())));
         FxWait.until("it's sent and drawn", () -> w.showsNewest() && picturesShown() > before);
         frames.stop("sending a photo: its bar, its bubble, its picture");
     }
@@ -279,7 +279,7 @@ class TimelineMediaUiTest {
     @Test
     void openingAChatWhoseNewestPhotoIsStillDownloading() throws Exception {
         w = TimelineWindow.open(20);
-        FxWait.fx(() -> { w.view.openChatId("!family:demo"); return null; });
+        FxWait.onFx(() -> w.view.openChatId("!family:demo"));
         FxWait.settled();
         ScriptedChatService.Gate downloads = w.svc.holdDownloads();
         w.svc.receive(CHAT, media(MessageType.IMAGE, still("png", 900, 600), "image/png", 0, 0));

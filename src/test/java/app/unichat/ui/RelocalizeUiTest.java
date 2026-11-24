@@ -63,6 +63,9 @@ class RelocalizeUiTest {
             System.gc(); // NOPMD: DoNotCallGarbageCollectionExplicitly, it measures what is kept after a collection
             return old.get() == null;
         });
-        fx(() -> { stage[0].close(); svc.stop(); return null; });
+        FxWait.onFx(() -> {
+            stage[0].close();
+            svc.stop();
+        });
     }
 }

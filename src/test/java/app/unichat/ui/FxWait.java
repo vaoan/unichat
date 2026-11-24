@@ -57,6 +57,20 @@ public final class FxWait {
         }
     }
 
+    /** Work for the FX thread that gives nothing back and may throw {@code E}. */
+    @FunctionalInterface
+    public interface FxRun<E extends Exception> {
+        void run() throws E;
+    }
+
+    /** Runs {@code r} on the FX thread (or rethrows what it threw), as {@link #fx} does for work with a result. */
+    public static <E extends Exception> void onFx(FxRun<E> r) throws E, InterruptedException {
+        fx(() -> {
+            r.run();
+            return null;
+        });
+    }
+
     /**
      * Until {@code condition}, run on the FX thread, is true: checked now and after every pulse. A condition that throws
      * (a node not there yet) counts as not yet.

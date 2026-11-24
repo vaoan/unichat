@@ -25,7 +25,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 class VaultTest {
-    private static final String MAC = UUID.randomUUID().toString(), PC = UUID.randomUUID().toString();
+    private static final String MAC = UUID.randomUUID().toString();
+    private static final String PC = UUID.randomUUID().toString();
 
     private FakeDav cloud;
     private Storage storage;
@@ -382,10 +383,16 @@ class VaultTest {
         @Override public String stamp(String path) throws IOException { return s.stamp(path); }
         @Override public void mkdirs(String dir) throws IOException { s.mkdirs(dir); }
         @Override public List<String> list(String dir) throws IOException { return s.list(dir); }
-        @Override public void delete(String path) throws IOException { beforeDelete.at(path); s.delete(path); }
+        @Override public void delete(String path) throws IOException {
+            beforeDelete.at(path);
+            s.delete(path);
+        }
         @Override public void move(String from, String to) throws IOException { s.move(from, to); }
         @Override public void put(String path, Path file) throws IOException { s.put(path, file); }
-        @Override public byte[] get(String path) throws IOException { beforeGet.at(path); return s.get(path); }
+        @Override public byte[] get(String path) throws IOException {
+            beforeGet.at(path);
+            return s.get(path);
+        }
         @Override public boolean get(String path, Path target) throws IOException { return s.get(path, target); }
 
         @Override

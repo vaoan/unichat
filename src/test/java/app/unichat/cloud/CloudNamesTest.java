@@ -26,14 +26,17 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * again), once, and again for what a computer still on an older Unichat writes there.
  */
 class CloudNamesTest {
-    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", OLD = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
+    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44";
+    private static final String OLD = "3d8c5b5a-2f3e-4e2a-9c73-8b4f9e3a4d66";
     private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl";
-    private static final String OLD_SETTINGS = "Unichat/Ajustes/unichat-settings.json", SETTINGS = CloudAccount.SETTINGS_FILE;
+    private static final String OLD_SETTINGS = "Unichat/Ajustes/unichat-settings.json";
+    private static final String SETTINGS = CloudAccount.SETTINGS_FILE;
 
     @TempDir
     Path dir;
     private FakeDav cloud;
-    private Map<String, String> portableWere, keysWere;
+    private Map<String, String> portableWere;
+    private Map<String, String> keysWere;
 
     @BeforeEach
     void start() throws Exception {
@@ -88,7 +91,9 @@ class CloudNamesTest {
 
     @Test
     void theOldFoldersAreMovedOnce() throws Exception {
-        byte[] photo = bytes("foto"), text = bytes("{\"t\":1}\n"), mine = settings(DESK, Instant.now().minusSeconds(60), "DARK");
+        byte[] photo = bytes("foto");
+        byte[] text = bytes("{\"t\":1}\n");
+        byte[] mine = settings(DESK, Instant.now().minusSeconds(60), "DARK");
         cloud.put("Unichat/Multimedia/Ana/a.jpg", photo);
         cloud.put("Unichat/Multimedia/Mamá d/v [1].mp4", bytes("video"));
         cloud.put(OLD_SETTINGS, mine);
@@ -220,7 +225,8 @@ class CloudNamesTest {
     @Test
     void settingsInBothKeepTheNewest() throws Exception {
         Instant now = Instant.now();
-        byte[] older = settings(DESK, now.minusSeconds(60), "LIGHT"), newer = settings(DESK, now, "DARK");
+        byte[] older = settings(DESK, now.minusSeconds(60), "LIGHT");
+        byte[] newer = settings(DESK, now, "DARK");
         cloud.put(SETTINGS, older);
         cloud.put(OLD_SETTINGS, newer);
         CloudNames.migrate(dav(), new Object());

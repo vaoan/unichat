@@ -23,7 +23,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 
-import static app.unichat.matrix.SyncEvents.*; // NOPMD: OnDemandImport, SyncEvents holds this class's own JSON helpers, split off for size
+import static app.unichat.matrix.SyncEvents.applyContent;
+import static app.unichat.matrix.SyncEvents.cleanName;
+import static app.unichat.matrix.SyncEvents.isBot;
+import static app.unichat.matrix.SyncEvents.stripReplyFallback;
+import static app.unichat.matrix.SyncEvents.text;
 
 /**
  * Turns Matrix /sync and /messages JSON into live {@link Chat} and {@link Message} objects.
@@ -148,7 +152,7 @@ final class SyncProcessor {
         room.invite = false;
         r.chatsChanged = true;
 
-        applySummary(room, j.path("summary"));
+        SyncEvents.applySummary(room, j.path("summary"));
 
         for (JsonNode ev : j.path("state").path("events")) applyState(room, ev);
 
@@ -165,7 +169,7 @@ final class SyncProcessor {
         for (JsonNode ev : j.path("ephemeral").path("events")) applyEphemeral(room, ev, r);
         for (JsonNode ev : j.path("account_data").path("events")) applyRoomAccountData(room, ev);
 
-        applyUnread(room, j.path("unread_notifications"));
+        SyncEvents.applyUnread(room, j.path("unread_notifications"));
 
         fields.refresh(room);
     }
@@ -255,7 +259,7 @@ final class SyncProcessor {
                 putMember(room, key, c);
                 if (key.equals(me) && "invite".equals(membership)) room.inviter = text(ev, "sender");
                 if (key.equals(me) && (c.path("is_direct").asBoolean(false)
-                        || prevContent(ev).path("is_direct").asBoolean(false))) {
+                        || SyncEvents.prevContent(ev).path("is_direct").asBoolean(false))) {
                     room.directInvite = true;
                 }
             }
@@ -326,7 +330,8 @@ final class SyncProcessor {
         String sender = text(ev, "sender");
         if (type == null || id == null || sender == null) return;
         if (ev.has("state_key")) {
-            if (older == null) applyState(room, ev); else learnMember(room, ev);
+            if (older == null) applyState(room, ev);
+            else learnMember(room, ev);
         }
         Message known = room.byId.get(id);
         if (known != null) {
@@ -417,14 +422,16 @@ final class SyncProcessor {
             Message local = room.byId.remove(LOCAL_PREFIX + txn);
             if (local != null) {
                 int idx = room.timeline.indexOf(local);
-                if (idx >= 0) room.timeline.set(idx, m); else room.timeline.add(m);
+                if (idx >= 0) room.timeline.set(idx, m);
+                else room.timeline.add(m);
                 room.byId.put(m.id(), m);
                 applyPending(room, m.id(), r);
                 return;
             }
         }
         room.byId.put(m.id(), m);
-        if (older != null) older.add(m); else room.addInOrder(m);
+        if (older != null) older.add(m);
+        else room.addInOrder(m);
         applyPending(room, m.id(), r);
         if (live && older == null && !m.outgoing() && m.type() != MessageType.SYSTEM) r.newMessages.add(m);
     }
@@ -668,7 +675,7 @@ final class SyncProcessor {
             rooms.values().forEach(this::refresh);
             r.chatsChanged = true;
         } else if ("m.push_rules".equals(type)) {
-            preferences.hearRules(mutedRoomsFrom(c));
+            preferences.hearRules(SyncEvents.mutedRoomsFrom(c));
             r.chatsChanged = true;
         }
     }
@@ -702,7 +709,8 @@ final class SyncProcessor {
         }
         Message real = local.withId(eventId);
         real.setStatus(MessageStatus.SENT);
-        if (idx >= 0) room.timeline.set(idx, real); else room.timeline.add(real);
+        if (idx >= 0) room.timeline.set(idx, real);
+        else room.timeline.add(real);
         room.byId.put(eventId, real);
         Result ignored = new Result();
         applyPending(room, eventId, ignored);
@@ -718,10 +726,10 @@ final class SyncProcessor {
         long ts = ev.path("origin_server_ts").asLong(0);
         Instant server = Instant.ofEpochMilli(ts);
         boolean time = known.outgoing() && ts > 0 && !known.timestamp().equals(server);
-        boolean media = takesServerMedia(known, ev.path("content"));
+        boolean media = SyncEvents.takesServerMedia(known, ev.path("content"));
         if (!time && !media) return;
         Message fixed = known.withTimestamp(time ? server : known.timestamp());
-        if (media) applyMedia(fixed, ev.path("content"));
+        if (media) SyncEvents.applyMedia(fixed, ev.path("content"));
         int idx = room.timeline.indexOf(known);
         if (idx >= 0) room.timeline.set(idx, fixed);
         room.byId.put(fixed.id(), fixed);

@@ -62,8 +62,8 @@ final class VideoViewer {
         return v.stage;
     }
 
-    private void open(Window owner, String title, Runnable onSave) {
-        this.onSave = onSave;
+    private void open(Window owner, String title, Runnable save) {
+        this.onSave = save;
         ProgressIndicator spin = new ProgressIndicator();
         spin.setMaxSize(40, 40);
         screen.getChildren().add(spin);

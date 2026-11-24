@@ -27,7 +27,8 @@ class OggOpusTest {
 
     @Test
     void decodesAVoiceNoteToWhisperWav(@TempDir Path dir) throws Exception {
-        Path ogg = fixture(dir), wav = dir.resolve("out.wav");
+        Path ogg = fixture(dir);
+        Path wav = dir.resolve("out.wav");
         assertTrue(OggOpus.isOggOpus(ogg));
         double seconds = OggOpus.toWav(ogg, wav);
         assertEquals(2.0, seconds, 0.05, "pre-skip removed, nothing lost");
@@ -41,7 +42,8 @@ class OggOpusTest {
         // ffmpeg's sine (amplitude 1/8) at 0.3 volume: RMS ~0.027 (ffmpeg's own decoder gives 0.0269), and a 440 Hz
         // tone crosses zero ~880 times a second; silence or noise would be far off.
         double sum = 0;
-        int n = b.getInt(40) / 2, crossings = 0;
+        int n = b.getInt(40) / 2;
+        int crossings = 0;
         short prev = 0;
         for (int i = 0; i < n; i++) {
             short v = b.getShort(44 + i * 2);

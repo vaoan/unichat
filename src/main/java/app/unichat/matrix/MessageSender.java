@@ -299,7 +299,8 @@ final class MessageSender {
     /** What was sent lately, by its event id: sent again when a bridge refused it only because it wasn't connected yet. */
     private record Sent(String chatId, String type, ObjectNode content, int tries) {}
 
-    private static final int REMEMBERED = 200, MOST_TRIES = 3;
+    private static final int REMEMBERED = 200;
+    private static final int MOST_TRIES = 3;
     private final Map<String, Sent> recent = java.util.Collections.synchronizedMap(BoundedMap.byAge(REMEMBERED));
     /** Seconds before each try again: a bridge that restarts with Unichat connects within seconds. Tests pass zeros. */
     private long[] retrySeconds = {15, 30, 60};

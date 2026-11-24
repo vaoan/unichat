@@ -102,7 +102,8 @@ class ReplyWriterTest {
     @DisabledOnOs(OS.WINDOWS)
     void cancellingStopsItAtOnce() throws Exception {
         // Two pipes: the program says it's running through one, then waits for ever on the other, which nobody opens.
-        Path started = fifo("started"), never = fifo("never");
+        Path started = fifo("started");
+        Path never = fifo("never");
         Path bin = script("printf x > '" + started + "'\nexec cat '" + never + "'");
         // Its own limit is a day: only cancelling can end it while the test runs.
         ReplyWriter w = new ReplyWriter(java.time.Duration.ofDays(1));
@@ -121,7 +122,8 @@ class ReplyWriterTest {
     @Test
     @DisabledOnOs(OS.WINDOWS)
     void interruptingStopsTheProgram() throws Exception {
-        Path started = fifo("started"), never = fifo("never");
+        Path started = fifo("started");
+        Path never = fifo("never");
         // It says its own process id, then waits for ever on a pipe nobody opens: only being stopped ends it.
         Path bin = script("echo $$ > '" + started + "'\nexec cat '" + never + "'");
         java.util.concurrent.atomic.AtomicReference<String> got = new java.util.concurrent.atomic.AtomicReference<>("not returned");

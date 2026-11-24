@@ -37,7 +37,8 @@ class AnimatedImageTest {
         assertTrue(AnimatedImage.isWebp(fixture()));
         AnimatedImage.RawFrames frames = AnimatedImage.composeWebp(fixture(), 24, 24);
         assertEquals(4, frames.images().size(), "all frames, not a static first frame");
-        BufferedImage a = frames.images().get(0), b = frames.images().get(1);
+        BufferedImage a = frames.images().get(0);
+        BufferedImage b = frames.images().get(1);
         assertTrue(a.getWidth() <= 24 && a.getHeight() <= 24, "scaled down: " + a.getWidth() + "x" + a.getHeight());
         assertEquals(a.getWidth(), b.getWidth(), "frames share the canvas size");
         assertFalse(same(a, b), "frames differ: the sticker moves");

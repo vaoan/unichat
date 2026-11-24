@@ -78,7 +78,7 @@ class ComposerHeightUiTest {
         double tall = FxWait.fx(box::getHeight);
         assertTrue(tall < 0.4 * 950 - 2, "the narrow box isn't at its cap (" + tall + " px), or it couldn't shrink");
 
-        FxWait.fx(() -> { composer[0].setMaxWidth(880); return null; }); // wider: fewer lines, a shorter box
+        FxWait.onFx(() -> composer[0].setMaxWidth(880));  // wider: fewer lines, a shorter box
         FxWait.settled();
         FxWait.until("all of it on screen, wider", () -> hidden(box) <= 1);
         // Measured after the layout that re-wraps it: one more pass on some systems (Linux), so wait for it, not a time.
@@ -87,13 +87,13 @@ class ComposerHeightUiTest {
             throw new AssertionError("still " + measures(box) + ", was " + tall + " narrow"); // what a failure reports
         });
 
-        FxWait.fx(() -> { box.setText("hola"); return null; });
+        FxWait.onFx(() -> box.setText("hola"));
         FxWait.settled();
         double one = FxWait.fx(box::getHeight);
-        FxWait.fx(() -> { box.setText("hola\n".repeat(40)); return null; });
+        FxWait.onFx(() -> box.setText("hola\n".repeat(40)));
         FxWait.settled();
         assertTrue(FxWait.fx(box::getHeight) < 950 * 0.45, "a long text stops growing and scrolls");
         assertTrue(FxWait.fx(box::getHeight) > one);
-        FxWait.fx(() -> { stage[0].close(); return null; });
+        FxWait.onFx(stage[0]::close);
     }
 }

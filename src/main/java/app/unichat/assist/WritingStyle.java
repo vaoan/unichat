@@ -77,7 +77,8 @@ public final class WritingStyle {
 
     /** As {@link #addCorrection(String, String)}, with what the draft answered. */
     public synchronized void addCorrection(StylePrompt.Correction c) {
-        String draft = c.draft(), sent = c.sent();
+        String draft = c.draft();
+        String sent = c.sent();
         if (draft == null || sent == null || draft.strip().equals(sent.strip())) return;
         pending.add(new StylePrompt.Correction(draft.strip(), sent.strip(), c.context(), c.chatId()));
         while (pending.size() > MAX_PENDING) pending.remove(0);
@@ -140,10 +141,10 @@ public final class WritingStyle {
      * Saves what was learned, uses up the corrections it came from and marks the chat as learned, but only if the
      * file is still {@code readAs}: the person may have changed it by hand meanwhile (Ajustes), and that wins.
      */
-    synchronized boolean commit(String readAs, String learned, int correctionsUsed, String chatId, String newest) {
+    synchronized boolean commit(String readAs, String style, int correctionsUsed, String chatId, String newest) {
         if (!text().equals(readAs)) return false;
         history.replaced(readAs);
-        save(learned);
+        save(style);
         used(correctionsUsed);
         learnedUpTo(chatId, newest);
         return true;

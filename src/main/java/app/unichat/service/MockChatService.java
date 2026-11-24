@@ -616,7 +616,8 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     protected void setTyping(Chat chat, Member who, boolean typing) {
         java.util.Set<String> names = new java.util.LinkedHashSet<>(chat.typing());
-        if (typing) names.add(who.displayName()); else names.remove(who.displayName());
+        if (typing) names.add(who.displayName());
+        else names.remove(who.displayName());
         chat.setTyping(names);
         fireChats();
         fireMessages(chat.id());

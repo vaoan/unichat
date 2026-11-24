@@ -93,7 +93,7 @@ class StickerSuggestionsUiTest {
     }
 
     private void type(String text) throws InterruptedException {
-        FxWait.fx(() -> { box().setText(text); return null; });
+        FxWait.onFx(() -> box().setText(text));
         FxWait.settled();
     }
 
@@ -164,7 +164,7 @@ class StickerSuggestionsUiTest {
         type("😂");
         FxWait.until("offered while on", () -> offered().size() == 1);
         Settings.get().setSuggestStickers(false);
-        FxWait.fx(() -> { view.settingsSynced(); return null; }); // as Ajustes and the cloud apply a change
+        FxWait.onFx(view::settingsSynced);  // as Ajustes and the cloud apply a change
         FxWait.settled();
         assertTrue(offered().isEmpty(), "the row showing went at once, not at the next key");
         type("🙏");
@@ -177,7 +177,7 @@ class StickerSuggestionsUiTest {
         FxWait.until("offered", () -> offered().size() == 1);
         svc.sendText(chat, "😂", null).get();
         Message mine = svc.messages(chat).getLast();
-        FxWait.fx(() -> { find(view).composer().edit(mine); return null; }); // the box already holds "😂": no text changes
+        FxWait.onFx(() -> find(view).composer().edit(mine));  // the box already holds "😂": no text changes
         FxWait.settled();
         assertTrue(offered().isEmpty(), "an edit stays a text: no sticker can take its place");
     }
@@ -206,7 +206,7 @@ class StickerSuggestionsUiTest {
         FxWait.until("offered", () -> offered().size() == 1);
         going.obtrudeValue(null);
         press(offered().getFirst());
-        FxWait.fx(() -> { view.openChatId(other); return null; });
+        FxWait.onFx(() -> view.openChatId(other));
         type("nos vemos a las 5");
         FxWait.until("the second sent", () -> stickersSent().size() == 2);
         FxWait.settled();
@@ -223,10 +223,10 @@ class StickerSuggestionsUiTest {
             return null;
         });
         type("😂");
-        FxWait.fx(() -> { view.openChatId(chat); return null; });
+        FxWait.onFx(() -> view.openChatId(chat));
         type("😂");
         FxWait.until("offered here", () -> offered().size() == 1 && FxWait.fx(() -> offered().getFirst().getAccessibleText()).endsWith(", enviar"));
-        FxWait.fx(() -> { view.openChatId(refusing); return null; }); // its draft is the same "😂": the text doesn't change
+        FxWait.onFx(() -> view.openChatId(refusing));  // its draft is the same "😂": the text doesn't change
         FxWait.settled();
         assertTrue(FxWait.fx(() -> offered().getFirst().getAccessibleText()).contains("no acepta stickers"),
                 "the tiles are this chat's: " + FxWait.fx(() -> offered().getFirst().getAccessibleText()));
@@ -239,7 +239,7 @@ class StickerSuggestionsUiTest {
         Node tile = offered().getFirst();
         assertTrue(FxWait.fx(tile::isFocusTraversable), "Tab reaches it");
         assertTrue(FxWait.fx(tile::getAccessibleText).contains("😂"), "and says which: " + FxWait.fx(tile::getAccessibleText));
-        FxWait.fx(() -> { box().requestFocus(); return null; });
+        FxWait.onFx(() -> box().requestFocus());
         List<Node> passed = new java.util.ArrayList<>();
         for (int i = 0; i < 4 && FxWait.fx(() -> view.getScene().getFocusOwner()) != tile; i++) { // the box's buttons, then it
             FxWait.fx(() -> {

@@ -26,10 +26,16 @@ class ShutdownTest {
         CompletableFuture<Thread> ranOn = new CompletableFuture<>();
         CompletableFuture<Void> ended = new CompletableFuture<>();
         Shutdown.stopThenEnd(List.of(
-                () -> { ranOn.complete(Thread.currentThread()); done.add("cloud"); },
+                () -> {
+                    ranOn.complete(Thread.currentThread());
+                    done.add("cloud");
+                },
                 () -> { throw new IllegalStateException("one failing stops nothing else"); },
                 () -> done.add("service"),
-                () -> done.add("server")), () -> { done.add("end"); ended.complete(null); });
+                () -> done.add("server")), () -> {
+                    done.add("end");
+                    ended.complete(null);
+                });
         ended.get();
         assertNotEquals(caller, ranOn.get());
         assertEquals(List.of("cloud", "service", "server", "end"), done);

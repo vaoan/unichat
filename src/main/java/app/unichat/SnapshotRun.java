@@ -130,7 +130,11 @@ final class SnapshotRun {
             ex.printStackTrace(System.err);
         }
         Thread guard = new Thread(() -> {
-            try { Thread.sleep(4000); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            try {
+                Thread.sleep(4000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             Runtime.getRuntime().halt(0); // NOPMD: DoNotTerminateVM, a snapshot run ends the JVM once the picture is out
         });
         guard.setDaemon(true);

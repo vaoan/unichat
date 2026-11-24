@@ -70,7 +70,7 @@ class InfoActionsLayoutUiTest {
                     return next.localToScene(next.getBoundsInLocal()).getMinY() < lastIcon - 0.5;
                 });
                 if (overlaps) wrong.add(px + "px in " + width + ": the next section overlaps the icons");
-                FxWait.fx(() -> { stage[0].close(); return null; });
+                FxWait.onFx(stage[0]::close);
             }
         }
         svc.stop();

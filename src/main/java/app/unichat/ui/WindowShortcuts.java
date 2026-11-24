@@ -57,10 +57,16 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
         int zones = thread.chat() == null ? 2 : view.infoVisible() ? 5 : 4;
         int next = Math.floorMod((current < 0 ? (dir > 0 ? -1 : 0) : current) + dir, zones);
         switch (next) {
-            case 0 -> { Node b = rail.lookup(".rail-button"); if (b != null) b.requestFocus(); }
+            case 0 -> {
+                Node b = rail.lookup(".rail-button");
+                if (b != null) b.requestFocus();
+            }
             case 1 -> listPane.focusList();
             case 2 -> thread.focusTimeline();
-            case 4 -> { Node b = panel.lookup(".chip"); if (b != null) b.requestFocus(); }
+            case 4 -> {
+                Node b = panel.lookup(".chip");
+                if (b != null) b.requestFocus();
+            }
             default -> thread.composer().focus();
         }
     }
@@ -145,7 +151,10 @@ final class WindowShortcuts implements EventHandler<KeyEvent> {
             var _ = svc.setArchived(c.id(), !c.archived());
             view.toast(c.archived() ? I18n.t("windowShortcuts.unarchived") : I18n.t("windowShortcuts.archived"));
         } else if (mod && e.isShiftDown() && e.getCode() == KeyCode.U && c != null) {
-            if (c.isUnread()) svc.markRead(c.id()); else { var _ = svc.setMarkedUnread(c.id(), true); }
+            if (c.isUnread()) svc.markRead(c.id());
+            else {
+                var _ = svc.setMarkedUnread(c.id(), true);
+            }
         } else if (mod && e.isShiftDown() && e.getCode() == KeyCode.I && c != null) {
             view.toggleInfo();
         } else {

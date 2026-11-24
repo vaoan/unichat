@@ -78,7 +78,8 @@ final class FormatMenu {
     }
 
     static void apply(TextArea box, TextFormat f) {
-        int from = box.getSelection().getStart(), to = box.getSelection().getEnd();
+        int from = box.getSelection().getStart();
+        int to = box.getSelection().getEnd();
         TextFormat.Edit edit = f.apply(box.getText(), from, to);
         box.replaceText(0, box.getLength(), edit.text()); // one step: ⌘Z takes it back whole
         box.selectRange(edit.from(), edit.to());

@@ -56,7 +56,7 @@ class FavoritesRebuildUiTest {
 
     @AfterEach
     void close() throws Exception {
-        if (stage != null) FxWait.fx(() -> { stage.close(); return null; });
+        if (stage != null) FxWait.onFx(stage::close);
     }
 
     /**
@@ -83,10 +83,10 @@ class FavoritesRebuildUiTest {
                 "yo", app.unichat.model.AccountStatus.CONNECTED, null));
         StickerGrid grid = FxWait.fx(() -> new StickerGrid(svc, library, () -> null, () -> null, toasts::add));
 
-        FxWait.fx(() -> { grid.rebuildOnce(telegram); return null; });
+        FxWait.onFx(() -> grid.rebuildOnce(telegram));
         FxWait.until("tried", () -> asked.get() == 1);
         FxWait.settled();
-        FxWait.fx(() -> { grid.rebuildOnce(telegram); return null; });
+        FxWait.onFx(() -> grid.rebuildOnce(telegram));
         FxWait.settled();
 
         assertEquals(1, asked.get(), "not again at once");
@@ -118,7 +118,7 @@ class FavoritesRebuildUiTest {
 
         Button rebuild = FxWait.fx(() -> (Button) grid.lookupAll(".button").stream()
                 .filter(n -> "Actualizar los favoritos desde sus sets".equals(n.getAccessibleText())).findFirst().orElseThrow());
-        FxWait.fx(() -> { rebuild.fire(); return null; });
+        FxWait.onFx(rebuild::fire);
 
         FxWait.until("rebuilt", () -> toasts.contains("1 favorito actualizado"));
         assertEquals(List.of(now.url()), library.favorites(MediaLibrary.Kind.STICKER).stream().map(MediaLibrary.Item::url).toList());

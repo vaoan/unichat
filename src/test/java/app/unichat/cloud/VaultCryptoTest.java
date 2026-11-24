@@ -60,7 +60,8 @@ class VaultCryptoTest {
     @Test
     void everySealIsDifferent() throws Exception {
         byte[] key = VaultCrypto.randomKey();
-        byte[] one = VaultCrypto.seal(key, "p", PLAIN), two = VaultCrypto.seal(key, "p", PLAIN);
+        byte[] one = VaultCrypto.seal(key, "p", PLAIN);
+        byte[] two = VaultCrypto.seal(key, "p", PLAIN);
         assertFalse(Arrays.equals(one, two));
         assertArrayEquals(PLAIN, VaultCrypto.open(key, "p", one));
         assertArrayEquals(PLAIN, VaultCrypto.open(key, "p", two));
@@ -72,7 +73,8 @@ class VaultCryptoTest {
         assertEquals(32, VaultCrypto.hkdf(secret, "x").length);
         assertArrayEquals(VaultCrypto.hkdf(secret, "x"), VaultCrypto.hkdf(secret, "x"));
         assertFalse(Arrays.equals(VaultCrypto.hkdf(secret, "x"), VaultCrypto.hkdf(secret, "y")));
-        byte[] salt = new byte[16], other = new byte[16];
+        byte[] salt = new byte[16];
+        byte[] other = new byte[16];
         other[0] = 1;
         char[] password = "correct horse battery".toCharArray();
         byte[] key = VaultCrypto.argon2id(password, salt);

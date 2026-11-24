@@ -33,7 +33,9 @@ public record CloudAccount(Service service, String url, String user, String secr
     /** The account saved on this computer, or null when none is connected. */
     public static CloudAccount saved() {
         Settings s = Settings.get();
-        String url = s.getString("cloud.url", null), user = s.getString("cloud.user", null), secret = s.getString("cloud.secret", null);
+        String url = s.getString("cloud.url", null);
+        String user = s.getString("cloud.user", null);
+        String secret = s.getString("cloud.secret", null);
         if (url == null || user == null || secret == null) return null;
         return new CloudAccount(s.getEnum("cloud.service", Service.OTHER), url, user, secret);
     }

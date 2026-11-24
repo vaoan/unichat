@@ -106,7 +106,11 @@ class GroupsUiTest {
             for (int k = 0; k < list.getItems().size(); k++) if (list.getItems().get(k).id().equals(id)) return k;
             throw new AssertionError("no row " + id + " in " + list.getItems().stream().map(app.unichat.model.Chat::id).toList());
         });
-        fx(() -> { list.requestFocus(); list.getSelectionModel().select(i); list.scrollTo(i); return null; });
+        FxWait.onFx(() -> {
+            list.requestFocus();
+            list.getSelectionModel().select(i);
+            list.scrollTo(i);
+        });
         key(list, KeyCode.ENTER);
     }
 
@@ -193,7 +197,7 @@ class GroupsUiTest {
         Spaces.joinWaitMs = 0;
         try {
             Runnable letTheRoomIn = svc.holdBridge();
-            fx(() -> { view.openChatId("!family:demo"); return null; });
+            FxWait.onFx(() -> view.openChatId("!family:demo"));
             enter(fx(() -> chatList(scene)), "!server:demo");
             CompletableFuture<Void> arrived = arrival(svc, MockChatService.UNJOINED_CHANNEL_ID);
             enter(fx(() -> spaceList(scene)), MockChatService.UNJOINED_CHANNEL_ID);
@@ -250,7 +254,7 @@ class GroupsUiTest {
     @Test
     void searchFindsServersToAdd() throws Exception {
         Scene scene = open(Network.DISCORD);
-        fx(() -> { ((javafx.scene.control.TextField) scene.getRoot().lookup(".search-field")).setText("juegos"); return null; });
+        FxWait.onFx(() -> ((javafx.scene.control.TextField) scene.getRoot().lookup(".search-field")).setText("juegos"));
         String offer = Spaces.OFFER_PREFIX + MockChatService.OFFERED_GUILD_ID;
         FxWait.until("the server to add found", () -> chatList(scene).getItems().stream().anyMatch(c -> c.id().equals(offer)));
         assertTrue(fx(() -> chatList(scene).getItems()).stream().anyMatch(c -> c.id().equals(offer)));

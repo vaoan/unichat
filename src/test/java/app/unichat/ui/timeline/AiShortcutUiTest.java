@@ -74,7 +74,7 @@ class AiShortcutUiTest {
         assertFalse(infoOpen(scene));
 
         Node elsewhere = fx(() -> scene.getRoot().lookup(".chat-cell"));
-        fx(() -> { elsewhere.requestFocus(); return null; });
+        FxWait.onFx(elsewhere::requestFocus);
         press(elsewhere, false);
         wrote.await(); // from anywhere in the window
         assertFalse(infoOpen(scene), "the info panel stays as it was");
@@ -86,7 +86,7 @@ class AiShortcutUiTest {
         press(box, true);
         assertFalse(infoOpen(scene), "also from the text box");
 
-        fx(() -> { AiReplyButton.SHOWN.set(false); return null; });
+        FxWait.onFx(() -> AiReplyButton.SHOWN.set(false));
         press(box, false);
         assertFalse(infoOpen(scene), "with the AI off, nothing");
     }

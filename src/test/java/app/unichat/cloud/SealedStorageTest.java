@@ -28,9 +28,11 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class SealedStorageTest {
-    private static final String PATH = "Unichat/Settings/prueba.json", STORED = Vault.ROOT + "/Settings/prueba.json";
+    private static final String PATH = "Unichat/Settings/prueba.json";
+    private static final String STORED = Vault.ROOT + "/Settings/prueba.json";
     private static final Instant T = Instant.parse("2026-11-10T08:00:00Z");
-    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
+    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44";
+    private static final String LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
     private final byte[] vk = VaultCrypto.randomKey();
 
     @TempDir
@@ -66,7 +68,8 @@ class SealedStorageTest {
             assertFalse(sealed.get("Unichat/Settings/otra.json", dir.resolve("x")));
             assertFalse(Files.exists(dir.resolve("x")));
 
-            Path file = Files.write(dir.resolve("in"), secret), out = dir.resolve("out");
+            Path file = Files.write(dir.resolve("in"), secret);
+            Path out = dir.resolve("out");
             AtomicLong reported = new AtomicLong();
             sealed.put("Unichat/Settings/dos.json", file, reported::set);
             assertEquals(there.length, reported.get(), "the sealed size, once");
@@ -134,9 +137,16 @@ class SealedStorageTest {
     void syncedPartRunsOverItUnchanged() throws Exception {
         try (FakeDav cloud = new FakeDav("u", "p")) {
             SealedStorage sealed = over(new WebDav(cloud.url(), "u", "p"));
-            Map<String, String> sa = new TreeMap<>(), sb = new TreeMap<>();
-            SyncedPart a = new SyncedPart(PATH, "test-sealed-a", now -> Bundle.of("a", now, sa, null), t -> { sa.clear(); sa.putAll(t.settings()); });
-            SyncedPart b = new SyncedPart(PATH, "test-sealed-b", now -> Bundle.of("b", now, sb, null), t -> { sb.clear(); sb.putAll(t.settings()); });
+            Map<String, String> sa = new TreeMap<>();
+            Map<String, String> sb = new TreeMap<>();
+            SyncedPart a = new SyncedPart(PATH, "test-sealed-a", now -> Bundle.of("a", now, sa, null), t -> {
+                sa.clear();
+                sa.putAll(t.settings());
+            });
+            SyncedPart b = new SyncedPart(PATH, "test-sealed-b", now -> Bundle.of("b", now, sb, null), t -> {
+                sb.clear();
+                sb.putAll(t.settings());
+            });
             sa.put("ui.theme", "DARK");
             assertEquals(Action.UPLOAD, a.sync(sealed, T));
             assertEquals(Action.ADOPT, b.sync(sealed, T));

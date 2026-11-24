@@ -130,7 +130,10 @@ class TranscriptsTest {
             await(t, url);
         }
         CountDownLatch idle = new CountDownLatch(1);
-        t.request("mxc://s/last", () -> { idle.countDown(); return CompletableFuture.completedFuture(dir.resolve("last.ogg")); });
+        t.request("mxc://s/last", () -> {
+            idle.countDown();
+            return CompletableFuture.completedFuture(dir.resolve("last.ogg"));
+        });
         idle.await(); // one worker in order: everything asked before has run
         await(t, "mxc://s/last");
         runs.forEach((note, n) -> assertEquals(1, n.get(), note + " transcribed " + n.get() + " times"));

@@ -26,7 +26,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @EnabledIfSystemProperty(named = "unichat.uiTests", matches = "true")
 class ComposerSelectionUiTest {
     private static final String TEXT = "primera linea\nsegunda linea larga\ntercera";
-    private static final int LINE_2 = TEXT.indexOf("segunda"), LINE_3 = TEXT.indexOf("tercera");
+    private static final int LINE_2 = TEXT.indexOf("segunda");
+    private static final int LINE_3 = TEXT.indexOf("tercera");
 
     private Stage stage;
     private TextArea box;
@@ -57,7 +58,7 @@ class ComposerSelectionUiTest {
 
     @AfterEach
     void close() throws Exception {
-        if (stage != null) FxWait.fx(() -> { stage.close(); return null; });
+        if (stage != null) FxWait.onFx(stage::close);
     }
 
     private String shift(KeyCode arrow) throws InterruptedException {
@@ -84,7 +85,8 @@ class ComposerSelectionUiTest {
     void shiftCommandUpAndDownSelectFromWhereItStartedAndStayThere() throws Exception {
         org.junit.jupiter.api.Assumptions.assumeTrue(app.unichat.support.Os.mac(), "the Mac's keys");
         open(TEXT, 400);
-        int from = LINE_2 + 3, end = TEXT.length();
+        int from = LINE_2 + 3;
+        int end = TEXT.length();
         caretAt(from);
         assertEquals(from + "-0", shiftShortcut(KeyCode.UP));
         assertEquals(from + "-0", shiftShortcut(KeyCode.UP), "again: still from where it started");
@@ -94,7 +96,7 @@ class ComposerSelectionUiTest {
     }
 
     private void caretAt(int at) throws InterruptedException {
-        FxWait.fx(() -> { box.positionCaret(at); return null; });
+        FxWait.onFx(() -> box.positionCaret(at));
     }
 
     @Test

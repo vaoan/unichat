@@ -76,7 +76,8 @@ public enum TextFormat {
     }
 
     private static Edit block(String text, int from, int to) {
-        String open = "```\n", close = "\n```";
+        String open = "```\n";
+        String close = "\n```";
         if (from >= open.length() && text.startsWith(open, from - open.length()) && text.startsWith(close, to)) {
             return new Edit(text.substring(0, from - open.length()) + text.substring(from, to) + text.substring(to + close.length()),
                     from - open.length(), to - open.length());

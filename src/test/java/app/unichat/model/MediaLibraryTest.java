@@ -235,8 +235,8 @@ class MediaLibraryTest {
     }
 
     @Test
-    void theQuickReactionsAreTheOnesUsedMostAndTravelInTheFile(@TempDir Path dir) {
-        Path f = dir.resolve("media-library.json");
+    void theQuickReactionsAreTheOnesUsedMostAndTravelInTheFile(@TempDir Path temp) {
+        Path f = temp.resolve("media-library.json");
         MediaLibrary lib = new MediaLibrary(f);
         List<String> usual = List.of("❤️", "👍", "😂", "😮", "😢", "🙏");
         assertEquals(usual, lib.mostReacted(6, usual), "no history: the usual ones");

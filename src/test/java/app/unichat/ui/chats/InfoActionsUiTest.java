@@ -50,14 +50,14 @@ class InfoActionsUiTest {
         List<String> names = FxWait.fx(() -> actions.stream().map(Button::getAccessibleText).toList());
         assertTrue(names.contains("Mover a prioridad baja") && names.contains("Opciones del chat"), names.toString());
         Button low = actions.get(names.indexOf("Mover a prioridad baja"));
-        FxWait.fx(() -> { low.fire(); return null; });
+        FxWait.onFx(low::fire);
         assertTrue(svc.chat(id).lowPriority());
         svc.setLowPriority(id, false).get();
         Button options = actions.get(names.indexOf("Opciones del chat"));
-        FxWait.fx(() -> { options.fire(); return null; });
+        FxWait.onFx(options::fire);
         assertEquals(id, opened.get().id(), "the gear opens this chat's options");
         assertTrue(FxWait.fx(() -> pane.lookupAll(".danger-button").isEmpty()), "leaving is in the options now, not here");
-        FxWait.fx(() -> { pane.getScene().getWindow().hide(); return null; });
+        FxWait.onFx(() -> pane.getScene().getWindow().hide());
         svc.stop();
     }
 }

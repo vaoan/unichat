@@ -20,7 +20,8 @@ final class FakeDav implements AutoCloseable {
     final Map<String, byte[]> files = new ConcurrentHashMap<>();
     final Set<String> dirs = ConcurrentHashMap.newKeySet();
     final Map<String, Integer> versions = new ConcurrentHashMap<>();
-    final AtomicInteger gets = new AtomicInteger(), puts = new AtomicInteger();
+    final AtomicInteger gets = new AtomicInteger();
+    final AtomicInteger puts = new AtomicInteger();
     /** Whether a listing gives whole addresses ("https://host/dav/…", as some servers do) rather than paths. */
     volatile boolean wholeHrefs;
     /** Paths whose next PUT fails (the network dropped), once each. */

@@ -69,7 +69,8 @@ class ProfileMediaTabsUiTest {
                     List<String> out = new ArrayList<>();
                     Node bar = pane.lookup(".media-tabs");
                     var barBounds = bar.localToScene(bar.getBoundsInLocal());
-                    double widest = 0, narrowest = Double.MAX_VALUE;
+                    double widest = 0;
+                    double narrowest = Double.MAX_VALUE;
                     for (Node n : pane.lookupAll(".media-tab")) {
                         widest = Math.max(widest, n.getLayoutBounds().getWidth());
                         narrowest = Math.min(narrowest, n.getLayoutBounds().getWidth());
@@ -81,7 +82,7 @@ class ProfileMediaTabsUiTest {
                     if (widest - narrowest > 1) out.add(px + "px in " + width + ": uneven, " + Math.round(narrowest) + " to " + Math.round(widest) + " px");
                     return out;
                 }));
-                FxWait.fx(() -> { stage[0].close(); return null; });
+                FxWait.onFx(stage[0]::close);
             }
         }
         svc.stop();

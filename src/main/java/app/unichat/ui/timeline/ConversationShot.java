@@ -44,7 +44,8 @@ final class ConversationShot {
      * The most it draws: a stretch longer is refused, said, before it's made. One picture of a thousand messages (or one
      * stranger's message of 60 000 lines) at 2x is gigabytes: the window's heap would run out (`ui/media/CLAUDE.md`).
      */
-    static final int MAX_MESSAGES = 400, MAX_HEIGHT_PX = 16_000;
+    static final int MAX_MESSAGES = 400;
+    static final int MAX_HEIGHT_PX = 16_000;
     /** Pixels a point: sharp on a phone's screen and a retina one. */
     static final double SCALE = 2;
     /** How often it looks whether its pictures arrived. */
@@ -165,7 +166,8 @@ final class ConversationShot {
     /** {@code shot} cut into pieces {@code height} pixels tall, between messages; the last one filled up with its background. */
     static List<Image> pieces(Shot shot, int height) {
         Image whole = shot.whole();
-        int w = (int) whole.getWidth(), total = (int) whole.getHeight();
+        int w = (int) whole.getWidth();
+        int total = (int) whole.getHeight();
         PixelReader in = whole.getPixelReader();
         Color background = in.getColor(0, total - 1);
         List<Image> out = new ArrayList<>();

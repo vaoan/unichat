@@ -53,7 +53,8 @@ final class AppearancePages {
         FlowPane accents = new FlowPane(6, 8);
         javafx.scene.control.ToggleGroup accentGroup = new javafx.scene.control.ToggleGroup();
         for (int i = 0; i < ACCENTS.length; i++) {
-            String hex = ACCENTS[i], name = I18n.t("settings.appearance.accent." + ACCENT_NAMES[i]);
+            String hex = ACCENTS[i];
+            String name = I18n.t("settings.appearance.accent." + ACCENT_NAMES[i]);
             javafx.scene.control.ToggleButton sw = new javafx.scene.control.ToggleButton();
             sw.getStyleClass().add("accent-swatch");
             sw.setToggleGroup(accentGroup);
@@ -76,12 +77,21 @@ final class AppearancePages {
                         row(I18n.t("settings.appearance.accent"), null, accents)),
                 group(I18n.t("settings.appearance.groupList"),
                         row(I18n.t("settings.appearance.textSize"), I18n.t("settings.appearance.textSizeHelp", Shortcuts.zoomKeys()), font),
-                        row(I18n.t("settings.appearance.compact"), I18n.t("settings.appearance.compactHelp"), toggle(s.compactList(), v -> { s.setCompactList(v); changed.run(); })),
-                        row(I18n.t("settings.appearance.badges"), I18n.t("settings.appearance.badgesHelp"), toggle(s.showNetworkBadges(), v -> { s.setShowNetworkBadges(v); changed.run(); }))),
+                        row(I18n.t("settings.appearance.compact"), I18n.t("settings.appearance.compactHelp"), toggle(s.compactList(), v -> {
+                            s.setCompactList(v);
+                            changed.run();
+                        })),
+                        row(I18n.t("settings.appearance.badges"), I18n.t("settings.appearance.badgesHelp"), toggle(s.showNetworkBadges(), v -> {
+                            s.setShowNetworkBadges(v);
+                            changed.run();
+                        }))),
                 group(I18n.t("settings.appearance.groupWriting"),
                         row(I18n.t("settings.appearance.enterSends"), I18n.t("settings.appearance.enterSendsHelp", Shortcuts.key("Enter")), toggle(s.sendOnEnter(), s::setSendOnEnter)),
                         row(I18n.t("settings.appearance.suggestStickers"), I18n.t("settings.appearance.suggestStickersHelp"),
-                                toggle(s.suggestStickers(), v -> { s.setSuggestStickers(v); changed.run(); })),
+                                toggle(s.suggestStickers(), v -> {
+                                    s.setSuggestStickers(v);
+                                    changed.run();
+                                })),
                         row(I18n.t("settings.appearance.forwardWho"), I18n.t("settings.appearance.forwardHelp"), toggle(s.forwardSaysWho(), s::setForwardSaysWho)),
                         row(I18n.t("settings.appearance.forwardWhere"), null, toggle(s.forwardSaysWhere(), s::setForwardSaysWhere)),
                         row(I18n.t("settings.appearance.forwardWhen"), null, toggle(s.forwardSaysWhen(), s::setForwardSaysWhen))));
@@ -142,19 +152,37 @@ final class AppearancePages {
                         row(I18n.t("settings.appearance.textSize"), I18n.t("settings.a11y.textSizeHelp", Shortcuts.zoomKeys()), fontSlider(changed)),
                         row(I18n.t("settings.a11y.contrast"), I18n.t("settings.a11y.contrastHelp",
                                 I18n.t(Theme.systemHighContrast() ? "settings.option.systemOn" : "settings.option.systemOff")),
-                                modeChips(I18n.t("settings.a11y.contrast"), s.highContrast(), m -> { s.setHighContrast(m); changed.run(); })),
+                                modeChips(I18n.t("settings.a11y.contrast"), s.highContrast(), m -> {
+                                    s.setHighContrast(m);
+                                    changed.run();
+                                })),
                         row(I18n.t("settings.a11y.readableFont"), I18n.t("settings.a11y.readableFontHelp"),
-                                toggle(s.readableFont(), v -> { s.setReadableFont(v); changed.run(); })),
+                                toggle(s.readableFont(), v -> {
+                                    s.setReadableFont(v);
+                                    changed.run();
+                                })),
                         row(I18n.t("settings.a11y.spacing"), I18n.t("settings.a11y.spacingHelp"),
-                                toggle(s.wideSpacing(), v -> { s.setWideSpacing(v); changed.run(); }))),
+                                toggle(s.wideSpacing(), v -> {
+                                    s.setWideSpacing(v);
+                                    changed.run();
+                                }))),
                 group(I18n.t("settings.a11y.groupMotion"),
                         row(I18n.t("settings.a11y.motion"), I18n.t("settings.a11y.motionHelp",
                                 I18n.t(Theme.systemReducedMotion() ? "settings.option.systemOn" : "settings.option.systemOff")),
-                                modeChips(I18n.t("settings.a11y.motion"), s.reduceMotion(), m -> { s.setReduceMotion(m); changed.run(); })),
+                                modeChips(I18n.t("settings.a11y.motion"), s.reduceMotion(), m -> {
+                                    s.setReduceMotion(m);
+                                    changed.run();
+                                })),
                         row(I18n.t("settings.a11y.focus"), I18n.t("settings.a11y.focusHelp"),
-                                toggle(s.strongFocus(), v -> { s.setStrongFocus(v); changed.run(); })),
+                                toggle(s.strongFocus(), v -> {
+                                    s.setStrongFocus(v);
+                                    changed.run();
+                                })),
                         row(I18n.t("settings.a11y.actions"), I18n.t("settings.a11y.actionsHelp"),
-                                toggle(s.alwaysShowMessageActions(), v -> { s.setAlwaysShowMessageActions(v); changed.run(); }))),
+                                toggle(s.alwaysShowMessageActions(), v -> {
+                                    s.setAlwaysShowMessageActions(v);
+                                    changed.run();
+                                }))),
                 group(I18n.t("settings.a11y.groupAudio"),
                         row(I18n.t("settings.a11y.speak"), I18n.t("settings.a11y.speakHelp"), speak)),
                 group(I18n.t("settings.a11y.groupReaders"),

@@ -128,7 +128,8 @@ final class RoomPreferences {
     void writeFinished(String roomId, boolean muted, boolean ok, Instant now) {
         writing.computeIfPresent(roomId, (k, n) -> n > 1 ? n - 1 : null);
         if (ok) {
-            if (muted) mutedRooms.add(roomId); else mutedRooms.remove(roomId);
+            if (muted) mutedRooms.add(roomId);
+            else mutedRooms.remove(roomId);
             retries.remove(roomId);
             return;
         }

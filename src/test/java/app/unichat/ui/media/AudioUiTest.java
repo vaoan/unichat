@@ -93,33 +93,34 @@ class AudioUiTest {
 
     @Test
     void onlyOnePlaysAtATime() throws Exception {
-        Message a = audio("$a", "mxc://s/a"), b = audio("$b", "mxc://s/b");
-        fx(() -> { playback.toggle(a, null); return null; });
+        Message a = audio("$a", "mxc://s/a");
+        Message b = audio("$b", "mxc://s/b");
+        FxWait.onFx(() -> playback.toggle(a, null));
         awaitPlaying(a);
-        fx(() -> { playback.toggle(b, null); return null; });
+        FxWait.onFx(() -> playback.toggle(b, null));
         awaitPlaying(b);
         assertFalse(fx(() -> playback.isCurrent(a)));
-        fx(() -> { playback.stop(); return null; });
+        FxWait.onFx(playback::stop);
     }
 
     @Test
     void theSameOnePausesAndResumes() throws Exception {
         Message a = audio("$a", "mxc://s/a");
-        fx(() -> { playback.toggle(a, null); return null; });
+        FxWait.onFx(() -> playback.toggle(a, null));
         awaitPlaying(a);
-        fx(() -> { playback.toggle(a, null); return null; });
+        FxWait.onFx(() -> playback.toggle(a, null));
         await(() -> playback.state() == AudioPlayback.State.PAUSED, "paused");
-        fx(() -> { playback.toggle(a, null); return null; });
+        FxWait.onFx(() -> playback.toggle(a, null));
         awaitPlaying(a);
-        fx(() -> { playback.stop(); return null; });
+        FxWait.onFx(playback::stop);
     }
 
     @Test
     void atTheEndItsGone() throws Exception {
         Message a = audio("$a", "mxc://s/a");
-        fx(() -> { playback.toggle(a, null); return null; });
+        FxWait.onFx(() -> playback.toggle(a, null));
         awaitPlaying(a);
-        fx(() -> { playback.seek(0.97); return null; });
+        FxWait.onFx(() -> playback.seek(0.97));
         await(() -> playback.current() == null, "finished");
         assertNull(fx(playback::state));
     }
@@ -127,7 +128,7 @@ class AudioUiTest {
     @Test
     void whatCantBeHadSaysSo() throws Exception {
         Message a = audio("$a", "mxc://s/roto");
-        fx(() -> { playback.toggle(a, null); return null; });
+        FxWait.onFx(() -> playback.toggle(a, null));
         await(() -> playback.current() == null, "gave up");
         await(() -> toasts.contains("No se pudo reproducir el audio"), "said so");
     }
@@ -150,25 +151,25 @@ class AudioUiTest {
         });
         assertFalse(fx(bar::isVisible), "nothing to control yet");
         Message a = audio("$a", "mxc://s/a");
-        fx(() -> { playback.toggle(a, chat); return null; });
+        FxWait.onFx(() -> playback.toggle(a, chat));
         awaitPlaying(a);
         assertTrue(fx(bar::isVisible));
-        fx(() -> { bar.lookupAll(".hyperlink").forEach(n -> ((javafx.scene.control.Hyperlink) n).fire()); return null; });
+        FxWait.onFx(() -> bar.lookupAll(".hyperlink").forEach(n -> ((javafx.scene.control.Hyperlink) n).fire()));
         assertEquals(List.of(chat), opened);
 
-        fx(() -> { ((Button) bar.lookup(".audio-toggle")).fire(); return null; });
+        FxWait.onFx(() -> ((Button) bar.lookup(".audio-toggle")).fire());
         await(() -> playback.state() == AudioPlayback.State.PAUSED, "the bar pauses it");
-        fx(() -> { ((Button) bar.lookup(".audio-toggle")).fire(); return null; });
+        FxWait.onFx(() -> ((Button) bar.lookup(".audio-toggle")).fire());
         awaitPlaying(a);
         fx(() -> {
             javax.imageio.ImageIO.write(javafx.embed.swing.SwingFXUtils.fromFXImage(stage.getScene().snapshot(null), null), "png",
                     Path.of(System.getProperty("java.io.tmpdir"), "unichat-audio-bar.png").toFile());
             return null;
         });
-        fx(() -> { bar.getChildren().stream().filter(n -> n instanceof Button).map(n -> (Button) n).forEach(Button::fire); return null; });
+        FxWait.onFx(() -> bar.getChildren().stream().filter(n -> n instanceof Button).map(n -> (Button) n).forEach(Button::fire));
         assertNull(fx(playback::current));
         assertFalse(fx(bar::isVisible));
-        fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 
     @Test
@@ -189,7 +190,7 @@ class AudioUiTest {
         AudioPlayback audio = view.audio();
         await(() -> view.lookup(".timeline .audio-toggle") != null, "the voice note shows its player");
         FxWait.settled(); // the timeline done drawing, so the button pressed is the one that stays
-        fx(() -> { ((Button) view.lookup(".timeline .audio-toggle")).fire(); return null; });
+        FxWait.onFx(() -> ((Button) view.lookup(".timeline .audio-toggle")).fire());
         await(() -> audio.state() == AudioPlayback.State.PLAYING, "plays");
         assertEquals("!family:demo", fx(() -> audio.chat().id()));
         fx(() -> {
@@ -200,17 +201,21 @@ class AudioUiTest {
 
         // Paused first: the demo note lasts 2 s, so "still playing" after changing chats depended on how loaded the
         // machine was (it failed in a full run). Paused, it must still be there, and the bar must start it again.
-        fx(() -> { audio.pause(); return null; });
+        FxWait.onFx(audio::pause);
         await(() -> audio.state() == AudioPlayback.State.PAUSED, "paused");
-        fx(() -> { view.openChatId("!andres:demo"); return null; });
+        FxWait.onFx(() -> view.openChatId("!andres:demo"));
         FxWait.settled(); // the other chat fully shown
         assertEquals(AudioPlayback.State.PAUSED, fx(audio::state), "changing chats doesn't stop it");
         assertEquals("!family:demo", fx(() -> audio.chat().id()));
         Node bar = fx(() -> view.lookup(".audio-bar"));
         assertTrue(fx(bar::isVisible));
-        fx(() -> { ((Button) bar.lookup(".audio-toggle")).fire(); return null; });
+        FxWait.onFx(() -> ((Button) bar.lookup(".audio-toggle")).fire());
         await(() -> audio.state() == AudioPlayback.State.PLAYING, "the bar controls it from the other chat");
-        fx(() -> { audio.stop(); stage[0].close(); svc.stop(); return null; });
+        FxWait.onFx(() -> {
+            audio.stop();
+            stage[0].close();
+            svc.stop();
+        });
     }
 
     @Test
@@ -232,6 +237,6 @@ class AudioUiTest {
         assertEquals(before + 1, fx(playback::listenerCount));
         fx(() -> root.getChildren().remove(controls));
         assertEquals(before, fx(playback::listenerCount));
-        fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 }

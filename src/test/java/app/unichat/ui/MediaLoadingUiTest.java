@@ -114,7 +114,7 @@ class MediaLoadingUiTest {
         assertEquals(windows, FxWait.fx(() -> Window.getWindows().size()), "a click on it opens nothing else (the viewer)");
 
         ScriptedChatService.Gate again = w.svc.holdDownloads();
-        FxWait.fx(() -> { retry(newestBubble()).fire(); return null; });
+        FxWait.onFx(() -> retry(newestBubble()).fire());
         FxWait.until("loading again", () -> ring(newestBubble()) != null && retry(newestBubble()) == null);
         again.release();
         FxWait.until("the picture this time", () -> drawn(newestBubble()) && ring(newestBubble()) == null);
@@ -124,9 +124,9 @@ class MediaLoadingUiTest {
     void aStickerSetsTilesShowTheirLoadAndCanTryAgain() throws Exception {
         w = TimelineWindow.open(5);
         ScriptedChatService.Gate downloads = w.svc.holdDownloads();
-        FxWait.fx(() -> { w.view.showPanel(SidePanel.Tab.STICKERS); return null; });
+        FxWait.onFx(() -> w.view.showPanel(SidePanel.Tab.STICKERS));
         FxWait.until("the demo's set is listed", () -> w.scene.getRoot().lookup(".sticker-set") != null);
-        FxWait.fx(() -> { ((Button) w.scene.getRoot().lookup(".sticker-set")).fire(); return null; });
+        FxWait.onFx(() -> ((Button) w.scene.getRoot().lookup(".sticker-set")).fire());
         FxWait.until("its tiles load", () -> w.scene.getRoot().lookupAll(".sticker-tile").stream().anyMatch(t -> ring(t) != null));
         downloads.fail();
         FxWait.until("each tile offers to try again", () -> w.scene.getRoot().lookupAll(".sticker-tile").stream()
@@ -134,7 +134,7 @@ class MediaLoadingUiTest {
         shot(FxWait.fx(() -> w.scene.getRoot().lookup(".sticker-set").getParent()), "set");
         ScriptedChatService.Gate again = w.svc.holdDownloads();
         Node tile = FxWait.fx(() -> w.scene.getRoot().lookupAll(".sticker-tile").stream().filter(t -> retry(t) != null).findFirst().orElseThrow());
-        FxWait.fx(() -> { retry(tile).fire(); return null; });
+        FxWait.onFx(() -> retry(tile).fire());
         again.release();
         FxWait.until("that tile's sticker shows", () -> drawn(tile) && retry(tile) == null && ring(tile) == null);
     }

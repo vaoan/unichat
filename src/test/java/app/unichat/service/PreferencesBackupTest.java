@@ -17,12 +17,17 @@ import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assumptions.assumeTrue;
 
 /** preferences.json is the only copy of the person's choices: a damaged one falls back to the previous version. */
 class PreferencesBackupTest {
-    private static final String A = "telegram:1", B = "telegram:2";
+    private static final String A = "telegram:1";
+    private static final String B = "telegram:2";
     private static final ObjectMapper JSON = new ObjectMapper();
 
     @TempDir Path dir;
@@ -259,8 +264,8 @@ class PreferencesBackupTest {
     void aSuccessfulRecoveryDoesNotWarnAboutSaving() throws Exception {
         twoSaves();
         Files.writeString(prefs(), "{roto");
-        var opened = open();
-        new FolderActions(opened, () -> { }).onSaveFailure(m -> { });
-        assertEquals(0, opened.announcements(), "nothing to warn about");
+        var file = open();
+        new FolderActions(file, () -> { }).onSaveFailure(m -> { });
+        assertEquals(0, file.announcements(), "nothing to warn about");
     }
 }

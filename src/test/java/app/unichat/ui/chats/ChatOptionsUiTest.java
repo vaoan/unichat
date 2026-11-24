@@ -70,15 +70,19 @@ class ChatOptionsUiTest {
         StackPane overlay = open(svc, id);
         Node note = FxWait.fx(() -> overlay.lookup(".chat-options-mine-note"));
         assertFalse(FxWait.fx(note::isVisible), "nothing saved: nothing to say");
-        CheckBox theirs = box(overlay, "Guardar lo que envíen en este chat"), mine = box(overlay, "Guardar lo que yo envíe en este chat");
-        FxWait.fx(() -> { theirs.fire(); return null; });
+        CheckBox theirs = box(overlay, "Guardar lo que envíen en este chat");
+        CheckBox mine = box(overlay, "Guardar lo que yo envíe en este chat");
+        FxWait.onFx(theirs::fire);
         assertTrue(FxWait.fx(note::isVisible), "theirs saved, mine not: said");
         assertTrue(FxWait.fx(((javafx.scene.control.Label) note)::getText).contains("tú"));
-        FxWait.fx(() -> { mine.fire(); return null; });
+        FxWait.onFx(mine::fire);
         assertFalse(FxWait.fx(note::isVisible), "mine saved too");
-        FxWait.fx(() -> { mine.fire(); theirs.fire(); return null; });
+        FxWait.onFx(() -> {
+            mine.fire();
+            theirs.fire();
+        });
         assertFalse(FxWait.fx(note::isVisible), "nothing saved again");
-        FxWait.fx(() -> { overlay.getScene().getWindow().hide(); return null; });
+        FxWait.onFx(() -> overlay.getScene().getWindow().hide());
     }
 
     /** "Textos" is a kind like the others, for what others send and for what I send, each apart. */
@@ -91,12 +95,12 @@ class ChatOptionsUiTest {
         CheckBox texts = FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)
                 .filter(b -> "Guardar lo que envíen en este chat: Textos (para poder ver lo que se borre)".equals(b.getAccessibleText()))
                 .findFirst().orElseThrow());
-        FxWait.fx(() -> { theirs.fire(); return null; });
+        FxWait.onFx(theirs::fire);
         assertTrue(svc.autoSaves(id).contains(SaveKind.TEXTS), "turned on: the texts too");
-        FxWait.fx(() -> { texts.fire(); return null; });
+        FxWait.onFx(texts::fire);
         assertEquals(EnumSet.complementOf(EnumSet.of(SaveKind.TEXTS)), svc.autoSaves(id), "the texts left out alone");
         assertTrue(svc.autoSaves(id, true).isEmpty(), "what I send untouched");
-        FxWait.fx(() -> { overlay.getScene().getWindow().hide(); return null; });
+        FxWait.onFx(() -> overlay.getScene().getWindow().hide());
     }
 
     @Test
@@ -108,32 +112,32 @@ class ChatOptionsUiTest {
         CheckBox on = FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)
                 .filter(b -> b.getText().equals("Guardar lo que envíen en este chat")).findFirst().orElseThrow());
         assertTrue(FxWait.fx(() -> boxes.stream().allMatch(Node::isDisabled)), "kinds wait for the switch");
-        FxWait.fx(() -> { on.fire(); return null; });
+        FxWait.onFx(on::fire);
         assertEquals(EnumSet.allOf(SaveKind.class), svc.autoSaves(id), "on: everything");
         CheckBox gifs = FxWait.fx(() -> boxes.stream().filter(b -> b.getText().equals("GIFs")).findFirst().orElseThrow());
-        FxWait.fx(() -> { gifs.fire(); return null; });
+        FxWait.onFx(gifs::fire);
         assertEquals(EnumSet.complementOf(EnumSet.of(SaveKind.GIFS)), svc.autoSaves(id), "GIFs left out");
         String where = FxWait.fx(() -> overlay.lookupAll(".label").stream().map(n -> ((javafx.scene.control.Label) n).getText())
                 .filter(t -> t != null && t.startsWith("Carpeta:")).findFirst().orElseThrow());
         assertTrue(where.contains(SaveFolders.shown(SaveFolders.of(svc.chat(id)))) && where.contains("test-autosave"), where);
-        FxWait.fx(() -> { on.fire(); return null; });
+        FxWait.onFx(on::fire);
         assertTrue(svc.autoSaves(id).isEmpty(), "off");
         CheckBox showMedia = FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)
                 .filter(b -> b.getText().equals("Mostrar la multimedia en el perfil")).findFirst().orElseThrow());
         assertTrue(FxWait.fx(showMedia::isSelected), "shown unless hidden");
-        FxWait.fx(() -> { showMedia.fire(); return null; });
+        FxWait.onFx(showMedia::fire);
         assertTrue(svc.mediaHidden(id), "hidden for this chat");
         svc.setMediaHidden(id, false).get();
         // What I send has its own switch and kinds, apart from what others send.
         CheckBox mineOn = FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)
                 .filter(b -> b.getText().equals("Guardar lo que yo envíe en este chat")).findFirst().orElseThrow());
-        FxWait.fx(() -> { mineOn.fire(); return null; });
+        FxWait.onFx(mineOn::fire);
         assertEquals(EnumSet.allOf(SaveKind.class), svc.autoSaves(id, true), "on: every kind");
         CheckBox minePhotos = FxWait.fx(() -> overlay.lookupAll(".check-box").stream().map(n -> (CheckBox) n)
                 .filter(b -> "Guardar lo que yo envíe en este chat: Fotos".equals(b.getAccessibleText())).findFirst().orElseThrow());
-        FxWait.fx(() -> { minePhotos.fire(); return null; });
+        FxWait.onFx(minePhotos::fire);
         assertFalse(svc.autoSaves(id, true).contains(SaveKind.PHOTOS), "its own kinds");
-        FxWait.fx(() -> { mineOn.fire(); return null; });
+        FxWait.onFx(mineOn::fire);
         assertTrue(svc.autoSaves(id, true).isEmpty(), "and off");
 
         // Leaving is on its own tab, "Peligroso": nothing of it shows among the everyday options.
@@ -141,23 +145,23 @@ class ChatOptionsUiTest {
                 "not on the General tab");
         javafx.scene.control.ToggleButton dangerTab = FxWait.fx(() -> overlay.lookupAll(".media-tab").stream()
                 .map(n -> (javafx.scene.control.ToggleButton) n).filter(t -> t.getText().equals("Peligroso")).findFirst().orElseThrow());
-        FxWait.fx(() -> { dangerTab.fire(); return null; });
+        FxWait.onFx(dangerTab::fire);
         assertTrue(FxWait.fx(() -> !shown(showMedia)), "and the General options are hidden there");
         // Leaving asks first; "Cancelar" goes back, only the second yes leaves.
         Button ask = FxWait.fx(() -> overlay.lookupAll(".danger-button").stream().map(n -> (Button) n)
                 .filter(ChatOptionsUiTest::shown).findFirst().orElseThrow());
-        FxWait.fx(() -> { ask.fire(); return null; });
+        FxWait.onFx(ask::fire);
         Button cancel = FxWait.fx(() -> overlay.lookupAll(".secondary-button").stream().map(n -> (Button) n)
                 .filter(b -> b.isVisible() && b.getText().equals("Cancelar")).findFirst().orElseThrow());
-        FxWait.fx(() -> { cancel.fire(); return null; });
+        FxWait.onFx(cancel::fire);
         assertNotNull(svc.chat(id), "not left: asked, then cancelled");
-        FxWait.fx(() -> { ask.fire(); return null; });
+        FxWait.onFx(ask::fire);
         Button yes = FxWait.fx(() -> overlay.lookupAll(".danger-button").stream().map(n -> (Button) n)
                 .filter(b -> b.isVisible() && b.getText().startsWith("Sí,")).findFirst().orElseThrow());
-        FxWait.fx(() -> { yes.fire(); return null; });
+        FxWait.onFx(yes::fire);
         FxWait.until("the chat is left", () -> svc.chat(id) == null);
         assertTrue(overlay.getChildren().isEmpty(), "and the sheet closed");
-        FxWait.fx(() -> { overlay.getScene().getWindow().hide(); return null; });
+        FxWait.onFx(() -> overlay.getScene().getWindow().hide());
         svc.stop();
     }
 

@@ -25,7 +25,8 @@ import java.util.stream.Stream;
  */
 public final class SpotBugsCache {
     /** The hash of this run's inputs, and the one a pass then marks. */
-    static final String INPUTS = "inputs.sha256", PASSED = "passed.sha256";
+    static final String INPUTS = "inputs.sha256";
+    static final String PASSED = "passed.sha256";
 
     private SpotBugsCache() {}
 
@@ -73,7 +74,8 @@ public final class SpotBugsCache {
      * cached (its mark is already these inputs').
      */
     static void passed(Path project, Path cache, String run) throws IOException {
-        Path inputs = cache.resolve(INPUTS), decision = cache.resolve(decision(run));
+        Path inputs = cache.resolve(INPUTS);
+        Path decision = cache.resolve(decision(run));
         if (!Files.isRegularFile(inputs) || !Files.isRegularFile(decision)) return;
         if (!Files.readString(decision).equals("spotbugs.skip=false\n")) return;
         Path report = project.resolve("target/spotbugsXml.xml");

@@ -21,7 +21,12 @@ final class VaultCrypto {
     /** Sealed form: version | nonce | ciphertext and tag. */
     private static final byte VERSION = 1;
     private static final String AAD_PREFIX = "unichat-vault/" + VERSION + ":";
-    private static final int KEY = 32, SALT = 16, NONCE = 12, TAG_BITS = 128, ARGON_KIB = 64 * 1024, ARGON_ITERATIONS = 3;
+    private static final int KEY = 32;
+    private static final int SALT = 16;
+    private static final int NONCE = 12;
+    private static final int TAG_BITS = 128;
+    private static final int ARGON_KIB = 64 * 1024;
+    private static final int ARGON_ITERATIONS = 3;
     private static final SecureRandom RANDOM = new SecureRandom();
 
     private VaultCrypto() {}

@@ -32,7 +32,12 @@ public final class ChatMenus {
         ContextMenu menu = new ContextMenu();
         menu.getItems().addAll(
                 item(c.isUnread() ? I18n.t("chatMenu.markRead") : I18n.t("chatMenu.markUnread"),
-                        () -> { if (c.isUnread()) svc.markRead(id); else { var _ = svc.setMarkedUnread(id, true); } }),
+                        () -> {
+                            if (c.isUnread()) svc.markRead(id);
+                            else {
+                                var _ = svc.setMarkedUnread(id, true);
+                            }
+                        }),
                 favoriteItem(c, svc), pinItem(c, svc), muteItem(c, svc),
                 reminderMenu(c, svc),
                 new SeparatorMenuItem(),

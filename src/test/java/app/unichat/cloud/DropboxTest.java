@@ -132,7 +132,8 @@ class DropboxTest {
     void theSettingsTravelThroughDropboxToo() throws Exception {
         try (FakeDropbox fake = new FakeDropbox("APP", "REFRESH")) {
             DropboxApi api = api(fake, DropboxApi.SINGLE, 1024);
-            Map<String, String> a = new HashMap<>(Map.of("ui.theme", "DARK")), b = new HashMap<>();
+            Map<String, String> a = new HashMap<>(Map.of("ui.theme", "DARK"));
+            Map<String, String> b = new HashMap<>();
             SyncedPart pa = new SyncedPart(CloudAccount.SETTINGS_FILE, "test-da", now -> Bundle.of("a", now, a, null), t -> { });
             SyncedPart pb = new SyncedPart(CloudAccount.SETTINGS_FILE, "test-db", now -> Bundle.of("b", now, b, null), t -> {
                 b.clear();

@@ -129,7 +129,8 @@ public final class ReplyPrompt {
 
         final String symbol;
         final int group;
-        final String change, alone;
+        final String change;
+        final String alone;
 
         Mark(String symbol, int group, String change, String alone) {
             this.symbol = symbol;

@@ -183,7 +183,8 @@ final class TimelineScroll {
      */
     private void holdWhatsInView(VirtualFlow<?> flow) {
         anchorId = null;
-        IndexedCell<?> first = flow.getFirstVisibleCell(), last = flow.getLastVisibleCell();
+        IndexedCell<?> first = flow.getFirstVisibleCell();
+        IndexedCell<?> last = flow.getLastVisibleCell();
         if (first == null || last == null) return;
         for (int i = first.getIndex(); i <= last.getIndex(); i++) {
             IndexedCell<?> c = flow.getVisibleCell(i);
@@ -220,7 +221,8 @@ final class TimelineScroll {
     }
 
     private static IndexedCell<?> cellOf(VirtualFlow<?> flow, String id) {
-        IndexedCell<?> first = flow.getFirstVisibleCell(), last = flow.getLastVisibleCell();
+        IndexedCell<?> first = flow.getFirstVisibleCell();
+        IndexedCell<?> last = flow.getLastVisibleCell();
         if (first == null || last == null) return null;
         for (int i = first.getIndex(); i <= last.getIndex(); i++) {
             IndexedCell<?> c = flow.getVisibleCell(i);

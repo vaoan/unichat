@@ -28,7 +28,8 @@ import java.util.function.Supplier;
  * Done files are remembered in {@code cloud-uploaded.txt}; nothing in the account is ever deleted.
  */
 final class MediaUpload {
-    static final Duration FIRST_WAIT = Duration.ofMinutes(1), LONGEST_WAIT = Duration.ofMinutes(60);
+    static final Duration FIRST_WAIT = Duration.ofMinutes(1);
+    static final Duration LONGEST_WAIT = Duration.ofMinutes(60);
 
     /** A file that failed: how many times, when it's tried again, and why. */
     record Retry(int attempts, Instant next, String why) {}
@@ -82,7 +83,8 @@ final class MediaUpload {
                 if (r == null || !now.isBefore(r.next())) due.put(key(folder, file), file);
             }
         }
-        int sent = 0, index = 0;
+        int sent = 0;
+        int index = 0;
         for (Map.Entry<String, Path> e : due.entrySet()) {
             if (!mayGoOn.getAsBoolean()) break;
             progress.uploading(index++, due.size(), PathParts.name(e.getValue()));
@@ -113,7 +115,8 @@ final class MediaUpload {
                 if (Files.isRegularFile(file) && !checked.contains(entry)) here.put(entry, file);
             }
         }
-        int repaired = 0, index = 0;
+        int repaired = 0;
+        int index = 0;
         for (Map.Entry<String, Path> e : here.entrySet()) {
             if (!mayGoOn.getAsBoolean()) return repaired;
             progress.uploading(index++, here.size(), PathParts.name(e.getValue()));

@@ -30,12 +30,12 @@ class FoldersTest {
 
     @Test
     void aPrivateFolderIsTheOwnersAlone(@TempDir Path tmp) throws Exception {
-        Path dir = Folders.ownerOnly(tmp.resolve("texts/here"));
-        assertTrue(Files.isDirectory(dir));
-        if (dir.getFileSystem().supportedFileAttributeViews().contains("posix")) {
-            assertEquals("rwx------", PosixFilePermissions.toString(Files.getPosixFilePermissions(dir)));
+        Path made = Folders.ownerOnly(tmp.resolve("texts/here"));
+        assertTrue(Files.isDirectory(made));
+        if (made.getFileSystem().supportedFileAttributeViews().contains("posix")) {
+            assertEquals("rwx------", PosixFilePermissions.toString(Files.getPosixFilePermissions(made)));
         }
-        assertEquals(dir, Folders.ownerOnly(dir), "there already: fine");
+        assertEquals(made, Folders.ownerOnly(made), "there already: fine");
     }
 
     @TempDir Path dir;

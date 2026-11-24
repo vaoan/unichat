@@ -14,7 +14,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** Forwarding: copies of the messages, in their order, to every chat chosen, saying where they came from only if asked. */
 class ForwardingTest {
-    private static final String FROM = "!family:demo", TO = "!mom:demo", ALSO = "!andres:demo";
+    private static final String FROM = "!family:demo";
+    private static final String TO = "!mom:demo";
+    private static final String ALSO = "!andres:demo";
 
     private static MockChatService svc() {
         MockChatService svc = new MockChatService();
@@ -31,7 +33,8 @@ class ForwardingTest {
     void copiesGoInOrderToEveryChatAndSayNothingByDefault() throws Exception {
         MockChatService svc = svc();
         List<Message> picked = svc.messages(FROM).stream().filter(m -> !m.isMedia() && m.type() == MessageType.TEXT).limit(3).toList();
-        int to = svc.messages(TO).size(), also = svc.messages(ALSO).size();
+        int to = svc.messages(TO).size();
+        int also = svc.messages(ALSO).size();
         Forwarding.Job job = Forwarding.send(svc, picked, List.of(TO, ALSO), m -> null, true);
         job.done().get();
         assertEquals(List.of(6, 6, 0), List.of(job.total(), job.sent(), job.failed()), "each message to each chat, counted");

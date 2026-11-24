@@ -76,7 +76,8 @@ public final class UnichatApp extends Application {
         Settings s = Settings.get();
         stage.setWidth(s.getDouble("window.width", 1180));
         stage.setHeight(s.getDouble("window.height", 760));
-        double x = s.getDouble("window.x", Double.NaN), y = s.getDouble("window.y", Double.NaN);
+        double x = s.getDouble("window.x", Double.NaN);
+        double y = s.getDouble("window.y", Double.NaN);
         if (!Double.isNaN(x) && !Double.isNaN(y)) {
             stage.setX(x);
             stage.setY(y);
@@ -132,7 +133,8 @@ public final class UnichatApp extends Application {
             case "matrix" -> MatrixLogin.fromSettings();
             default -> null;
         };
-        if (restored != null) showMain(restored); else showLogin();
+        if (restored != null) showMain(restored);
+        else showLogin();
         if (System.getProperty("unichat.snapshot") != null) {
             // Diagnostics run: invisible and behind other windows so it never takes the user's keyboard.
             stage.setOpacity(0);
@@ -367,7 +369,8 @@ public final class UnichatApp extends Application {
     /** A notification's click: the window, then its chat; the log says what it led to (after the open's own runLaters). */
     private void openFromNotification(String target) {
         showWindow();
-        String id = NotificationTarget.chat(target), message = NotificationTarget.message(target);
+        String id = NotificationTarget.chat(target);
+        String message = NotificationTarget.message(target);
         Platform.runLater(() -> {
             if (mainView == null) return;
             mainView.openChatId(id);

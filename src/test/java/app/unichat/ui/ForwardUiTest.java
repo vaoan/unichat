@@ -77,7 +77,9 @@ class ForwardUiTest {
     void severalPickedInTheChatGoInItsOrder() throws Exception {
         w = TimelineWindow.open(5, "mensaje %d");
         List<Message> mine = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(m -> m.body().startsWith("mensaje")).toList());
-        Message first = mine.get(1), third = mine.get(3), last = mine.get(4);
+        Message first = mine.get(1);
+        Message third = mine.get(3);
+        Message last = mine.get(4);
         FxWait.until("they're listed", () -> w.cellOf(first) != null && w.cellOf(last) != null);
         TimelineWindow.fire(w.menuItem(first, "Reenviar…"));
         assertTrue(FxWait.fx(() -> w.scene.getRoot().lookup(".thread-header .selection-bar") != null), "the bar is in the header");
@@ -121,7 +123,8 @@ class ForwardUiTest {
     void whilePickingKeysDontActOnMessagesAndADeletedOneDropsOut() throws Exception {
         w = TimelineWindow.open(4, "mensaje %d");
         List<Message> mine = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(m -> m.body().startsWith("mensaje")).toList());
-        Message a = mine.get(2), b = mine.get(3);
+        Message a = mine.get(2);
+        Message b = mine.get(3);
         FxWait.until("they're listed", () -> w.cellOf(a) != null && w.cellOf(b) != null);
         TimelineWindow.fire(w.menuItem(a, "Reenviar…"));
         FxWait.fx(() -> {

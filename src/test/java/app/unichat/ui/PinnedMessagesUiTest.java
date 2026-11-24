@@ -96,7 +96,8 @@ class PinnedMessagesUiTest {
     void severalPinsSayHowManyAndTheClickGoesFromOneToTheNext() throws Exception {
         w = TimelineWindow.open(20, "mensaje %d");
         List<Message> mine = FxWait.fx(() -> w.svc.messages(CHAT).stream().filter(m -> m.body().startsWith("mensaje 1")).toList());
-        Message a = mine.get(1), b = mine.get(4); // "mensaje 10", "mensaje 13"
+        Message a = mine.get(1);
+        Message b = mine.get(4); // "mensaje 10", "mensaje 13"
         FxWait.fx(() -> {
             PinnedMessages.get().pin(CHAT, a);
             PinnedMessages.get().pin(CHAT, b);

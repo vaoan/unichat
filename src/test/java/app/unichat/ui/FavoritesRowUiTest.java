@@ -119,8 +119,8 @@ class FavoritesRowUiTest {
         });
         FxWait.until("the folder open", () -> scene.getRoot().lookupAll(".folder-title").stream()
                 .anyMatch(n -> n.isVisible() && "Trabajo".equals(((Label) n).getText())));
-        FxWait.fx(() -> { scene.getRoot().lookupAll("*").stream().filter(MainView.class::isInstance).map(MainView.class::cast)
-                .findFirst().orElseThrow().openChatId("!family:demo"); return null; }); // back to the inbox
+        FxWait.onFx(() -> scene.getRoot().lookupAll("*").stream().filter(MainView.class::isInstance).map(MainView.class::cast)
+                .findFirst().orElseThrow().openChatId("!family:demo")); // back to the inbox
         svc.setFolderFavorite(id, false);
         FxWait.until("no longer among the favorites", () -> scene.getRoot().lookup(".favorite-tile.favorite-folder") == null);
     }
@@ -154,7 +154,10 @@ class FavoritesRowUiTest {
     void fourFavoritesStayOnOneLineWithLargeText() throws Exception {
         Scene scene = open(1.6);
         svc.setFavorite("!devs:demo", true).get();
-        FxWait.fx(() -> { Theme.applyAll(); stage.setWidth(960); return null; });
+        FxWait.onFx(() -> {
+            Theme.applyAll();
+            stage.setWidth(960);
+        });
         FxWait.until("four favorites", () -> scene.getRoot().lookupAll(".favorite-tile").size() >= 4);
         FxWait.settled();
         assertEquals(List.of(), oneRowProblems(scene));
@@ -168,7 +171,10 @@ class FavoritesRowUiTest {
         for (String id : List.of("!devs:demo", "!family:demo", "!sofia:demo", "!valen:demo", "!notes:demo", "!carlos:demo")) {
             svc.setFavorite(id, true).get();
         }
-        FxWait.fx(() -> { Theme.applyAll(); stage.setWidth(900); return null; });
+        FxWait.onFx(() -> {
+            Theme.applyAll();
+            stage.setWidth(900);
+        });
         FxWait.until("the tile for the rest", () -> scene.getRoot().lookup(".favorite-more") != null
                 && scene.getRoot().lookup(".favorite-more").isVisible());
         FxWait.settled();
@@ -195,7 +201,7 @@ class FavoritesRowUiTest {
     @Test
     void namesFitTheirTilesWithLargeText() throws Exception {
         Scene scene = open(1.6);
-        FxWait.fx(() -> { Theme.applyAll(); return null; });
+        FxWait.onFx(Theme::applyAll);
         FxWait.settled();
         check(scene);
     }

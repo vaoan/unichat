@@ -73,7 +73,7 @@ class CloakBarUiTest {
             // them (headless measures and draws alike, so the cut doesn't show here). The number keeps room after it.
             javafx.scene.control.Label percent = FxWait.fx(() -> (javafx.scene.control.Label) bar.lookup(".upload-percent"));
             assertTrue(FxWait.fx(() -> percent.snappedRightInset() >= 0.15 * percent.getFont().getSize()), "room after the number at " + px + "px");
-            FxWait.fx(() -> { bar.getScene().getWindow().hide(); return null; });
+            FxWait.onFx(() -> bar.getScene().getWindow().hide());
         }
         job.cancel();
     }

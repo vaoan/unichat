@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
@@ -67,6 +68,8 @@ class SuppressionsHaveReasonsTest {
                 "a list over lines: the reason goes on the line it closes");
         assertEquals(1, unexplained("A.java", "@" + "SuppressWarnings(\"PMD\") // why\n").size(), "every PMD rule at once");
         assertEquals(1, unexplained("A.java", "@" + "SuppressWarnings({\"all\"}) // why\n").size(), "every warning at once");
+        assertEquals(1, unexplained("A.java", "@" + "SuppressWarnings(\"checkstyle:all\") // why\n").size(), "every Checkstyle check");
+        assertEquals(1, unexplained("A.java", "@" + "SuppressWarnings(\"checkstyle\") // why\n").size(), "every Checkstyle check");
         assertEquals(1, unexplained("A.java", "String s = \"\"\"\n  text\n  \"\"\"; @" + "SuppressWarnings(\"x\") int b;\n").size(),
                 "after a text block");
     }
@@ -83,6 +86,19 @@ class SuppressionsHaveReasonsTest {
                 "public WString lpszClassName;")) {
             assertEquals(List.of(), unexplained("A.java", ok + "\n" + member + "\n"), "on a member: " + member);
         }
+    }
+
+    @Test
+    void checkstyleSuppressionsSitOnOneMemberNeverTheFilesType() {
+        for (String name : List.of("checkstyle:MethodName", "HiddenField", "CHECKSTYLE:hiddenfield")) {
+            String ok = "@" + "SuppressWarnings(\"" + name + "\") // why\n";
+            assertEquals(1, unexplained("A.java", ok + "public final class A {}\n").size(), name + " on the file's class");
+            assertEquals(1, unexplained("A.java", "package a;\n" + ok + "@Deprecated\ninterface A {}\n").size(), name + " on its interface");
+            assertEquals(List.of(), unexplained("A.java", "class A {\n" + ok + "    interface B {}\n}\n"), name + " on a nested type");
+            assertEquals(List.of(), unexplained("A.java", "class A {\n" + ok + "    void f(int a) {}\n}\n"), name + " on a method");
+        }
+        assertEquals(List.of(), unexplained("A.java", "@" + "SuppressWarnings(\"PMD.TooManyMethods\") // why\nclass A {}\n"),
+                "another tool's on a class is that tool's rule");
     }
 
     @Test
@@ -120,8 +136,10 @@ class SuppressionsHaveReasonsTest {
         while (w.find()) {
             int close = closing(code, w.end() - 1);
             String args = text.substring(w.end(), close);
-            boolean blanket = args.matches("(?s).*\"\\s*(PMD|all)\\s*\".*");
-            if (blanket || !lineComment(text, kinds, lineOf(text, close)).matches("//\\s*\\S.*")) {
+            boolean blanket = args.matches("(?s).*\"\\s*(PMD|all|checkstyle|checkstyle:all)\\s*\".*");
+            boolean wholeFile = namesCheckstyle(args) && depth(code, w.start()) == 0
+                    && TYPE.matcher(declarationAfter(code, close + 1)).find();
+            if (blanket || wholeFile || !lineComment(text, kinds, lineOf(text, close)).matches("//\\s*\\S.*")) {
                 out.add(at(name, lines, lineOf(text, w.start())));
             }
         }
@@ -137,7 +155,10 @@ class SuppressionsHaveReasonsTest {
         return out;
     }
 
-    private static final char CODE = 'c', TEXT = 's', BLOCK = 'b', LINE = 'l';
+    private static final char CODE = 'c';
+    private static final char TEXT = 's';
+    private static final char BLOCK = 'b';
+    private static final char LINE = 'l';
 
     /** For each character of {@code text}: code, inside a string, char or text block, or in a block or line comment. */
     private static String kinds(String text) {
@@ -196,6 +217,41 @@ class SuppressionsHaveReasonsTest {
             else if (code.charAt(k) == ')' && --depth == 0) return k;
         }
         return code.length() - 1;
+    }
+
+    /** Checkstyle's checks, by the names its SuppressWarningsHolder takes: "checkstyle:" and the check, any case. */
+    private static final List<String> CHECKSTYLE = checkstyleModules();
+    private static final Pattern QUOTED = Pattern.compile("\"([^\"]*)\"");
+
+    private static List<String> checkstyleModules() {
+        try {
+            Matcher m = Pattern.compile("<module name=\"(\\w+)\"").matcher(Files.readString(Path.of("checkstyle.xml")));
+            List<String> out = new ArrayList<>();
+            while (m.find()) out.add(m.group(1).toLowerCase(Locale.ROOT));
+            return out;
+        } catch (IOException e) {
+            throw new IllegalStateException("checkstyle.xml can't be read", e);
+        }
+    }
+
+    /** Whether the annotation's arguments name one of Checkstyle's checks. */
+    private static boolean namesCheckstyle(String args) {
+        Matcher q = QUOTED.matcher(args);
+        while (q.find()) {
+            String name = q.group(1).strip().toLowerCase(Locale.ROOT);
+            if (name.startsWith("checkstyle:") || CHECKSTYLE.contains(name)) return true;
+        }
+        return false;
+    }
+
+    /** How many braces are open in {@code code} (comments and strings blanked) before {@code index}: 0 is the file's top. */
+    private static int depth(String code, int index) {
+        int d = 0;
+        for (int k = 0; k < index; k++) {
+            if (code.charAt(k) == '{') d++;
+            else if (code.charAt(k) == '}') d--;
+        }
+        return d;
     }
 
     /** A type's declaration: SpotBugs' suppression goes on the one member it's about, never a whole class. */

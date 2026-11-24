@@ -31,9 +31,15 @@ import javax.crypto.KeyAgreement;
  * computer off through two changes follows the chain from the key it holds.
  */
 final class VaultNext {
-    static final String PUBLIC = "x25519", PUBLIC_SEALED = "x25519Sealed", NEXT = "next";
-    private static final String EPHEMERAL = "x25519", SEALED = "sealed", INFO = "unichat-vault rotate", AUTH = "auth",
-        PRIOR = "prior", GENERATION = "generation";
+    static final String PUBLIC = "x25519";
+    static final String PUBLIC_SEALED = "x25519Sealed";
+    static final String NEXT = "next";
+    private static final String EPHEMERAL = "x25519";
+    private static final String SEALED = "sealed";
+    private static final String INFO = "unichat-vault rotate";
+    private static final String AUTH = "auth";
+    private static final String PRIOR = "prior";
+    private static final String GENERATION = "generation";
     /** Changes followed back from an offer at most: a chain from the account is untrusted. */
     private static final int CHAIN = 64;
 
@@ -110,7 +116,8 @@ final class VaultNext {
 
     private static byte[] taken(VaultSlot slot, ObjectNode next, PrivateKey own, byte[] mine, long generation, byte[] held, int depth)
         throws VaultCrypto.Broken {
-        byte[] ephemeral = bytes(next, EPHEMERAL), sealed = bytes(next, SEALED);
+        byte[] ephemeral = bytes(next, EPHEMERAL);
+        byte[] sealed = bytes(next, SEALED);
         if (ephemeral == null || sealed == null) throw new VaultCrypto.Broken();
         if (!vouches(next, slot, generation, held)) {
             // Vouched for with a key this computer never took: the offer before it, if it's that key's.
@@ -140,7 +147,9 @@ final class VaultNext {
 
     /** Whether {@code next}'s vouching opens with {@code oldVk} and names this very offer (its ephemeral key, what it seals). */
     private static boolean vouches(ObjectNode next, VaultSlot slot, long generation, byte[] oldVk) {
-        byte[] ephemeral = bytes(next, EPHEMERAL), sealed = bytes(next, SEALED), auth = bytes(next, AUTH);
+        byte[] ephemeral = bytes(next, EPHEMERAL);
+        byte[] sealed = bytes(next, SEALED);
+        byte[] auth = bytes(next, AUTH);
         if (ephemeral == null || sealed == null || auth == null) return false;
         try {
             return MessageDigest.isEqual(vouching(ephemeral, sealed), VaultCrypto.open(oldVk, offerPath(slot.vault(), slot.id(), generation), auth));

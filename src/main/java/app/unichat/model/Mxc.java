@@ -17,7 +17,8 @@ public record Mxc(String server, String mediaId) {
         String rest = url.substring(SCHEME.length());
         int slash = rest.indexOf('/');
         if (slash < 0) return null;
-        String server = rest.substring(0, slash), mediaId = rest.substring(slash + 1);
+        String server = rest.substring(0, slash);
+        String mediaId = rest.substring(slash + 1);
         return valid(server) && valid(mediaId) ? new Mxc(server, mediaId) : null;
     }
 

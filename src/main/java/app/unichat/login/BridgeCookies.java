@@ -143,7 +143,9 @@ public final class BridgeCookies {
     }
 
     public static CookieSpec spec(Network n, BridgeLogin.CookieParams p) {
-        Set<String> required = new LinkedHashSet<>(), optional = new LinkedHashSet<>(), domains = new LinkedHashSet<>();
+        Set<String> required = new LinkedHashSet<>();
+        Set<String> optional = new LinkedHashSet<>();
+        Set<String> domains = new LinkedHashSet<>();
         for (BridgeLogin.CookieField f : p.fields()) {
             BridgeLogin.Source s = cookieSource(f);
             if (s == null) continue;

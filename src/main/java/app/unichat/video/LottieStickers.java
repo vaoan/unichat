@@ -29,7 +29,9 @@ import java.util.zip.GZIPInputStream;
  */
 public final class LottieStickers {
     /** Telegram's are 512 px, at most 3 s and 60 frames a second; 30 is plenty to look at. */
-    private static final int SIDE = 512, FPS = 30, QUALITY = 80;
+    private static final int SIDE = 512;
+    private static final int FPS = 30;
+    private static final int QUALITY = 80;
     /**
      * Longer isn't a sticker (Telegram's last 3 s at most): each frame is written whole to disk (1 MB at 512 px) before
      * the WebP is made, so this caps that at 300 MB.
@@ -39,7 +41,8 @@ public final class LottieStickers {
     static final int MAX_JSON_BYTES = 8 * 1024 * 1024;
     private static final long TIMEOUT_SECONDS = 60;
     /** Telegram's run at 30 or 60 frames a second; anything far from that isn't a sticker. */
-    private static final double MIN_RATE = 1, MAX_RATE = 120;
+    private static final double MIN_RATE = 1;
+    private static final double MAX_RATE = 120;
     private static final ObjectMapper JSON = new ObjectMapper();
 
     private LottieStickers() {}
@@ -103,7 +106,9 @@ public final class LottieStickers {
      */
     static double check(byte[] json) throws IOException {
         JsonNode n = JSON.readTree(json);
-        double fr = n.path("fr").asDouble(0), ip = n.path("ip").asDouble(0), op = n.path("op").asDouble(0);
+        double fr = n.path("fr").asDouble(0);
+        double ip = n.path("ip").asDouble(0);
+        double op = n.path("op").asDouble(0);
         // Counted as rlottie counts them (first and last frame rounded, both drawn), and as LottieConverter writes
         // them, FPS a second: by the file's own seconds, "fr":0.000001 and "op":0.00001 were 10 s and 30 million frames.
         long own = Math.round(op) - Math.round(ip) + 1;
@@ -124,7 +129,8 @@ public final class LottieStickers {
      */
     @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "lottieconverter on checked JSON under fixed names in its own folder, as a list, no shell")
     public static Path toWebp(Path lottie, Path out, DoubleConsumer installProgress) throws IOException, InterruptedException {
-        Path tool = tool(), img2webp = AnimatedWebp.img2webp();
+        Path tool = tool();
+        Path img2webp = AnimatedWebp.img2webp();
         if (tool == null) throw new IOException("lottieconverter isn't there");
         if (img2webp == null) throw new IOException("img2webp isn't there");
         byte[] json = json(lottie);
@@ -207,7 +213,8 @@ public final class LottieStickers {
     /** A PAM file (RGB_ALPHA, 8 bits per sample), which img2webp reads without a PNG library. */
     static void writePam(BufferedImage img, Path to) throws IOException {
         if (img == null) throw new IOException(I18n.t("video.webpFailed"));
-        int w = img.getWidth(), h = img.getHeight();
+        int w = img.getWidth();
+        int h = img.getHeight();
         try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(to))) {
             out.write(("P7\nWIDTH " + w + "\nHEIGHT " + h + "\nDEPTH 4\nMAXVAL 255\nTUPLTYPE RGB_ALPHA\nENDHDR\n")
                     .getBytes(StandardCharsets.US_ASCII));

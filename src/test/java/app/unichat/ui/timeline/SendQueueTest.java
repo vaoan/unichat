@@ -178,13 +178,13 @@ class SendQueueTest {
     @Test
     void whenOthersWroteMeanwhileItAnswersWhatWasLastSaidWhenItWasWritten() {
         svc.receive(CHAT, "¿vienes mañana?");
-        Message asked = lastOfOthers();
+        Message question = lastOfOthers();
         queue.submit(CHAT, "creo q sí", null);
         svc.receive(CHAT, "¿y a qué hora?"); // the chat goes on while it's corrected
         answer(0);
         Message mine = svc.messages(CHAT).getLast();
         assertEquals("creo que sí", mine.body());
-        assertEquals(asked.id(), mine.replyToId(), "it says what it answers, so the thread reads right");
+        assertEquals(question.id(), mine.replyToId(), "it says what it answers, so the thread reads right");
     }
 
     @Test
@@ -276,9 +276,9 @@ class SendQueueTest {
     @Test
     void itNeverAnswersAMessageDeletedMeanwhile() {
         svc.receive(CHAT, "¿vienes mañana?");
-        Message asked = lastOfOthers();
+        Message question = lastOfOthers();
         queue.submit(CHAT, "creo q sí", null);
-        asked.markDeleted(); // what it answered was taken back
+        question.markDeleted(); // what it answered was taken back
         svc.receive(CHAT, "olvídalo"); // and the chat went on
         answer(0);
         assertNull(svc.messages(CHAT).getLast().replyToId(), "never a quote of what's gone");

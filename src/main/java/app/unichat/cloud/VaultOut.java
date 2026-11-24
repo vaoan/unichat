@@ -29,7 +29,8 @@ final class VaultOut {
 
     /** What a run left plain: each path's content, and what was there before each it wrote (null: nothing), to take it back. */
     private static final class Written {
-        final Map<String, byte[]> now = new LinkedHashMap<>(), before = new LinkedHashMap<>();
+        final Map<String, byte[]> now = new LinkedHashMap<>();
+        final Map<String, byte[]> before = new LinkedHashMap<>();
 
         void put(Storage plain, String path, byte[] data, byte[] was) throws IOException {
             plain.mkdirs(path.substring(0, path.lastIndexOf('/')));
@@ -105,7 +106,8 @@ final class VaultOut {
     private static void settle(Storage plain, Written w) throws IOException {
         for (Map.Entry<String, byte[]> f : new LinkedHashMap<>(w.now).entrySet()) {
             String path = f.getKey();
-            byte[] there = plain.get(path), mine = f.getValue();
+            byte[] there = plain.get(path);
+            byte[] mine = f.getValue();
             boolean text = TextIndex.FILE.matcher(path.substring(path.lastIndexOf('/') + 1)).matches();
             if (there != null && (!text || there.length >= mine.length)) continue;
             w.put(plain, path, mine, there);
@@ -127,7 +129,8 @@ final class VaultOut {
      * own plain again.
      */
     private static void textsOut(Storage plain, Storage sealed, String machine, Written w) throws IOException {
-        String folder = TextSync.ROOT + "/" + machine, indexPath = folder + "/" + TextIndex.NAME;
+        String folder = TextSync.ROOT + "/" + machine;
+        String indexPath = folder + "/" + TextIndex.NAME;
         byte[] raw = plain.get(indexPath);
         Map<String, Long> had;
         try {

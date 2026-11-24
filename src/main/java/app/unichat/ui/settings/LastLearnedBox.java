@@ -24,7 +24,8 @@ final class LastLearnedBox {
     private final WritingStyle style;
     private final Consumer<String> restored;
     private final Label when = new Label();
-    private final Label added = Labels.help(""), removed = Labels.help("");
+    private final Label added = Labels.help("");
+    private final Label removed = Labels.help("");
     private final Button undo = new Button();
     private final Label pending = new Label();
     private final Node node;

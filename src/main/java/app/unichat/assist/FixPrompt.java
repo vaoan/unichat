@@ -44,7 +44,8 @@ public final class FixPrompt {
      * itself) mustn't carry what a stranger's words, learned into how the person writes, steered the AI to add.
      */
     public static boolean addsWhatWasntThere(String original, String fixed) {
-        String o = original.strip(), f = fixed.strip();
+        String o = original.strip();
+        String f = fixed.strip();
         if (f.length() > o.length() * 13 / 10 + 15) return true;
         for (char lead : new char[] {'@', '!', '/'}) if (f.indexOf(lead) == 0 && o.indexOf(lead) != 0) return true;
         return !marks(o).containsAll(marks(f));

@@ -32,7 +32,8 @@ public final class VoiceEnhancer {
     private static final int OUTPUT_RATE = 48_000;
     /** Each pass: this much, plus twice the note's length. Two minutes for every note left the person waiting with no word. */
     private static final long BASE_TIMEOUT_SECONDS = 15;
-    private static final String RUMBLE = "highpass=f=80", VOLUME = "speechnorm=e=2:r=0.0001:l=1";
+    private static final String RUMBLE = "highpass=f=80";
+    private static final String VOLUME = "speechnorm=e=2:r=0.0001:l=1";
 
     private VoiceEnhancer() {}
 

@@ -166,9 +166,9 @@ class SendQueueUiTest {
         int before = sentSoFar();
         send("uno q sí");
         send("dos q no");
-        FxWait.fx(() -> { button("Cancelar el envío de «uno q sí»").fire(); return null; });
+        FxWait.onFx(() -> button("Cancelar el envío de «uno q sí»").fire());
         assertEquals(List.of("Corrigiendo antes de enviar: «dos q no»"), rows());
-        FxWait.fx(() -> { button("Enviar sin corregir «dos q no»").fire(); return null; });
+        FxWait.onFx(() -> button("Enviar sin corregir «dos q no»").fire());
         assertEquals(List.of("dos q no"), mine(before), "as written, at once; the cancelled one never");
         assertEquals(List.of(), rows());
     }
@@ -176,7 +176,7 @@ class SendQueueUiTest {
     @Test
     void eachChatShowsItsOwnQueueAndAnotherChatsKeepsGoing() throws Exception {
         send("uno q sí");
-        FxWait.fx(() -> { view.openChatId("!mom:demo"); return null; });
+        FxWait.onFx(() -> view.openChatId("!mom:demo"));
         assertEquals(List.of(), rows(), "not this chat's");
         release("uno q sí");
         FxWait.until("it went while another chat was open", () -> svc.messages(CHAT).getLast().body().equals("uno que sí"));
@@ -203,7 +203,7 @@ class SendQueueUiTest {
         app.unichat.autosave.AutoSave.of(svc).messagesChanged(CHAT); // the server's word on it: kept as it comes
         javafx.scene.control.MenuItem versions = FxWait.fx(() -> thread.actions().messageMenu(m).getItems().stream()
                 .filter(i -> "Ver versiones…".equals(i.getText())).findFirst().orElseThrow());
-        FxWait.fx(() -> { versions.fire(); return null; });
+        FxWait.onFx(versions::fire);
         FxWait.until("both versions, each said what it is", () -> {
             List<String> texts = FxWait.fx(() -> {
                 Node sheet = stage.getScene().getRoot().lookup(".saved-text-sheet");
@@ -237,7 +237,7 @@ class SendQueueUiTest {
         send("uno q sí");
         send("dos q no");
         Button cancelSecond = button("Cancelar el envío de «dos q no»");
-        FxWait.fx(() -> { cancelSecond.requestFocus(); return null; });
+        FxWait.onFx(cancelSecond::requestFocus);
         release("uno q sí");
         FxWait.until("the first went", () -> rowsNow().size() == 1);
         FxWait.settled();
@@ -250,7 +250,7 @@ class SendQueueUiTest {
         int before = svc.messages(CHAT).size();
         send("mira esto q chévere");
         java.io.File photo = java.nio.file.Files.writeString(java.nio.file.Files.createTempFile("foto", ".txt"), "x").toFile();
-        FxWait.fx(() -> { thread.composer().sendFiles(List.of(photo)); return null; });
+        FxWait.onFx(() -> thread.composer().sendFiles(List.of(photo)));
         assertEquals(before, svc.messages(CHAT).size(), "the file waits its turn");
         release("mira esto q chévere");
         FxWait.until("both went", () -> svc.messages(CHAT).size() == before + 2);

@@ -94,7 +94,7 @@ class StartupBeforeSyncTest {
     }
 
     /** What a previous run left on disk: the logins each bridge reported and the last full sync. */
-    private void previousRun(MatrixChatService svc) throws IOException {
+    private void previousRun(MatrixChatService service) throws IOException {
         long now = System.currentTimeMillis();
         Settings.get().set("matrix.logins.whatsapp", now + "\n573001112233\t+57 300 111 2233\tCONNECTED\n");
         Settings.get().set("matrix.logins.telegram", now + "\n900000042\tJuan\tCONNECTED\n");
@@ -113,7 +113,7 @@ class StartupBeforeSyncTest {
                     "timeline":{"events":[{"type":"m.room.message","event_id":"$2","sender":"@telegram_42:localhost",
                        "origin_server_ts":1700000100000,"content":{"msgtype":"m.text","body":"buenas"}}]}}
                 }}}""";
-        Path f = svc.syncCacheFile();
+        Path f = service.syncCacheFile();
         Files.createDirectories(PathParts.parent(f));
         Files.writeString(f, sync);
     }

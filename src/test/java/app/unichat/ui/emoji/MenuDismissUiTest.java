@@ -74,7 +74,7 @@ class MenuDismissUiTest {
             });
             FxWait.until(how + " closes it", () -> open() == null);
         }
-        FxWait.fx(() -> { stage[0].hide(); return null; });
+        FxWait.onFx(stage[0]::hide);
         assertFalse(FxWait.fx(() -> open() != null));
     }
 

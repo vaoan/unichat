@@ -15,7 +15,8 @@ import com.sun.jna.Pointer;
  * leaves the Windows taskbar. Call on the FX thread, which on macOS is AppKit's main thread.
  */
 public final class DockIcon {
-    private static final long POLICY_REGULAR = 0, POLICY_ACCESSORY = 1;
+    private static final long POLICY_REGULAR = 0;
+    private static final long POLICY_ACCESSORY = 1;
     private static final boolean MAC = Os.mac();
     private static volatile boolean broken;
     private static volatile boolean trayAvailable = true;

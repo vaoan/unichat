@@ -165,7 +165,8 @@ public final class Settings {
      * temp file, so a failure keeps the old one.
      */
     private void writeOnce() {
-        Properties session = null, portable = null;
+        Properties session = null;
+        Properties portable = null;
         synchronized (this) {
             if ((!machine.isEmpty() || Files.exists(sessionFile)) && readable(sessionFile, machine)) session = copy(machine);
             if (readable(file, props)) portable = copy(props);
@@ -243,7 +244,8 @@ public final class Settings {
     public synchronized String getString(String key, String def) { return holder(key).getProperty(key, def); }
 
     public synchronized void set(String key, String value) {
-        if (value == null) holder(key).remove(key); else holder(key).setProperty(key, value);
+        if (value == null) holder(key).remove(key);
+        else holder(key).setProperty(key, value);
         save();
         changed(key);
     }

@@ -92,7 +92,7 @@ class MediaViewerUiTest {
         });
         double screenWidth = fx(() -> javafx.stage.Screen.getScreensForRectangle(v.getX(), v.getY(), 1, 1).get(0).getBounds().getWidth());
         FxWait.until("the window fills the screen (" + screenWidth + " wide)", () -> v.isFullScreen() && v.getWidth() >= screenWidth - 1);
-        fx(() -> { v.setFullScreen(false); return null; });
+        FxWait.onFx(() -> v.setFullScreen(false));
         FxWait.until("back to a window", () -> !v.isFullScreen());
     }
 
@@ -138,14 +138,14 @@ class MediaViewerUiTest {
 
     @Test
     void theArrowsStepThroughTheChatsPictures() throws Exception {
-        fx(() -> { viewer().ifPresent(Window::hide); return null; });
+        FxWait.onFx(() -> viewer().ifPresent(Window::hide));
         List<MediaViewer.Item> items = new ArrayList<>();
         for (int i = 1; i <= 3; i++) {
             Path f = dir.resolve("foto" + i + ".png");
             ImageIO.write(new BufferedImage(1600, 1200, BufferedImage.TYPE_INT_RGB), "png", f.toFile());
             items.add(new MediaViewer.Item("foto" + i, () -> CompletableFuture.completedFuture(f), () -> saves++));
         }
-        fx(() -> { MediaViewer.show(owner, items, 1); return null; });
+        FxWait.onFx(() -> MediaViewer.show(owner, items, 1));
         waitFor(() -> fx(() -> viewer().isPresent() && photo().view().getImage() != null));
         assertEquals("foto2", fx(() -> ((Stage) viewer().orElseThrow()).getTitle()), "opens on the one clicked");
 

@@ -58,7 +58,7 @@ class StickerSetMenuUiTest {
             ThreadPane thread = FxWait.fx(() -> find(view, ThreadPane.class));
             MenuItem show = FxWait.fx(() -> thread.actions().messageMenu(sticker).getItems().stream()
                     .filter(i -> "Ver el set de este sticker".equals(i.getText())).findFirst().orElseThrow());
-            FxWait.fx(() -> { show.fire(); return null; });
+            FxWait.onFx(show::fire);
             SidePanel panel = FxWait.fx(() -> find(view, SidePanel.class));
             FxWait.until("the Stickers tab", () -> FxWait.fx(panel::current) == SidePanel.Tab.STICKERS);
             FxWait.until("that set, open", () -> FxWait.fx(() -> find(panel, Button.class, "gatitos")) != null);
@@ -71,13 +71,13 @@ class StickerSetMenuUiTest {
             MenuItem big = FxWait.fx(() -> thread.actions().messageMenu(sticker).getItems().stream()
                     .filter(i -> "Ver en grande".equals(i.getText())).findFirst().orElse(null));
             assertNotNull(big, "the chat's sticker menu offers Ver en grande");
-            FxWait.fx(() -> { big.fire(); return null; });
+            FxWait.onFx(big::fire);
             // The viewer is a window of its own (no owner, by design): found by its title.
             FxWait.until("the viewer", () -> FxWait.fx(() -> viewer() != null));
-            FxWait.fx(() -> { viewer().close(); return null; });
+            FxWait.onFx(() -> viewer().close());
         } finally {
             svc.stop();
-            FxWait.fx(() -> { window[0].close(); return null; });
+            FxWait.onFx(window[0]::close);
         }
     }
 

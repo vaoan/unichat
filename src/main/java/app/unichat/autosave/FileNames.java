@@ -112,7 +112,8 @@ public final class FileNames {
     public static Path free(Path dir, String name) {
         Path p = dir.resolve(name);
         int dot = name.lastIndexOf('.');
-        String base = dot > 0 ? name.substring(0, dot) : name, ext = dot > 0 ? name.substring(dot) : "";
+        String base = dot > 0 ? name.substring(0, dot) : name;
+        String ext = dot > 0 ? name.substring(dot) : "";
         for (int i = 2; Files.exists(p); i++) p = dir.resolve(base + " (" + i + ")" + ext);
         return p;
     }

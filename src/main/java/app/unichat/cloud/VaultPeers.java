@@ -49,7 +49,8 @@ final class VaultPeers {
 
     /** What this computer saw of {@code vault}; nothing when what it holds is another vault's or none. */
     static VaultPeers load(String vault) {
-        Map<String, String> pins = new TreeMap<>(), seen = new TreeMap<>();
+        Map<String, String> pins = new TreeMap<>();
+        Map<String, String> seen = new TreeMap<>();
         Map<String, Integer> after = new TreeMap<>();
         Set<String> removed = new TreeSet<>();
         int removals = 0;

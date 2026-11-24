@@ -289,14 +289,38 @@ final class DemoChats {
             return list.stream().filter(m -> m.timestamp().equals(t)).findFirst().orElseThrow();
         }
 
-        ChatBuilder unread(int n) { chat.setUnreadCount(n); return this; }
-        ChatBuilder mention() { chat.setMentionCount(1); return this; }
-        ChatBuilder favorite() { chat.setFavorite(true); return this; }
-        ChatBuilder lowPriority() { chat.setLowPriority(true); return this; }
-        ChatBuilder archived() { chat.setArchived(true); return this; }
-        ChatBuilder muted() { chat.setMuted(true); return this; }
-        ChatBuilder pinned() { chat.setPinned(true); return this; }
-        ChatBuilder account(String id) { chat.setAccountId(id); return this; }
+        ChatBuilder unread(int n) {
+            chat.setUnreadCount(n);
+            return this;
+        }
+        ChatBuilder mention() {
+            chat.setMentionCount(1);
+            return this;
+        }
+        ChatBuilder favorite() {
+            chat.setFavorite(true);
+            return this;
+        }
+        ChatBuilder lowPriority() {
+            chat.setLowPriority(true);
+            return this;
+        }
+        ChatBuilder archived() {
+            chat.setArchived(true);
+            return this;
+        }
+        ChatBuilder muted() {
+            chat.setMuted(true);
+            return this;
+        }
+        ChatBuilder pinned() {
+            chat.setPinned(true);
+            return this;
+        }
+        ChatBuilder account(String id) {
+            chat.setAccountId(id);
+            return this;
+        }
 
         void done() {
             if (chat.accountId() == null) {

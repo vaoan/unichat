@@ -37,7 +37,9 @@ class TranscriberRunTest {
     @Test
     void anOldSpeechCommandStillRuns() throws Exception {
         app.unichat.settings.Settings s = app.unichat.settings.Settings.get();
-        String engine = s.getString("stt.engine", null), command = s.getString("stt.command", null), lang = s.getString("stt.language", null);
+        String engine = s.getString("stt.engine", null);
+        String command = s.getString("stt.command", null);
+        String lang = s.getString("stt.language", null);
         try {
             Path audio = dir.resolve("nota.wav");
             Files.write(audio, "RIFF\0\0\0\0WAVEfmt ".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1));

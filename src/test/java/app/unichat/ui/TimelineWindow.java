@@ -75,7 +75,8 @@ final class TimelineWindow {
     }
 
     /** The window's usual height; {@link #SHORT} leaves a list as short as Linux's taller fonts do (416 px there). */
-    static final int HEIGHT = 560, SHORT = 480;
+    static final int HEIGHT = 560;
+    static final int SHORT = 480;
 
     /** {@code height}: the window's. */
     static TimelineWindow open(int messages, String format, java.util.function.Consumer<ScriptedChatService> before,
@@ -85,17 +86,17 @@ final class TimelineWindow {
         for (int i = 0; i < messages; i++) svc.sendText(CHAT, format.formatted(i), null).get();
         before.accept(svc);
         TimelineWindow w = FxWait.fx(() -> {
-            Stage stage = new Stage();
-            stage.setOpacity(0);
-            MainView view = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
-            Scene sc = new Scene(view, 1000, height);
+            Stage window = new Stage();
+            window.setOpacity(0);
+            MainView main = new MainView(svc, window, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            Scene sc = new Scene(main, 1000, height);
             Theme.register(sc);
-            stage.setScene(sc);
-            stage.show();
-            return new TimelineWindow(svc, stage, view, sc);
+            window.setScene(sc);
+            window.show();
+            return new TimelineWindow(svc, window, main, sc);
         });
         FxWait.until("the chat list shows", () -> !w.scene.getRoot().lookupAll(".chat-list .list-cell").isEmpty());
-        FxWait.fx(() -> { w.view.openChatId("!family:demo"); return null; });
+        FxWait.onFx(() -> w.view.openChatId("!family:demo"));
         FxWait.settled();
         w.openChat();
         return w;
@@ -103,7 +104,7 @@ final class TimelineWindow {
 
     /** Opens {@link #CHAT} and waits until it's at its newest message. */
     void openChat() throws InterruptedException {
-        FxWait.fx(() -> { view.openChatId(CHAT); return null; });
+        FxWait.onFx(() -> view.openChatId(CHAT));
         FxWait.until("the chat's newest message is listed", this::showsNewest);
         untilAtBottom();
     }
@@ -216,7 +217,8 @@ final class TimelineWindow {
         VirtualFlow<?> flow = flow();
         // The viewport's top, as TimelineScroll measures it: the flow's bounds reach up to a row cut above it (-9 px), and
         // a message read from there wasn't the one the list holds (CI's Linux, now and then, when the text grew).
-        double top = flow.localToScene(0, 0).getY(), middle = top + flow.getHeight() / 2;
+        double top = flow.localToScene(0, 0).getY();
+        double middle = top + flow.getHeight() / 2;
         String read = null;
         for (int i = flow.getFirstVisibleCell().getIndex(); i <= flow.getLastVisibleCell().getIndex(); i++) {
             IndexedCell<?> c = flow.getVisibleCell(i);
@@ -278,7 +280,10 @@ final class TimelineWindow {
         for (int i = 0; i < lines.length; i++) {
             sofar.append(i == 0 ? "" : "\n").append(lines[i]);
             String now = sofar.toString();
-            FxWait.fx(() -> { input().setText(now); input().end(); return null; });
+            FxWait.onFx(() -> {
+                input().setText(now);
+                input().end();
+            });
             FxWait.pulses(1);
         }
     }
@@ -342,7 +347,7 @@ final class TimelineWindow {
     /** Every frame drawn from now on, until {@link Frames#stop}. */
     Frames watch(Frames.Probe probe) throws InterruptedException {
         Frames f = new Frames(probe);
-        FxWait.fx(() -> { scene.addPostLayoutPulseListener(f.listener); return null; });
+        FxWait.onFx(() -> scene.addPostLayoutPulseListener(f.listener));
         return f;
     }
 
@@ -379,7 +384,7 @@ final class TimelineWindow {
         /** Stops watching once the window has done all it was asked, and fails with the frames that were wrong. */
         void stop(String what) throws InterruptedException {
             FxWait.settled();
-            FxWait.fx(() -> { scene.removePostLayoutPulseListener(listener); return null; });
+            FxWait.onFx(() -> scene.removePostLayoutPulseListener(listener));
             if (!wrong.isEmpty()) fail(what + ": " + wrong.size() + " of " + count + " frames wrong: " + wrong);
             assertTrue(count > 0, "no frame was drawn");
         }

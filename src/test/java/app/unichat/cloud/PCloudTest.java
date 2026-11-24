@@ -92,7 +92,8 @@ class PCloudTest {
     void theSettingsTravelThroughPCloudToo() throws Exception {
         try (FakePCloud cloud = new FakePCloud("tok")) {
             PCloudApi api = new PCloudApi(cloud.host(), "tok");
-            Map<String, String> a = new HashMap<>(Map.of("ui.theme", "DARK")), b = new HashMap<>();
+            Map<String, String> a = new HashMap<>(Map.of("ui.theme", "DARK"));
+            Map<String, String> b = new HashMap<>();
             SyncedPart pa = new SyncedPart(CloudAccount.SETTINGS_FILE, "test-pa", now -> Bundle.of("a", now, a, null), t -> { });
             SyncedPart pb = new SyncedPart(CloudAccount.SETTINGS_FILE, "test-pb", now -> Bundle.of("b", now, b, null), t -> {
                 b.clear();

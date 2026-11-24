@@ -108,7 +108,8 @@ final class DiscordServersPage extends StackPane {
                     sw.setSelected(!want);
                     toast.accept(I18n.t("discord.servers.changeFailed", g.name(), LoginTexts.rootMessage(ex)));
                 } else {
-                    if (want) on.add(g.id()); else on.remove(g.id());
+                    if (want) on.add(g.id());
+                    else on.remove(g.id());
                     showCount();
                     toast.accept(want ? I18n.t("discord.servers.on", g.name()) : I18n.t("discord.servers.off", g.name()));
                 }

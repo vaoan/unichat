@@ -57,9 +57,9 @@ class NetworkSettingsUiTest {
         });
         FxWait.until("the WhatsApp options show", () -> option("Enviar stickers animados de WhatsApp como Sticker") != null);
         assertTrue(fx(() -> option("Enviar stickers animados de WhatsApp como Sticker").isSelected()), "sticker by default");
-        fx(() -> { option("Enviar stickers animados de WhatsApp como GIF").fire(); return null; });
+        FxWait.onFx(() -> option("Enviar stickers animados de WhatsApp como GIF").fire());
         assertEquals("GIF", Settings.get().getString("whatsapp.animatedStickers", null));
-        fx(() -> { option("Enviar stickers animados de WhatsApp como Video").fire(); return null; });
+        FxWait.onFx(() -> option("Enviar stickers animados de WhatsApp como Video").fire());
         assertEquals("VIDEO", Settings.get().getString("whatsapp.animatedStickers", null));
     }
 

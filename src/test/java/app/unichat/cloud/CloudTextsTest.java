@@ -20,7 +20,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /** The texts in the cloud's rounds: alone when asked, before the media in a round, and never holding the media back. */
 class CloudTextsTest {
-    private static final String LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55", CHAT = "3f2a9c1b2d4e", FILE = CHAT + " 2026-11.jsonl";
+    private static final String LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
+    private static final String CHAT = "3f2a9c1b2d4e";
+    private static final String FILE = CHAT + " 2026-11.jsonl";
 
     @TempDir
     Path dir;
@@ -79,7 +81,8 @@ class CloudTextsTest {
 
     @Test
     void asksWhileOneIsWaitingJoinItAndOneAfterItStartsGetsItsOwn() throws Exception {
-        java.util.concurrent.CountDownLatch running = new java.util.concurrent.CountDownLatch(1), goOn = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch running = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch goOn = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.atomic.AtomicInteger rounds = new java.util.concurrent.atomic.AtomicInteger();
         Cloud c = cloud(() -> {
             if (rounds.incrementAndGet() == 1) {

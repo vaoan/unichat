@@ -14,10 +14,13 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 class CloudShownTest {
     @Test
     void theLatestStatusIsShownThoughTheOlderOnesPostingRunsLast() {
-        Cloud.Status older = new Cloud.Status(true, null, null, 1, 5), newer = new Cloud.Status(true, null, null, 2, 4);
+        Cloud.Status older = new Cloud.Status(true, null, null, 1, 5);
+        Cloud.Status newer = new Cloud.Status(true, null, null, 2, 4);
         AtomicReference<Cloud.Status> status = new AtomicReference<>(older);
-        List<Runnable> awt = new ArrayList<>(), fx = new ArrayList<>(); // both threads held: what's posted waits
-        AtomicReference<Cloud.Status> onTray = new AtomicReference<>(), onGear = new AtomicReference<>();
+        List<Runnable> awt = new ArrayList<>();
+        List<Runnable> fx = new ArrayList<>(); // both threads held: what's posted waits
+        AtomicReference<Cloud.Status> onTray = new AtomicReference<>();
+        AtomicReference<Cloud.Status> onGear = new AtomicReference<>();
         CloudShown shown = new CloudShown(status::get, onTray::set, awt::add, onGear::set, fx::add);
         shown.run(); // a vault job told the older one
         status.set(newer);

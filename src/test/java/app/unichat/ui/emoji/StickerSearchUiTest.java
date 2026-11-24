@@ -120,7 +120,7 @@ class StickerSearchUiTest {
 
     @AfterEach
     void close() throws Exception {
-        FxWait.fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 
     private TextField search() throws InterruptedException {
@@ -128,7 +128,7 @@ class StickerSearchUiTest {
     }
 
     private void type(String text) throws InterruptedException {
-        FxWait.fx(() -> { search().setText(text); return null; });
+        FxWait.onFx(() -> search().setText(text));
         FxWait.settled();
     }
 
@@ -205,7 +205,7 @@ class StickerSearchUiTest {
         StickerPack gatitos = answers.get(GATITOS).get().get();
         answers.put(GATITOS, () -> CompletableFuture.failedFuture(new IllegalStateException("the bridge isn't ready")));
         long[] now = {1_000_000};
-        FxWait.fx(() -> { grid.sets.clock = () -> now[0]; return null; });
+        FxWait.onFx(() -> grid.sets.clock = () -> now[0]);
         type("gato");
         FxWait.until("both asked, the cats' failed", () -> fetched.get() == 2 && shown().stream().anyMatch(s -> s.contains("«gato»")));
         answers.put(GATITOS, () -> CompletableFuture.completedFuture(gatitos));

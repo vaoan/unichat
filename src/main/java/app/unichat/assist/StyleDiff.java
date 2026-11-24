@@ -19,8 +19,10 @@ public record StyleDiff(List<String> added, List<String> removed) {
     }
 
     public static StyleDiff between(String before, String after) {
-        Set<String> was = traits(before), is = traits(after);
-        List<String> added = new ArrayList<>(is), removed = new ArrayList<>(was);
+        Set<String> was = traits(before);
+        Set<String> is = traits(after);
+        List<String> added = new ArrayList<>(is);
+        List<String> removed = new ArrayList<>(was);
         added.removeAll(was);
         removed.removeAll(is);
         return new StyleDiff(added, removed);

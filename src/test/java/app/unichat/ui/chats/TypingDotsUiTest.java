@@ -66,7 +66,7 @@ class TypingDotsUiTest {
         assertTrue(seen.size() > 1, "the first dot changes: " + seen);
         fx(() -> root.getChildren().remove(dots));
         assertFalse(fx(dots::isRunning), "nothing keeps ticking once it's gone");
-        fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 
     @Test
@@ -93,7 +93,11 @@ class TypingDotsUiTest {
             return v;
         });
         Chat chat = svc.chat("!family:demo");
-        fx(() -> { chat.setTyping(Set.of("Laura")); view.thread().refreshHeader(); view.list().refresh(); return null; });
+        FxWait.onFx(() -> {
+            chat.setTyping(Set.of("Laura"));
+            view.thread().refreshHeader();
+            view.list().refresh();
+        });
         FxWait.until("the chat's row shows the dots", () -> view.lookup(".chat-preview.typing .typing-dots") != null);
         assertNotNull(fx(() -> view.lookup(".chat-preview.typing .typing-dots")), "the chat's row in the list too");
         Label line = fx(() -> (Label) view.lookup(".typing-line"));
@@ -105,10 +109,17 @@ class TypingDotsUiTest {
                     java.nio.file.Path.of(System.getProperty("java.io.tmpdir"), "unichat-typing.png").toFile());
             return null;
         });
-        fx(() -> { chat.setTyping(Set.of()); view.thread().refreshHeader(); view.list().refresh(); return null; });
+        FxWait.onFx(() -> {
+            chat.setTyping(Set.of());
+            view.thread().refreshHeader();
+            view.list().refresh();
+        });
         FxWait.until("the dots go", () -> line.getGraphic() == null && view.lookup(".chat-list .typing-dots") == null);
         assertNull(fx(line::getGraphic));
         assertNull(fx(() -> view.lookup(".chat-list .typing-dots")), "a recycled row doesn't keep them");
-        fx(() -> { stage[0].close(); svc.stop(); return null; });
+        FxWait.onFx(() -> {
+            stage[0].close();
+            svc.stop();
+        });
     }
 }

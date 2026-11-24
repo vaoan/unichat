@@ -13,8 +13,12 @@ import java.util.Set;
 final class NetworkFormats {
     private NetworkFormats() {}
 
-    static final String WEBP = "image/webp", PNG = "image/png", JPEG = "image/jpeg", GIF = "image/gif", WEBM = "video/webm",
-            LOTTIE = "video/lottie+json";
+    static final String WEBP = "image/webp";
+    static final String PNG = "image/png";
+    static final String JPEG = "image/jpeg";
+    static final String GIF = "image/gif";
+    static final String WEBM = "video/webm";
+    static final String LOTTIE = "video/lottie+json";
 
     /**
      * Whether a sticker that couldn't be made what {@code n} should get (no tool) goes as it is rather than as a still

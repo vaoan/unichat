@@ -43,7 +43,8 @@ final class SavedMove {
 
     /** How many files went from {@code from} to {@code to}; nothing when one is inside the other or there's nothing. */
     static int move(Path from, Path to) throws IOException {
-        Path a = from.toAbsolutePath().normalize(), b = to.toAbsolutePath().normalize();
+        Path a = from.toAbsolutePath().normalize();
+        Path b = to.toAbsolutePath().normalize();
         if (!Files.isDirectory(a) || a.startsWith(b) || b.startsWith(a)) return 0;
         Files.createDirectories(b);
         int moved = 0;

@@ -28,7 +28,8 @@ final class StyleHistory {
     static final int KEEP = 20;
     static final String FOLDER = "writing-style-history";
     private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmssSSS'Z'", Locale.ROOT).withZone(ZoneOffset.UTC);
-    private static final String LEARNED = ".md", UNDONE = ".undone.md";
+    private static final String LEARNED = ".md";
+    private static final String UNDONE = ".undone.md";
 
     /** One kept version: {@code when} it was replaced (or undone). */
     record Version(Path file, Instant when, boolean undone) {

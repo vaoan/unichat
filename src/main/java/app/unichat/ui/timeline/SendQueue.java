@@ -108,8 +108,8 @@ public final class SendQueue {
     }
 
     /** Where what came of it is told: the window showing the queue now. */
-    void tellTo(Consumer<String> tell) {
-        this.tell = tell;
+    void tellTo(Consumer<String> to) {
+        this.tell = to;
     }
 
     /** Tests: a stand-in for the AI program. */

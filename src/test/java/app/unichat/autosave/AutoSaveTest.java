@@ -45,9 +45,12 @@ class AutoSaveTest {
     /** The message each failure told came in. */
     private final List<String> failedIn = new CopyOnWriteArrayList<>();
     /** A link that has no video, and a file that can't be downloaded. */
-    private static final String NO_VIDEO = "https://example.org/sin-video", BROKEN = "mxc://s/roto.jpg", ENDLESS = "mxc://s/enorme.mov";
+    private static final String NO_VIDEO = "https://example.org/sin-video";
+    private static final String BROKEN = "mxc://s/roto.jpg";
+    private static final String ENDLESS = "mxc://s/enorme.mov";
     /** A file and a link that fail for {@link #flaky}'s reason while it's set, and are saved once it isn't. */
-    private static final String FLAKY = "mxc://s/a-veces.jpg", FLAKY_LINK = "https://example.org/a-veces";
+    private static final String FLAKY = "mxc://s/a-veces.jpg";
+    private static final String FLAKY_LINK = "https://example.org/a-veces";
     private volatile String flaky;
     /** Every file asked for, in order. */
     private final List<String> asked = new CopyOnWriteArrayList<>();
@@ -507,7 +510,8 @@ class AutoSaveTest {
 
     @Test
     void aFileTheServerSaysIsGoneIsGoneForGood() {
-        RuntimeException notThere = new RuntimeException("HTTP 404"), later = new RuntimeException("HTTP 502");
+        RuntimeException notThere = new RuntimeException("HTTP 404");
+        RuntimeException later = new RuntimeException("HTTP 502");
         app.unichat.service.MediaSource source = new app.unichat.service.MediaSource() {
             @Override public CompletableFuture<Path> media(String url, int w, int h) {
                 return CompletableFuture.failedFuture(url.endsWith("gone") ? notThere : later);

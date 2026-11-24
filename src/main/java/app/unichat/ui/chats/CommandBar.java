@@ -76,10 +76,22 @@ public final class CommandBar extends VBox {
         field.textProperty().addListener((o, a, q) -> filter(q));
         field.addEventFilter(KeyEvent.KEY_PRESSED, e -> {
             switch (e.getCode()) {
-                case DOWN -> { list.getSelectionModel().selectNext(); e.consume(); }
-                case UP -> { list.getSelectionModel().selectPrevious(); e.consume(); }
-                case ENTER -> { run(list.getSelectionModel().getSelectedItem()); e.consume(); }
-                case ESCAPE -> { close.run(); e.consume(); }
+                case DOWN -> {
+                    list.getSelectionModel().selectNext();
+                    e.consume();
+                }
+                case UP -> {
+                    list.getSelectionModel().selectPrevious();
+                    e.consume();
+                }
+                case ENTER -> {
+                    run(list.getSelectionModel().getSelectedItem());
+                    e.consume();
+                }
+                case ESCAPE -> {
+                    close.run();
+                    e.consume();
+                }
                 default -> { }
             }
         });

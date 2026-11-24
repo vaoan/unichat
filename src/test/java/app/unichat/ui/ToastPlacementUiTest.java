@@ -59,6 +59,6 @@ class ToastPlacementUiTest {
             });
             assertTrue(clear, "the notice sits above the box with " + text.lines().count() + " line(s)");
         }
-        FxWait.fx(() -> { stage[0].close(); return null; });
+        FxWait.onFx(stage[0]::close);
     }
 }

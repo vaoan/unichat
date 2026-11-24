@@ -5,7 +5,8 @@ package app.unichat.settings;
  * {@code server.TelegramKeys} says what's wrong in words, and keys from the vault that aren't ones are never taken.
  */
 public final class TelegramKeyFormat {
-    public static final String ID = "server.telegram.apiId", HASH = "server.telegram.apiHash";
+    public static final String ID = "server.telegram.apiId";
+    public static final String HASH = "server.telegram.apiHash";
 
     private TelegramKeyFormat() {}
 

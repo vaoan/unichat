@@ -119,7 +119,7 @@ class VoiceUiTest {
 
     @AfterEach
     void close() throws Exception {
-        fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
         svc.stop();
     }
 
@@ -134,7 +134,7 @@ class VoiceUiTest {
     private Node mic() { return composer.lookup(".mic-button"); }
 
     private void startRecording() throws InterruptedException {
-        fx(() -> { ((Button) mic()).fire(); return null; });
+        FxWait.onFx(() -> ((Button) mic()).fire());
         await(() -> composer.lookup(".voice-bar") != null, "the recording bar shows");
     }
 
@@ -146,7 +146,7 @@ class VoiceUiTest {
     void theMicIsThereUntilSomethingIsWritten() throws Exception {
         assertTrue(fx(() -> mic().isVisible()));
         assertFalse(fx(() -> composer.lookup(".send-button").isVisible()));
-        fx(() -> { composer.insert("hola"); return null; });
+        FxWait.onFx(() -> composer.insert("hola"));
         assertFalse(fx(() -> mic().isVisible()));
         assertTrue(fx(() -> composer.lookup(".send-button").isVisible()));
     }
@@ -169,10 +169,10 @@ class VoiceUiTest {
     @Test
     void aVoiceNoteGoesInItsChatsTurn() throws Exception {
         List<Runnable> held = new java.util.concurrent.CopyOnWriteArrayList<>();
-        fx(() -> { composer.setInTurn((chat, send) -> held.add(send)); return null; }); // texts still being corrected
+        FxWait.onFx(() -> composer.setInTurn((chat, send) -> held.add(send))); // texts still being corrected
         startRecording();
         speak(1200);
-        fx(() -> { ((Button) composer.lookup(".voice-bar .send-button")).fire(); return null; });
+        FxWait.onFx(() -> ((Button) composer.lookup(".voice-bar .send-button")).fire());
         await(() -> held.size() == 1, "it waits its turn");
         assertEquals(0, voiceNotes().size());
         held.getFirst().run();
@@ -182,10 +182,10 @@ class VoiceUiTest {
     @Test
     void aReplyStaysAReply() throws Exception {
         Message first = svc.messages(CHAT).get(0);
-        fx(() -> { composer.reply(first); return null; });
+        FxWait.onFx(() -> composer.reply(first));
         startRecording();
         speak(1500); // well over the shortest note
-        fx(() -> { ((Button) composer.lookup(".voice-bar .send-button")).fire(); return null; });
+        FxWait.onFx(() -> ((Button) composer.lookup(".voice-bar .send-button")).fire());
         await(() -> voiceNotes().size() == 1, "sent");
         assertEquals(first.id(), voiceNotes().get(0).replyToId());
     }
@@ -199,7 +199,7 @@ class VoiceUiTest {
         assertEquals(1, recording.size(), "the recording's file");
         Path file = recording.iterator().next();
         speak(300);
-        fx(() -> { composer.lookup(".voice-bar").lookupAll(".icon-button").stream().findFirst().map(n -> (Button) n).orElseThrow().fire(); return null; });
+        FxWait.onFx(() -> composer.lookup(".voice-bar").lookupAll(".icon-button").stream().findFirst().map(n -> (Button) n).orElseThrow().fire());
         assertTrue(fx(() -> composer.lookup(".voice-bar") == null));
         await(() -> !Files.exists(file), "the discarded recording's file deleted"); // discarding is done
         assertTrue(voiceNotes().isEmpty());
@@ -218,7 +218,7 @@ class VoiceUiTest {
     @Test
     void tooShortIsNotSent() throws Exception {
         startRecording();
-        fx(() -> { ((Button) composer.lookup(".voice-bar .send-button")).fire(); return null; });
+        FxWait.onFx(() -> ((Button) composer.lookup(".voice-bar .send-button")).fire());
         await(() -> toasts.contains("La nota de voz es demasiado corta"), "says so");
         assertTrue(voiceNotes().isEmpty());
     }
@@ -226,7 +226,7 @@ class VoiceUiTest {
     @Test
     void changingChatDiscardsIt() throws Exception {
         startRecording();
-        fx(() -> { composer.setChat("!andres:demo"); return null; });
+        FxWait.onFx(() -> composer.setChat("!andres:demo"));
         assertTrue(fx(() -> composer.lookup(".voice-bar") == null));
         assertTrue(toasts.contains("Grabación descartada al cambiar de chat"));
     }

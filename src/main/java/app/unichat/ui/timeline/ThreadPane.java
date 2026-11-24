@@ -98,7 +98,9 @@ public final class ThreadPane extends BorderPane {
     private final MessageFixer messageFixer;
     private final SendQueue sendQueue;
     private final SendQueueView sendQueueView;
-    private final MessageSelection.Purpose forwarding, deleting, capturing;
+    private final MessageSelection.Purpose forwarding;
+    private final MessageSelection.Purpose deleting;
+    private final MessageSelection.Purpose capturing;
     private CaptureSheet captureSheet;
     private final Consumer<String> toast;
 
@@ -161,7 +163,7 @@ public final class ThreadPane extends BorderPane {
             if (savedTextSheet != null) savedTextSheet.show(app.unichat.autosave.AutoSave.of(svc).said(m));
         });
         scroll = new TimelineScroll(list, rows, this, () -> chat != null, this::loadOlder);
-        Node header = buildHeader();
+        Node top = buildHeader();
         messageRows = new MessageRowView(svc, media, messageActions, openLink, () -> chat, this::member, scroll::jumpTo);
         redrawOnTranscriptProgress();
         StackPane.setAlignment(scroll.indicator(), Pos.BOTTOM_RIGHT);
@@ -171,7 +173,7 @@ public final class ThreadPane extends BorderPane {
         typing.getStyleClass().add("typing-line");
         VBox bottom = new VBox(typing, composer);
 
-        content.setTop(new VBox(header, selection.ends(), pinnedBar.node()));
+        content.setTop(new VBox(top, selection.ends(), pinnedBar.node()));
         content.setCenter(timeline);
         content.setBottom(bottom);
 
@@ -199,7 +201,8 @@ public final class ThreadPane extends BorderPane {
         });
     }
 
-    private HBox header, headerButtons;
+    private HBox header;
+    private HBox headerButtons;
 
     private Node buildHeader() {
         headerTitle.getStyleClass().add("thread-title");
@@ -531,7 +534,8 @@ public final class ThreadPane extends BorderPane {
         composer.hearAhead(); // a voice note that just arrived is ready when a draft answers it
         messageRows.index(msgs);
         List<ThreadRows.Row> next = ThreadRows.build(msgs, ZoneId.systemDefault());
-        if (forceBottom) rows.setAll(next); else ThreadRows.update(rows, next);
+        if (forceBottom) rows.setAll(next);
+        else ThreadRows.update(rows, next);
         // Drawn from elsewhere than the messages: photos of who's in the chat, what it allows, and "Hoy" on the day separators.
         int surroundings = java.util.Objects.hash(chat.id(), chat.members(), chat.features(), java.time.LocalDate.now(ZoneId.systemDefault()));
         if (surroundings != drawnWith && !forceBottom) list.refresh();
@@ -621,7 +625,8 @@ public final class ThreadPane extends BorderPane {
             pseudoClassStateChanged(MessageSelection.PICKED, picked);
             showActions(isSelected());
             if (getItem() instanceof ThreadRows.MessageRow mr && drawn != null) {
-                boolean start = selection.rangeStart(mr.message()), end = selection.rangeEnd(mr.message());
+                boolean start = selection.rangeStart(mr.message());
+                boolean end = selection.rangeEnd(mr.message());
                 Node shown = RangeMarkers.around(drawn, start, end, () -> selection.removeRangeEnd(true), () -> selection.removeRangeEnd(false));
                 if (getGraphic() != shown) setGraphic(shown);
             }

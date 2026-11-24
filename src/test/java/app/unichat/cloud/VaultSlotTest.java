@@ -46,7 +46,8 @@ class VaultSlotTest {
 
     @Test
     void passwordParamsCarryAFreshSalt() {
-        ObjectNode a = VaultSlot.newPasswordParams(), b = VaultSlot.newPasswordParams();
+        ObjectNode a = VaultSlot.newPasswordParams();
+        ObjectNode b = VaultSlot.newPasswordParams();
         assertEquals("argon2id", a.get("kdf").asText());
         assertEquals(65536, a.get("m").asInt());
         assertEquals(3, a.get("t").asInt());

@@ -292,11 +292,17 @@
           </systemPropertyVariables>
         </configuration>
       </plugin>
-      <!-- File and method size limits (checkstyle.xml), checked on every build. -->
+      <!-- Checkstyle in validate, main and test code (checkstyle.xml): the size limits and the checks that catch defects
+           or unclear code, no layout. Any finding fails, warnings too. Checkstyle itself is pinned: the plugin's own
+           default (9.3) can't read Java 25. A finding kept on purpose is one member's
+           @SuppressWarnings("checkstyle:Name") // why (SuppressionsHaveReasonsTest); BuildRulesTest keeps all of this on. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-checkstyle-plugin</artifactId>
         <version>3.6.0</version>
+        <dependencies>
+          <dependency><groupId>com.puppycrawl.tools</groupId><artifactId>checkstyle</artifactId><version>14.4.0</version></dependency>
+        </dependencies>
         <configuration>
           <configLocation>checkstyle.xml</configLocation>
           <consoleOutput>true</consoleOutput>

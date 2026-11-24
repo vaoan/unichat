@@ -24,8 +24,11 @@ import java.util.List;
  * whose tool isn't there or fails gives the sticker as it is, or a still PNG. It knows formats, not networks.
  */
 public final class StickerConverter {
-    static final String WEBP = NetworkFormats.WEBP, PNG = NetworkFormats.PNG, WEBM = NetworkFormats.WEBM, GIF = NetworkFormats.GIF,
-            LOTTIE = NetworkFormats.LOTTIE;
+    static final String WEBP = NetworkFormats.WEBP;
+    static final String PNG = NetworkFormats.PNG;
+    static final String WEBM = NetworkFormats.WEBM;
+    static final String GIF = NetworkFormats.GIF;
+    static final String LOTTIE = NetworkFormats.LOTTIE;
 
     record Result(Path file, String mime) {}
 
@@ -40,8 +43,10 @@ public final class StickerConverter {
     static Result toMp4(Path gif, Path dir) throws IOException {
         List<GifFrames.Frame> frames = GifFrames.read(gif);
         if (frames.isEmpty()) throw new IOException(I18n.t("sticker.noFrames"));
-        int w = frames.get(0).image().getWidth(), h = frames.get(0).image().getHeight();
-        int ew = w + (w & 1), eh = h + (h & 1);
+        int w = frames.get(0).image().getWidth();
+        int h = frames.get(0).image().getHeight();
+        int ew = w + (w & 1);
+        int eh = h + (h & 1);
         Files.createDirectories(dir);
         Path out = Files.createTempDirectory(dir, "sticker").resolve("sticker.mp4");
         org.jcodec.api.awt.AWTSequenceEncoder enc = org.jcodec.api.awt.AWTSequenceEncoder.createSequenceEncoder(out.toFile(), FPS);

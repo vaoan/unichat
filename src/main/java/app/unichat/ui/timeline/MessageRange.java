@@ -11,7 +11,8 @@ import java.util.Set;
  * chat's order; pure.
  */
 final class MessageRange {
-    private String start, end;
+    private String start;
+    private String end;
     /** The chat's order when the ends were last placed: a message between them deleted later still leaves the rest in. */
     private List<String> order = List.of();
 
@@ -40,7 +41,8 @@ final class MessageRange {
             end = above ? other : id;
             return;
         }
-        int s = order.indexOf(start), e = order.indexOf(end);
+        int s = order.indexOf(start);
+        int e = order.indexOf(end);
         if (s < 0 || e < 0) { // its ends were deleted meanwhile: it starts again here
             start = id;
             end = id;
@@ -62,9 +64,11 @@ final class MessageRange {
 
     /** The messages in it, of {@code chat} as it is now, in its order: those between the ends, still there. */
     List<String> of(List<String> chat) {
-        String a = start != null ? start : end, b = end != null ? end : start;
+        String a = start != null ? start : end;
+        String b = end != null ? end : start;
         if (a == null) return List.of();
-        int s = order.indexOf(a), e = order.indexOf(b);
+        int s = order.indexOf(a);
+        int e = order.indexOf(b);
         if (s < 0 || e < 0) return List.of();
         Set<String> between = new HashSet<>(order.subList(Math.min(s, e), Math.max(s, e) + 1));
         return chat.stream().filter(between::contains).toList();

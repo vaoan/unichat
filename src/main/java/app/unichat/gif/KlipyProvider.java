@@ -45,8 +45,10 @@ public final class KlipyProvider implements GifProvider {
         for (JsonNode d : root.path("data").path("data")) {
             JsonNode file = d.path("file");
             if (file.isMissingNode() || "ad".equals(d.path("type").asText())) continue;
-            JsonNode big = first(file, "hd", "md", "sm", "xs"), small = first(file, "sm", "xs", "md", "hd");
-            String preview = text(small.path("gif").path("url")), gif = text(big.path("gif").path("url"));
+            JsonNode big = first(file, "hd", "md", "sm", "xs");
+            JsonNode small = first(file, "sm", "xs", "md", "hd");
+            String preview = text(small.path("gif").path("url"));
+            String gif = text(big.path("gif").path("url"));
             if (preview == null || gif == null) continue;
             out.add(new Gif("klipy", d.path("id").asText(), d.path("title").asText(""), preview, text(big.path("mp4").path("url")), gif,
                     big.path("gif").path("width").asInt(0), big.path("gif").path("height").asInt(0)));

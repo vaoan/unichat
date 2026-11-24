@@ -95,7 +95,8 @@ class VoiceEnhancerTest {
     @Test
     void theCommandsReadOnlyTheRawFileAndNameTheModelBare() {
         List<List<String>> c = VoiceEnhancer.commands(Path.of("ffmpeg"), Path.of("a.pcm"), 16_000, Path.of("m.pcm"), Path.of("b.pcm"), true);
-        List<String> first = c.get(0), second = c.get(1);
+        List<String> first = c.get(0);
+        List<String> second = c.get(1);
         assertEquals("file", first.get(first.indexOf("-protocol_whitelist") + 1));
         assertEquals("16000", first.get(first.indexOf("-ar") + 1), "the input's rate comes first");
         assertEquals("a.pcm", first.get(first.indexOf("-i") + 1));
@@ -143,7 +144,8 @@ class VoiceEnhancerTest {
         double sum = 0;
         int n = 0;
         for (int w = 0; (w + 1) * window <= Math.min(audio.length, clean.length); w++) {
-            double c = 0, a = 0;
+            double c = 0;
+            double a = 0;
             for (int i = w * window; i < (w + 1) * window; i++) {
                 c += clean[i] * (double) clean[i];
                 a += audio[i] * (double) audio[i];
@@ -169,7 +171,8 @@ class VoiceEnhancerTest {
     void theRealModelQuietsTheNoiseAndKeepsTheVoice() throws Exception {
         assumeTrue(Ffmpeg.find() != null, "no ffmpeg");
         Ffmpeg.setAutoInstall(true);
-        Path clean = dir.resolve("limpia.pcm"), noisy = dir.resolve("nota.ogg.pcm");
+        Path clean = dir.resolve("limpia.pcm");
+        Path noisy = dir.resolve("nota.ogg.pcm");
         speechAndNoise(clean, noisy);
         VoiceNote out = VoiceEnhancer.improve(recorded(), noisy, RATE, p -> { });
         assertTrue(Files.isRegularFile(app.unichat.settings.Settings.get().dir().resolve("tools/rnnoise/sh.rnnn")));
@@ -179,7 +182,8 @@ class VoiceEnhancerTest {
         short[] reference = samples(Files.readAllBytes(clean), 0);
         short[] before = samples(Files.readAllBytes(noisy), 0);
         short[] after = samples(Files.readAllBytes(wav), 44);
-        double noiseBefore = power(before, reference, false), noiseAfter = power(after, reference, false);
+        double noiseBefore = power(before, reference, false);
+        double noiseAfter = power(after, reference, false);
         assertTrue(noiseAfter < noiseBefore - 8, "noise " + noiseBefore + " -> " + noiseAfter + " dB");
         assertTrue(power(after, reference, true) >= power(before, reference, true) - 1, "the voice stays as loud");
     }

@@ -129,8 +129,8 @@ class NewChatUiTest {
     void aClosedPaneDoesNotJumpToTheChatLater() throws Exception {
         MockChatService svc = new MockChatService();
         Scene scene = start(svc);
-        fx(() -> { scene.getRoot().lookupAll("*").stream().filter(n -> n instanceof MainView).map(n -> (MainView) n)
-                .findFirst().orElseThrow().openChatId("!family:demo"); return null; });
+        FxWait.onFx(() -> scene.getRoot().lookupAll("*").stream().filter(n -> n instanceof MainView).map(n -> (MainView) n)
+                .findFirst().orElseThrow().openChatId("!family:demo"));
         shortcutN(scene);
         chooseNetwork(scene, "WhatsApp");
         type(scene, "Pedro");

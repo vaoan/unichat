@@ -55,8 +55,11 @@ final class MessageActionsUi {
     /** Links offered in a message's menu: the keyboard has no other way to them. */
     private static final int MENU_LINKS = 5;
 
-    private Consumer<Message> onForward = m -> { }, onDelete = m -> { }, onDeleteSeveral = m -> { }, onSavedText = m -> { },
-            onCapture = m -> { };
+    private Consumer<Message> onForward = m -> { };
+    private Consumer<Message> onDelete = m -> { };
+    private Consumer<Message> onDeleteSeveral = m -> { };
+    private Consumer<Message> onSavedText = m -> { };
+    private Consumer<Message> onCapture = m -> { };
 
     /** "Capturar conversación…": picking the stretch to capture starts with {@code m}. */
     void setOnCapture(Consumer<Message> capture) {

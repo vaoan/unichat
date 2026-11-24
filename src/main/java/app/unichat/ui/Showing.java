@@ -81,11 +81,18 @@ public final class Showing {
     public static final class Animated implements Watch {
         private final Animation animation;
         private final Watch watch;
-        private boolean wanted, shown;
+        private boolean wanted;
+        private boolean shown;
 
         private Animated(Node node, Animation animation) {
             this.animation = animation;
-            watch = whileShowing(node, () -> { shown = true; follow(); }, () -> { shown = false; follow(); });
+            watch = whileShowing(node, () -> {
+                shown = true;
+                follow();
+            }, () -> {
+                shown = false;
+                follow();
+            });
         }
 
         /** Whether it should run when it can be seen (a count going on), or not at all. */
@@ -151,7 +158,8 @@ public final class Showing {
 
     private static final class Watcher implements Watch {
         private final Node node;
-        private final Runnable start, stop;
+        private final Runnable start;
+        private final Runnable stop;
         private final ChangeListener<Scene> onScene = (o, a, s) -> scene(s);
         private final ChangeListener<Window> onWindow = (o, a, w) -> window(w);
         private final ChangeListener<Boolean> onChange = (o, a, s) -> update();

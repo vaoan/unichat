@@ -30,7 +30,10 @@ class StyleLearnerTest {
     @Test
     void nothingNewMeansNoCall() {
         AtomicInteger calls = new AtomicInteger();
-        StyleLearner l = new StyleLearner(new WritingStyle(dir), p -> { calls.incrementAndGet(); return "- hahaha"; });
+        StyleLearner l = new StyleLearner(new WritingStyle(dir), p -> {
+            calls.incrementAndGet();
+            return "- hahaha";
+        });
         l.learn("!c", CHAT);
         l.learn("!c", CHAT);
         assertEquals(1, calls.get());
@@ -88,7 +91,10 @@ class StyleLearnerTest {
         s.save("- viejo");
         s.addCorrection("a", "b");
         AtomicInteger calls = new AtomicInteger();
-        StyleLearner l = new StyleLearner(s, p -> { calls.incrementAndGet(); return bullets(38, 90); });
+        StyleLearner l = new StyleLearner(s, p -> {
+            calls.incrementAndGet();
+            return bullets(38, 90);
+        });
         assertEquals("- viejo", l.learn("!c", CHAT));
         assertEquals(2, calls.get(), "shortened once, not again and again");
         assertEquals(1, s.pending().size());
@@ -106,10 +112,15 @@ class StyleLearnerTest {
     @Test
     void theFileStaysReadableWhileLearning() throws Exception {
         WritingStyle s = new WritingStyle(dir);
-        CountDownLatch inside = new CountDownLatch(1), release = new CountDownLatch(1);
+        CountDownLatch inside = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
         StyleLearner l = new StyleLearner(s, p -> {
             inside.countDown();
-            try { release.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             return "- x";
         });
         Thread t = Thread.ofPlatform().start(() -> l.learn("!c", CHAT));
@@ -139,7 +150,10 @@ class StyleLearnerTest {
         WritingStyle s = new WritingStyle(dir);
         s.writtenByAi("hahaha sí");
         s.writtenByAi("nos vemos");
-        StyleLearner l = new StyleLearner(s, p -> { calls.incrementAndGet(); return "- x"; });
+        StyleLearner l = new StyleLearner(s, p -> {
+            calls.incrementAndGet();
+            return "- x";
+        });
         l.learn("!c", CHAT);
         assertEquals(0, calls.get(), "only the AI's texts: nothing of theirs to learn from");
     }
@@ -165,13 +179,19 @@ class StyleLearnerTest {
 
     @Test
     void oneAtATime() throws Exception {
-        AtomicInteger now = new AtomicInteger(), most = new AtomicInteger();
-        CountDownLatch inside = new CountDownLatch(1), release = new CountDownLatch(1);
+        AtomicInteger now = new AtomicInteger();
+        AtomicInteger most = new AtomicInteger();
+        CountDownLatch inside = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
         WritingStyle s = new WritingStyle(dir);
         StyleLearner l = new StyleLearner(s, p -> {
             most.accumulateAndGet(now.incrementAndGet(), Math::max);
             inside.countDown();
-            try { release.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
             now.decrementAndGet();
             return "- x";
         });
@@ -193,12 +213,18 @@ class StyleLearnerTest {
         List<String> asked = new java.util.ArrayList<>();
         try {
             app.unichat.support.I18n.use("en");
-            new StyleLearner(new WritingStyle(dir), p -> { asked.add(p); return "- lol"; }).learn("!c", CHAT);
+            new StyleLearner(new WritingStyle(dir), p -> {
+                asked.add(p);
+                return "- lol";
+            }).learn("!c", CHAT);
         } finally {
             app.unichat.support.I18n.use(before.getLanguage());
         }
         assertTrue(asked.getFirst().contains("Write the file in English"), asked.toString());
-        new StyleLearner(new WritingStyle(dir.resolve("es")), p -> { asked.add(p); return "- jajaja"; }).learn("!c", CHAT);
+        new StyleLearner(new WritingStyle(dir.resolve("es")), p -> {
+            asked.add(p);
+            return "- jajaja";
+        }).learn("!c", CHAT);
         assertTrue(asked.getLast().contains("Write the file in Spanish"), "the tests run in Spanish");
     }
 
@@ -207,7 +233,10 @@ class StyleLearnerTest {
     void anEnglishChatWithASpanishUiStillAsksForTheNotesInSpanish() {
         List<String> asked = new java.util.ArrayList<>();
         List<Message> english = List.of(mine("$e1", "lol see you tomorrow"), mine("$e2", "omg yes"));
-        new StyleLearner(new WritingStyle(dir), p -> { asked.add(p); return "- lol"; }).learn("!c", english);
+        new StyleLearner(new WritingStyle(dir), p -> {
+            asked.add(p);
+            return "- lol";
+        }).learn("!c", english);
         assertTrue(asked.getFirst().contains("lol see you tomorrow"), asked.toString());
         assertTrue(asked.getFirst().contains("Write the file in Spanish, this person's language, whatever language their "
                 + "messages are in"), asked.toString());

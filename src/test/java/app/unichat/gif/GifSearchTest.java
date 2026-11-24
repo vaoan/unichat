@@ -49,11 +49,21 @@ class GifSearchTest {
             int status = 200;
             if (uri.startsWith("/giphy/v1/gifs/search")) body = GIPHY;
             else if (uri.startsWith("/klipy/api/v1/KEY2/gifs/search")) body = KLIPY;
-            else if (uri.startsWith("/broken")) { status = 500; body = "{}"; }
+            else if (uri.startsWith("/broken")) {
+                status = 500;
+                body = "{}";
+            }
             else if (uri.startsWith("/slow")) {
-                try { slow.await(); } catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+                try {
+                    slow.await();
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
                 body = GIPHY;
-            } else { status = 404; body = "{}"; }
+            } else {
+                status = 404;
+                body = "{}";
+            }
             byte[] b = body.getBytes(StandardCharsets.UTF_8);
             ex.sendResponseHeaders(status, b.length);
             try (OutputStream o = ex.getResponseBody()) {

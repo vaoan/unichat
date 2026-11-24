@@ -37,14 +37,16 @@ public final class WakeWatch {
     }
 
     private static void tick() {
-        long wall = System.currentTimeMillis(), awake = System.nanoTime();
+        long wall = System.currentTimeMillis();
+        long awake = System.nanoTime();
         while (true) {
             try {
                 Thread.sleep(TICK_MS);
             } catch (InterruptedException e) {
                 return;
             }
-            long w = System.currentTimeMillis(), a = System.nanoTime();
+            long w = System.currentTimeMillis();
+            long a = System.nanoTime();
             if (slept(w - wall, (a - awake) / 1_000_000)) {
                 for (Runnable r : LISTENERS) {
                     try {

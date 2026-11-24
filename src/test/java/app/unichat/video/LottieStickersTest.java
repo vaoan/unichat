@@ -117,7 +117,8 @@ public class LottieStickersTest { // NOPMD: JUnitJupiterTestShouldBePackagePriva
     void oneFileIsMadeOnceAtATimeAndAFailureIsntTriedAgain() throws Exception {
         LottieStickers.Once once = new LottieStickers.Once();
         Path f = dir.resolve("s.tgs");
-        java.util.concurrent.CountDownLatch started = new java.util.concurrent.CountDownLatch(1), release = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch started = new java.util.concurrent.CountDownLatch(1);
+        java.util.concurrent.CountDownLatch release = new java.util.concurrent.CountDownLatch(1);
         java.util.concurrent.atomic.AtomicInteger runs = new java.util.concurrent.atomic.AtomicInteger();
         java.util.concurrent.Callable<Path> make = () -> {
             runs.incrementAndGet();

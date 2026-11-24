@@ -7,6 +7,7 @@ import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
+import javax.xml.XMLConstants;
 import javax.xml.parsers.DocumentBuilderFactory;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -131,7 +132,7 @@ class BuildRulesTest {
     @Test
     void noExecutionIsUnbound() {
         for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin", "maven-pmd-plugin",
-                "spotbugs-maven-plugin", "exec-maven-plugin", "properties-maven-plugin")) {
+                "spotbugs-maven-plugin", "exec-maven-plugin", "properties-maven-plugin", "maven-checkstyle-plugin")) {
             Element executions = elements(plugin(plugin), "executions").stream().findFirst().orElse(null);
             if (executions == null) continue;
             for (Element e : elements(executions, "execution")) {
@@ -145,7 +146,7 @@ class BuildRulesTest {
         for (Element profile : elements(child(POM.getDocumentElement(), "profiles"), "profile")) {
             for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin", "maven-pmd-plugin",
                     "spotbugs-maven-plugin", "findsecbugs-plugin", "spotbugs-exclude.xml", "exec-maven-plugin",
-                    "properties-maven-plugin", "SpotBugsCache")) {
+                    "properties-maven-plugin", "SpotBugsCache", "maven-checkstyle-plugin", "checkstyle.xml")) {
                 assertFalse(profile.getTextContent().contains(plugin), text(profile, "id") + " leaves " + plugin + " as it is");
             }
         }
@@ -158,7 +159,10 @@ class BuildRulesTest {
                 "pmd.failOnViolation", "pmd.failurePriority", "spotbugs.skip", "spotbugs.failOnError", "spotbugs.effort",
                 "spotbugs.threshold", "spotbugs.includeTests", "spotbugs.onlyAnalyze", "spotbugs.omitVisitors",
                 "spotbugs.maxAllowedViolations", "spotbugs.excludeFilterFile", "spotbugs.classFilesDirectory",
-                "spotbugs.testClassFilesDirectory", "exec.skip", "skip.exec", "properties.skip")) {
+                "spotbugs.testClassFilesDirectory", "exec.skip", "skip.exec", "properties.skip", "checkstyle.skip",
+                "checkstyle.failOnViolation", "checkstyle.failsOnError", "checkstyle.violationSeverity",
+                "checkstyle.includeTestSourceDirectory", "checkstyle.config.location", "checkstyle.suppressions.location",
+                "checkstyle.excludes", "checkstyle.includes", "checkstyle.maxAllowedViolations", "checkstyle.consoleOutput")) {
             assertEquals(0, POM.getElementsByTagName(property).getLength(), property + " isn't set in pom.xml");
         }
     }
@@ -293,6 +297,92 @@ class BuildRulesTest {
         }
     }
 
+    @Test
+    void checkstyleChecksMainAndTestCodeAndFailsOnAnyFinding() {
+        Element execution = execution("maven-checkstyle-plugin", "check");
+        assertTrue(BEFORE_INSTALL.contains(text(execution, "phase")), "Checkstyle runs in verify or before: " + text(execution, "phase"));
+        Element config = configuration("maven-checkstyle-plugin");
+        assertEquals("checkstyle.xml", text(config, "configLocation"), "the project's checks, only them");
+        assertNotEquals("false", text(config, "failOnViolation"), "a finding fails the build");
+        assertEquals("warning", text(config, "violationSeverity"), "a warning fails too, not only an error");
+        assertEquals("true", text(config, "includeTestSourceDirectory"), "the tests are checked too");
+        assertEquals("true", text(config, "consoleOutput"), "each finding is printed");
+        List<Element> configs = new ArrayList<>(elements(execution, "configuration"));
+        configs.add(config);
+        for (Element c : configs) {
+            for (String leftOut : List.of("suppressionsLocation", "excludes", "includes", "sourceDirectories",
+                    "testSourceDirectories", "maxAllowedViolations", "failsOnError", "skip", "resourceIncludes")) {
+                assertTrue(elements(c, leftOut).isEmpty(), "no <" + leftOut + ">: nothing is left out of Checkstyle's sight");
+            }
+        }
+        Element tool = elements(child(plugin("maven-checkstyle-plugin"), "dependencies"), "dependency").stream()
+                .filter(d -> "checkstyle".equals(text(d, "artifactId"))).findFirst().orElseThrow();
+        assertTrue(text(tool, "version").matches("\\d+\\.\\d+\\.\\d+"), "Checkstyle itself pinned, not the plugin's old default");
+    }
+
+    @Test
+    void checkstyleKeepsTheSizeLimitsAndEveryCheckThatCatchesDefects() {
+        Document checks = read("checkstyle.xml");
+        Element checker = checks.getDocumentElement();
+        assertEquals("error", property(checker, "severity"), "every finding is an error");
+        assertEquals("800", property(module(checks, "FileLength"), "max"), "files stay under 800 lines");
+        assertEquals("100", property(module(checks, "MethodLength"), "max"), "methods stay under 100 lines");
+        for (String check : List.of("EqualsHashCode", "FallThrough", "ModifierOrder", "RedundantModifier", "UnusedImports",
+                "AvoidStarImport", "OneStatementPerLine", "MultipleVariableDeclarations", "StringLiteralEquality",
+                "SimplifyBooleanExpression", "SimplifyBooleanReturn", "InnerAssignment", "EmptyCatchBlock", "HiddenField",
+                "TypeName", "MethodName", "MemberName", "ConstantName", "ParameterName", "LocalVariableName", "PackageName",
+                "SuppressWarningsHolder", "SuppressWarningsFilter")) {
+            module(checks, check);
+        }
+        assertEquals("true", property(module(checks, "HiddenField"), "ignoreConstructorParameter"));
+        // Left out with its reason: Error Prone forbids the default MissingSwitchDefault wants (an enum switch that
+        // names every constant), and PMD's NonExhaustiveSwitch catches the switch that misses a value without one.
+        assertTrue(allComments(checks).contains("MissingSwitchDefault is left out"), "MissingSwitchDefault's reason is in checkstyle.xml");
+        assertTrue(errorProneFlags().contains("-Xep:UnnecessaryDefaultInEnumSwitch:ERROR"), "Error Prone has that switch's case");
+        NodeList pmdLeftOut = read("pmd-rules.xml").getElementsByTagName("exclude");
+        for (int i = 0; i < pmdLeftOut.getLength(); i++) {
+            assertNotEquals("NonExhaustiveSwitch", ((Element) pmdLeftOut.item(i)).getAttribute("name"), "PMD has the missing default's");
+        }
+        NodeList all = checks.getElementsByTagName("module");
+        for (int i = 0; i < all.getLength(); i++) {
+            Element m = (Element) all.item(i);
+            String name = m.getAttribute("name");
+            assertFalse(name.startsWith("Suppression") || name.startsWith("SuppressWith") || name.equals("BeforeExecutionExclusionFileFilter"),
+                    name + ": a finding kept is one member's @SuppressWarnings(\"checkstyle:...\") // why, never a file or a pattern");
+            String severity = property(m, "severity");
+            assertTrue(severity == null || severity.equals("error"), name + " fails the build (severity " + severity + ")");
+        }
+    }
+
+    /** checkstyle.xml's one module named {@code name}. */
+    private static Element module(Document checks, String name) {
+        NodeList all = checks.getElementsByTagName("module");
+        List<Element> found = new ArrayList<>();
+        for (int i = 0; i < all.getLength(); i++) {
+            if (name.equals(((Element) all.item(i)).getAttribute("name"))) found.add((Element) all.item(i));
+        }
+        assertEquals(1, found.size(), name + " is in checkstyle.xml once");
+        return found.getFirst();
+    }
+
+    /** The value of the module's own property {@code name}, or null. */
+    private static String property(Element module, String name) {
+        return elements(module, "property").stream().filter(p -> name.equals(p.getAttribute("name")))
+                .map(p -> p.getAttribute("value")).findFirst().orElse(null);
+    }
+
+    /** Every comment in {@code d}, together. */
+    private static String allComments(Document d) {
+        StringBuilder out = new StringBuilder();
+        NodeList all = d.getElementsByTagName("*");
+        for (int i = 0; i < all.getLength(); i++) {
+            for (Node n = all.item(i).getFirstChild(); n != null; n = n.getNextSibling()) {
+                if (n instanceof Comment c) out.append(c.getData()).append('\n');
+            }
+        }
+        return out.toString();
+    }
+
     /** Error Prone's own options: what follows {@code -Xplugin:ErrorProne} in its argument. */
     private static List<String> errorProneFlags() {
         String arg = texts(child(configuration("maven-compiler-plugin"), "compilerArgs"), "arg").stream()
@@ -392,7 +482,12 @@ class BuildRulesTest {
     private static Document read(String file) {
         try {
             DocumentBuilderFactory f = DocumentBuilderFactory.newInstance();
-            f.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+            // checkstyle.xml names its DTD, which is never fetched; no entity is ever expanded.
+            f.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            f.setFeature("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+            f.setFeature("http://xml.org/sax/features/external-general-entities", false);
+            f.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            f.setExpandEntityReferences(false);
             return f.newDocumentBuilder().parse(Path.of(file).toFile());
         } catch (Exception e) {
             throw new IllegalStateException(file + " can't be read", e);

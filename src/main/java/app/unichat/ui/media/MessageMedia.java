@@ -63,7 +63,8 @@ public final class MessageMedia {
     public Node imageNode(Message m) {
         boolean sticker = m.type() == MessageType.STICKER;
         MediaSizes.Size size = sticker ? MediaSizes.sticker(m.width(), m.height()) : MediaSizes.media(m.width(), m.height());
-        double dw = size.width(), dh = size.height();
+        double dw = size.width();
+        double dh = size.height();
         StackPane box = mediaBox(dw, dh, sticker);
         ImageView view = new ImageView();
         view.setFitWidth(dw);
@@ -186,7 +187,8 @@ public final class MessageMedia {
     public Node inlineVideoNode(Message m) {
         boolean sticker = m.type() == MessageType.STICKER;
         MediaSizes.Size size = sticker ? MediaSizes.sticker(m.width(), m.height()) : MediaSizes.media(m.width(), m.height());
-        double dw = size.width(), dh = size.height();
+        double dw = size.width();
+        double dh = size.height();
         StackPane box = mediaBox(dw, dh, sticker);
         if (isWebm(m)) showAnimated(box, m, dw, dh);
         else box.getChildren().add(new InlineVideo(svc, m.mediaUrl(), dw, dh, () -> fileNode(m)));

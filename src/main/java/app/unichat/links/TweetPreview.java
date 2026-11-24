@@ -42,7 +42,8 @@ final class TweetPreview {
         JsonNode t = JSON.readTree(json).path("tweet");
         if (t.isMissingNode()) return null;
         JsonNode author = t.path("author");
-        String name = author.path("name").asText(""), handle = author.path("screen_name").asText("");
+        String name = author.path("name").asText("");
+        String handle = author.path("screen_name").asText("");
         String title = handle.isEmpty() ? name : name + " (@" + handle + ")";
         JsonNode media = t.path("media").path("all").path(0);
         String type = media.path("type").asText("");

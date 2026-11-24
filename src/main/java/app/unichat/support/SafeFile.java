@@ -31,7 +31,8 @@ public final class SafeFile {
 
     private final Path target;
     private final String suffix;
-    private final boolean hidden, ownerOnly;
+    private final boolean hidden;
+    private final boolean ownerOnly;
     private final Check beforeMove;
 
     private SafeFile(Path target, String suffix, boolean hidden, boolean ownerOnly, Check beforeMove) {

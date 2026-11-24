@@ -80,7 +80,8 @@ final class FakePCloud implements AutoCloseable {
                 json(x, "{\"result\": 0}");
             }
             case "uploadfile" -> {
-                String folder = q.get("path"), p = (folder.equals("/") ? "" : folder) + "/" + q.get("filename");
+                String folder = q.get("path");
+                String p = (folder.equals("/") ? "" : folder) + "/" + q.get("filename");
                 if (!dirs.contains(folder)) {
                     json(x, "{\"result\": 2005, \"error\": \"Directory does not exist.\"}");
                     return;

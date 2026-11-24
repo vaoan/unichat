@@ -104,7 +104,9 @@ final class LinkSaver {
 
     /** The tools this computer has: yt-dlp and ffmpeg (Unichat's own, downloaded when first needed), gallery-dl if any. */
     static Tools tools() throws IOException, InterruptedException {
-        Path ytDlp = YtDlp.whenNeeded(p -> { }), ffmpeg = Ffmpeg.whenNeeded(p -> { }), gallery = GalleryDl.find();
+        Path ytDlp = YtDlp.whenNeeded(p -> { });
+        Path ffmpeg = Ffmpeg.whenNeeded(p -> { });
+        Path gallery = GalleryDl.find();
         return new Tools() {
             @Override public String ytDlp() { return ytDlp == null ? null : ytDlp.toString(); }
             @Override public String galleryDl() { return gallery == null ? null : gallery.toString(); }

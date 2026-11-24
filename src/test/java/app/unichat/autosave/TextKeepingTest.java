@@ -123,7 +123,8 @@ class TextKeepingTest {
     @Test
     void whatIWriteGoesUpAndLookingAsksTheCloudFirst() throws Exception {
         svc.setAutoSave(chat.id(), false, EnumSet.of(SaveKind.TEXTS)).get();
-        AtomicInteger written = new AtomicInteger(), fetched = new AtomicInteger();
+        AtomicInteger written = new AtomicInteger();
+        AtomicInteger fetched = new AtomicInteger();
         keeping.setSync(written::incrementAndGet, () -> {
             fetched.incrementAndGet();
             return CompletableFuture.completedFuture(null);
@@ -214,7 +215,8 @@ class TextKeepingTest {
         svc.setAutoSave(chat.id(), true, EnumSet.of(SaveKind.TEXTS)).get();
         keeping.wroteBefore(chat.id(), "Ok.", "ok");
         keeping.wroteBefore(chat.id(), "Ok.", "okk");
-        Message a = mine("$a", "Ok."), b = mine("$b", "Ok.");
+        Message a = mine("$a", "Ok.");
+        Message b = mine("$b", "Ok.");
         timeline.add(a);
         timeline.add(b);
         keeping.changed(chat.id());

@@ -55,7 +55,8 @@ public final class Supervisor {
                 String[] parts = Files.readString(f).strip().split("\\s+");
                 Files.deleteIfExists(f);
                 if (parts.length != 2) continue;
-                long pid = Long.parseLong(parts[0]), started = Long.parseLong(parts[1]);
+                long pid = Long.parseLong(parts[0]);
+                long started = Long.parseLong(parts[1]);
                 ProcessHandle.of(pid).filter(ProcessHandle::isAlive)
                         .filter(h -> h.info().startInstant().map(i -> i.toEpochMilli() == started).orElse(false))
                         .ifPresent(h -> {

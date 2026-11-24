@@ -78,7 +78,8 @@ final class AppLog {
     }
 
     private static final class Tee extends OutputStream {
-        private final OutputStream a, b;
+        private final OutputStream a;
+        private final OutputStream b;
 
         Tee(OutputStream a, OutputStream b) {
             this.a = a;

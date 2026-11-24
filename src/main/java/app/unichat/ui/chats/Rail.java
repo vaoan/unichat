@@ -109,9 +109,11 @@ public final class Rail extends VBox {
 
     /** Scrolls the networks so {@code b} shows whole (keyboard focus). */
     private void reveal(Button b) {
-        double content = networks.getHeight(), view = scroll.getViewportBounds().getHeight();
+        double content = networks.getHeight();
+        double view = scroll.getViewportBounds().getHeight();
         if (content <= view) return;
-        double top = b.getBoundsInParent().getMinY(), bottom = b.getBoundsInParent().getMaxY();
+        double top = b.getBoundsInParent().getMinY();
+        double bottom = b.getBoundsInParent().getMaxY();
         double shown = scroll.getVvalue() * (content - view);
         if (top < shown) scroll.setVvalue(top / (content - view));
         else if (bottom > shown + view) scroll.setVvalue((bottom - view) / (content - view));

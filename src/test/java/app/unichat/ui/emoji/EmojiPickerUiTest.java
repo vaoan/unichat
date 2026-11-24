@@ -66,12 +66,12 @@ class EmojiPickerUiTest {
                 .map(w -> (javafx.scene.control.ContextMenu) w).findFirst().orElseThrow());
         double size = FxWait.fx(() -> ((javafx.scene.control.Labeled) menu.getSkin().getNode().lookup(".menu-item .label")).getFont().getSize());
         String family = FxWait.fx(() -> ((javafx.scene.control.Labeled) menu.getSkin().getNode().lookup(".menu-item .label")).getFont().getFamily());
-        FxWait.fx(() -> { menu.hide(); return null; });
+        FxWait.onFx(menu::hide);
         assertTrue(size < 16, "menu text at the window's size, was " + size);
         assertFalse(family.contains("Emoji"), "not the emoji font: " + family);
         assertTrue(FxWait.fx(() -> menu.getItems().stream().noneMatch(i -> app.unichat.support.I18n.t("library.enlarge").equals(i.getText()))),
                 "no 'see it big' for an emoji");
-        FxWait.fx(() -> { b.getScene().getWindow().hide(); return null; });
+        FxWait.onFx(() -> b.getScene().getWindow().hide());
     }
 
     @Test
@@ -110,7 +110,7 @@ class EmojiPickerUiTest {
                 }
                 return -1;
             });
-            FxWait.fx(() -> { list.scrollTo(row); return null; });
+            FxWait.onFx(() -> list.scrollTo(row));
             FxWait.until(e + " on screen", () -> button(grid, e) != null);
             Button b = FxWait.fx(() -> button(grid, e));
             boolean picture = !e.equals("🫠");
@@ -121,7 +121,7 @@ class EmojiPickerUiTest {
             var img = FxWait.fx(() -> grid.snapshot(null, null));
             ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", java.nio.file.Path.of(shot).toFile());
         }
-        FxWait.fx(() -> { grid.getScene().getWindow().hide(); return null; });
+        FxWait.onFx(() -> grid.getScene().getWindow().hide());
     }
 
     /** Typing in the search keeps what's called that, in the language in use; Enter takes the first. */
@@ -147,7 +147,7 @@ class EmojiPickerUiTest {
                 .filter(n -> n instanceof javafx.scene.control.ListView).map(n -> (javafx.scene.control.ListView<?>) n)
                 .findFirst().orElseThrow());
         FxWait.until("laid out", () -> !list.getItems().isEmpty());
-        FxWait.fx(() -> { grid.searchField().setText("cara derrit"); return null; });
+        FxWait.onFx(() -> grid.searchField().setText("cara derrit"));
         List<?> rows = FxWait.fx(() -> List.copyOf(list.getItems()));
         assertEquals(new EmojiRows.Title("Resultados"), rows.get(0));
         assertEquals(List.of("🫠"), rows.stream().filter(r -> r instanceof EmojiRows.Emojis).flatMap(r -> ((EmojiRows.Emojis) r).emoji().stream()).toList());
@@ -157,9 +157,9 @@ class EmojiPickerUiTest {
             return null;
         });
         assertEquals("🫠", picked.get());
-        FxWait.fx(() -> { grid.searchField().setText("zzqx"); return null; });
+        FxWait.onFx(() -> grid.searchField().setText("zzqx"));
         assertEquals(new EmojiRows.Hint("Ningún emoji se llama así."), FxWait.fx(() -> list.getItems().get(1)));
-        FxWait.fx(() -> { grid.getScene().getWindow().hide(); return null; });
+        FxWait.onFx(() -> grid.getScene().getWindow().hide());
     }
 
     private static Button button(Node in, String e) {

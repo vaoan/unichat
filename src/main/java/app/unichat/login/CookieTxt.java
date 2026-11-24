@@ -33,7 +33,11 @@ public final class CookieTxt {
             String expiryText = f[4].strip();
             long expiry = 0;
             if (!expiryText.isEmpty()) {
-                try { expiry = Long.parseLong(expiryText); } catch (NumberFormatException e) { continue; }
+                try {
+                    expiry = Long.parseLong(expiryText);
+                } catch (NumberFormatException e) {
+                    continue;
+                }
             }
             if (expiry > 0 && expiry < nowSec) continue;
             if (!spec.isForNetwork(domain)) continue;

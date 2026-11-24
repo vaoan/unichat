@@ -106,7 +106,7 @@ class VideoUiTest {
         fx(() -> root.getChildren().remove(video[0]));
         await(() -> video[0].player() == null, "released");
         assertEquals(MediaPlayer.Status.DISPOSED, player.getStatus());
-        fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 
     /** Nobody can see Unichat: the GIF's native player and its visibility timeline go, and come back once it's seen. */
@@ -130,7 +130,7 @@ class VideoUiTest {
             await(() -> video[0].player() != null && video[0].player().getStatus() == MediaPlayer.Status.PLAYING, "plays again once seen");
         } finally {
             app.unichat.support.Seen.reset(true);
-            fx(() -> { stage.close(); return null; });
+            FxWait.onFx(stage::close);
         }
     }
 
@@ -149,7 +149,7 @@ class VideoUiTest {
         });
         await(() -> video[0].getChildren().contains(fallback), "fallback shown");
         assertNull(fx(video[0]::player));
-        fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 
     @Test
@@ -167,7 +167,10 @@ class VideoUiTest {
                     Path.of(System.getProperty("java.io.tmpdir"), "unichat-video-viewer.png").toFile());
             return null;
         });
-        fx(() -> { viewer.close(); owner.close(); return null; });
+        FxWait.onFx(() -> {
+            viewer.close();
+            owner.close();
+        });
         await(() -> player.getStatus() == MediaPlayer.Status.DISPOSED, "released");
         assertFalse(fx(viewer::isShowing));
     }
@@ -191,7 +194,10 @@ class VideoUiTest {
                 "K plays it again");
         assertTrue(fx(() -> viewer.getScene().getRoot().lookupAll(".icon-button").stream()
                 .anyMatch(n -> "Pantalla completa (F)".equals(n.getAccessibleText()))), "full screen button");
-        fx(() -> { viewer.close(); owner.close(); return null; });
+        FxWait.onFx(() -> {
+            viewer.close();
+            owner.close();
+        });
     }
 
     @Test
@@ -213,7 +219,10 @@ class VideoUiTest {
             javafx.geometry.Bounds b = bar.localToScene(bar.getBoundsInLocal());
             return b.getHeight() > 0 && b.getMaxY() <= viewer.getScene().getHeight() + 0.5;
         }), "the controls are inside the window: " + where);
-        fx(() -> { viewer.close(); owner.close(); return null; });
+        FxWait.onFx(() -> {
+            viewer.close();
+            owner.close();
+        });
     }
 
     @Test
@@ -228,9 +237,12 @@ class VideoUiTest {
         double screenWidth = fx(() -> javafx.stage.Screen.getScreensForRectangle(viewer.getX(), viewer.getY(), 1, 1).get(0).getBounds().getWidth());
         FxWait.until("the window fills the screen (" + screenWidth + " wide)",
                 () -> viewer.isFullScreen() && viewer.getWidth() >= screenWidth - 1);
-        fx(() -> { viewer.setFullScreen(false); return null; });
+        FxWait.onFx(() -> viewer.setFullScreen(false));
         FxWait.until("back to a window", () -> !viewer.isFullScreen());
-        fx(() -> { viewer.close(); owner.close(); return null; });
+        FxWait.onFx(() -> {
+            viewer.close();
+            owner.close();
+        });
     }
 
     @Test
@@ -271,7 +283,10 @@ class VideoUiTest {
             return played[0] >= 0.6;
         }, "0.6 s of the new round played");
         double wall = (t1[0] - t0[0]) / 1e9;
-        fx(() -> { viewer.close(); owner.close(); return null; });
+        FxWait.onFx(() -> {
+            viewer.close();
+            owner.close();
+        });
         assertTrue(played[0] / wall > 1.4, "after starting over it still plays at " + rate + "x, not " + played[0] / wall);
     }
 
@@ -291,7 +306,10 @@ class VideoUiTest {
         Stage owner = window(root);
         Stage viewer = fx(() -> VideoViewer.show(owner, CompletableFuture.completedFuture(bad), "roto", null, p -> { }));
         await(() -> viewer.getScene().getRoot().lookupAll(".primary-button").size() == 1, "offers another app");
-        fx(() -> { viewer.close(); owner.close(); return null; });
+        FxWait.onFx(() -> {
+            viewer.close();
+            owner.close();
+        });
     }
 
     @Test
@@ -318,7 +336,7 @@ class VideoUiTest {
             return n;
         });
         await(() -> node.lookup(".image-view") instanceof javafx.scene.image.ImageView v && v.getImage() != null, "the converted sticker shows");
-        fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 
     /** A real GIF: bridges deliver one for a sticker they still label video/webm. */
@@ -351,7 +369,7 @@ class VideoUiTest {
                 return n;
             });
             await(() -> node.lookup(".image-view") instanceof javafx.scene.image.ImageView v && v.getImage() != null, "the GIF shows");
-            fx(() -> { stage.close(); return null; });
+            FxWait.onFx(stage::close);
         } finally {
             System.clearProperty("unichat.ffmpeg");
         }
@@ -365,7 +383,10 @@ class VideoUiTest {
         Stage viewer = fx(() -> VideoViewer.show(owner, CompletableFuture.completedFuture(file), "s", null, p -> { }));
         await(() -> viewer.getScene().getRoot().lookup(".image-view") instanceof javafx.scene.image.ImageView v && v.getImage() != null, "shows it");
         assertTrue(fx(() -> viewer.getScene().getRoot().lookupAll(".primary-button").isEmpty()), "no format complaint");
-        fx(() -> { viewer.close(); owner.close(); return null; });
+        FxWait.onFx(() -> {
+            viewer.close();
+            owner.close();
+        });
     }
 
     @Test
@@ -381,6 +402,9 @@ class VideoUiTest {
         Stage owner = window(root);
         Stage viewer = fx(() -> VideoViewer.show(owner, CompletableFuture.completedFuture(webm), "video", null, p -> { }));
         await(() -> viewer.getProperties().get(VideoViewer.PLAYER) instanceof MediaPlayer p && p.getStatus() == MediaPlayer.Status.PLAYING, "plays converted");
-        fx(() -> { viewer.close(); owner.close(); return null; });
+        FxWait.onFx(() -> {
+            viewer.close();
+            owner.close();
+        });
     }
 }

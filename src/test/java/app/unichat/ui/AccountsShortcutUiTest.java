@@ -43,7 +43,10 @@ class AccountsShortcutUiTest {
                     return v;
                 });
                 FxWait.settled();
-                FxWait.fx(() -> { view.showSettings(); SettingsWindow.select("about"); return null; });
+                FxWait.onFx(() -> {
+                    view.showSettings();
+                    SettingsWindow.select("about");
+                });
                 FxWait.fx(view::showAccounts);
                 FxWait.until("the accounts page in " + lang, () -> "accounts".equals(SettingsWindow.currentPage()));
                 assertEquals("accounts", FxWait.fx(SettingsWindow::currentPage));

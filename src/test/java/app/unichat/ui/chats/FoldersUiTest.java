@@ -313,7 +313,7 @@ class FoldersUiTest {
         clickCell(".folder-chats", title(SERVER));
 
         svc.setInFolder(work, svc.chat(FAMILIA), true);
-        fx(() -> { pane.refresh(); return null; });
+        FxWait.onFx(pane::refresh);
         assertEquals(1, fx(() -> folderChats().getItems().size()), "hidden: nothing to draw");
 
         key(fx(() -> scene.getRoot().lookup(".space-list")), KeyCode.ESCAPE);
@@ -412,10 +412,7 @@ class FoldersUiTest {
         fire(railButton("Carpetas"));
         clickCell(".folder-list", "Trabajo");
         clickCell(".folder-chats", title(FAMILIA));
-        fx(() -> {
-            pane.refresh();
-            return null;
-        });
+        FxWait.onFx(pane::refresh);
         assertEquals(FAMILIA, fx(() -> folderChats().getSelectionModel().getSelectedItem().id()));
 
         fire(fx(() -> buttons("Volver a carpetas").get(0)));

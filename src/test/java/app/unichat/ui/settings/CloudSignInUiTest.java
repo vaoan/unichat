@@ -44,7 +44,7 @@ class CloudSignInUiTest {
             return s;
         });
         assertFalse(login.isDone(), "still waiting while the page shows");
-        FxWait.fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
         assertTrue(login.isCancelled());
     }
 
@@ -62,8 +62,8 @@ class CloudSignInUiTest {
             s.show();
             return s;
         });
-        FxWait.fx(() -> { root[0].getChildren().clear(); return null; }); // another page of Ajustes
+        FxWait.onFx(() -> root[0].getChildren().clear());  // another page of Ajustes
         assertTrue(login.isCancelled());
-        FxWait.fx(() -> { stage.close(); return null; });
+        FxWait.onFx(stage::close);
     }
 }

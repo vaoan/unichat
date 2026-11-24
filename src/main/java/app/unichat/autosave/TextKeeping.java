@@ -83,21 +83,21 @@ final class TextKeeping {
      * {@code written}: runs after this computer wrote something (so it goes up now); {@code fetch}: brings what the other
      * computers kept, asked before looking at a message.
      */
-    void setSync(Runnable written, Supplier<CompletableFuture<?>> fetch) {
-        this.written = written;
-        this.fetch = fetch;
+    void setSync(Runnable onWritten, Supplier<CompletableFuture<?>> fetcher) {
+        this.written = onWritten;
+        this.fetch = fetcher;
     }
 
     /**
      * {@code sent} went in {@code chatId} in place of {@code written}, which the AI corrected before it went: kept as
      * that message's first version once it's here, so every version of what was said can be seen.
      */
-    void wroteBefore(String chatId, String sent, String written) {
+    void wroteBefore(String chatId, String sent, String drafted) {
         if (!prefs.autoSaves(chatId, true).contains(SaveKind.TEXTS)) return; // not kept: nothing to hold for later
         Set<String> before = new HashSet<>();
         for (Message m : chats.messages(chatId)) if (m.outgoing()) before.add(m.id());
         synchronized (wrote) {
-            wrote.addLast(new Written(chatId, sent.strip(), written, Instant.now(), before));
+            wrote.addLast(new Written(chatId, sent.strip(), drafted, Instant.now(), before));
             if (wrote.size() > WROTE) wrote.removeFirst();
         }
     }

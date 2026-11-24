@@ -16,7 +16,8 @@ public final class Os {
      */
     public static <T> T pick(T appleChip, T intelMac, T windows64) {
         String arch = System.getProperty("os.arch", "");
-        boolean arm = arch.equals("aarch64") || arch.equals("arm64"), x64 = arch.equals("amd64") || arch.equals("x86_64");
+        boolean arm = arch.equals("aarch64") || arch.equals("arm64");
+        boolean x64 = arch.equals("amd64") || arch.equals("x86_64");
         if (mac()) return arm ? appleChip : x64 ? intelMac : null;
         return windows() && x64 ? windows64 : null;
     }

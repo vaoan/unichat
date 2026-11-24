@@ -53,7 +53,8 @@ class QuickReactionsUiTest {
             MessageActionsUi actions = thread.actions();
             assertEquals(EmojiPicker.QUICK, FxWait.fx(actions::quick), "no history: the usual six");
             List<Message> msgs = svc.messages("!family:demo");
-            Message a = msgs.get(msgs.size() - 1), b = msgs.get(msgs.size() - 2);
+            Message a = msgs.get(msgs.size() - 1);
+            Message b = msgs.get(msgs.size() - 2);
             FxWait.fx(() -> {
                 actions.react(a, "🔥"); // added: counts
                 actions.react(a, "🔥"); // taken away: doesn't
@@ -66,7 +67,7 @@ class QuickReactionsUiTest {
             assertEquals(List.of("🫠", "🔥"), quick.subList(0, 2), "most first; a removal isn't a use");
             assertEquals(EmojiPicker.QUICK.size(), quick.size(), "still six");
             svc.stop();
-            FxWait.fx(() -> { window[0].close(); return null; });
+            FxWait.onFx(window[0]::close);
         } finally {
             Files.deleteIfExists(library);
         }

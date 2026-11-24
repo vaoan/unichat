@@ -65,13 +65,16 @@ class ExploreBarUiTest {
 
         Button stop = FxWait.fx(() -> bar.lookupAll(".button").stream().map(n -> (Button) n)
                 .filter(b -> b.getText().equals("Detener")).findFirst().orElseThrow());
-        FxWait.fx(() -> { stop.fire(); return null; });
+        FxWait.onFx(stop::fire);
         assertEquals(List.of("!family:demo"), stopped);
 
         states.put("!family:demo", new AutoSave.Exploring(false, nov3, true, 8, 2, 120, null));
         changed.run();
         FxWait.until("over: the bar goes", () -> !bar.isVisible());
-        FxWait.fx(() -> { bar.dispose(); stage[0].close(); return null; });
+        FxWait.onFx(() -> {
+            bar.dispose();
+            stage[0].close();
+        });
         assertTrue(listeners.isEmpty(), "and stops listening");
         svc.stop();
     }

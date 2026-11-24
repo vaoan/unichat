@@ -12,7 +12,8 @@ class BackgroundWriterTest {
     /** Many requests during a round make one more round, not one each; flush waits for it. */
     @Test
     void requestsDuringARoundBecomeOneMore() throws InterruptedException {
-        CountDownLatch started = new CountDownLatch(1), release = new CountDownLatch(1);
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
         AtomicInteger rounds = new AtomicInteger();
         BackgroundWriter writer = new BackgroundWriter("test-writer", new Object(), () -> {
             if (rounds.incrementAndGet() == 1) {

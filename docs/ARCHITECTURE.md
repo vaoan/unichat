@@ -97,6 +97,7 @@ and checks it on every build:
 |---|---|---|
 | Lines per Java file | 800 | Checkstyle (`checkstyle.xml`) |
 | Lines per method | 100 (goal: 60) | Checkstyle |
+| Naming, imports, `equals`/`hashCode`, `switch`, modifiers, hidden fields | no finding | Checkstyle (no layout rule) |
 | Copied code | 100 tokens | PMD CPD (`./mvnw verify`) |
 
 The limit isn't the goal. A file is split by responsibility, not to get under a number.

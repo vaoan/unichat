@@ -85,7 +85,10 @@ class BridgesLiveIT {
     private static String replyAfter(List<Message> msgs, String command) {
         int cmd = -1;
         for (int i = msgs.size() - 1; i >= 0; i--) {
-            if (msgs.get(i).outgoing() && command.equals(msgs.get(i).body())) { cmd = i; break; }
+            if (msgs.get(i).outgoing() && command.equals(msgs.get(i).body())) {
+                cmd = i;
+                break;
+            }
         }
         if (cmd < 0) return null;
         StringBuilder sb = new StringBuilder();

@@ -60,8 +60,11 @@ public record SavedText(String id, String chatId, Instant at, Instant seen, Stri
         try {
             JsonNode n = JSON.readTree(line);
             if (n == null || !n.isObject()) return null;
-            String id = n.path("id").asText(null), chat = n.path("chat").asText(null), text = n.path("text").asText(null);
-            String at = n.path("at").asText(null), seen = n.path("seen").asText(null);
+            String id = n.path("id").asText(null);
+            String chat = n.path("chat").asText(null);
+            String text = n.path("text").asText(null);
+            String at = n.path("at").asText(null);
+            String seen = n.path("seen").asText(null);
             if (id == null || chat == null || text == null || at == null || seen == null) return null;
             return new SavedText(id, chat, Instant.parse(at), Instant.parse(seen), n.path("from").asText(""),
                     n.path("fromId").asText(""), n.path("mine").asBoolean(false), text, n.path("written").asBoolean(false));

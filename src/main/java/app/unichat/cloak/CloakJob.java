@@ -126,7 +126,8 @@ public final class CloakJob {
         String[] p = line.strip().split(" ");
         if (p.length != 3 || !p[0].equals("progress")) return -1;
         try {
-            double done = Double.parseDouble(p[1]), total = Double.parseDouble(p[2]);
+            double done = Double.parseDouble(p[1]);
+            double total = Double.parseDouble(p[2]);
             return total > 0 ? Math.min(1, done / total) : -1;
         } catch (NumberFormatException e) {
             return -1;

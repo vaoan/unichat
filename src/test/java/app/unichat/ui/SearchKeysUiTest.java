@@ -62,12 +62,21 @@ class SearchKeysUiTest {
         MockChatService svc = new MockChatService();
         InfoPane info = fx(() -> new InfoPane(svc, () -> { }, t -> { }));
         javafx.scene.layout.VBox box = fx(() -> (javafx.scene.layout.VBox) info.getContent());
-        fx(() -> { info.show(svc.chat("!family:demo")); return null; });
+        fx(() -> {
+            info.show(svc.chat("!family:demo"));
+            return null;
+        });
         Node first = fx(() -> box.getChildren().get(0));
-        fx(() -> { info.refresh(); return null; });
+        fx(() -> {
+            info.refresh();
+            return null;
+        });
         assertTrue(fx(() -> box.getChildren().get(0) == first), "nothing changed: the same nodes");
         svc.setFavorite("!family:demo", !svc.chat("!family:demo").favorite()).get();
-        fx(() -> { info.refresh(); return null; });
+        fx(() -> {
+            info.refresh();
+            return null;
+        });
         assertFalse(fx(() -> box.getChildren().get(0) == first), "a change: built again");
     }
 
@@ -95,12 +104,22 @@ class SearchKeysUiTest {
         Button clear = fx(() -> (Button) scene.getRoot().lookup(".search-box .search-clear"));
         assertFalse(fx(clear::isVisible), "no ✕ while it's empty");
 
-        fx(() -> { search.requestFocus(); search.setText("fam"); return null; });
+        fx(() -> {
+            search.requestFocus();
+            search.setText("fam");
+            return null;
+        });
         assertTrue(fx(clear::isVisible));
-        fx(() -> { clear.fire(); return null; });
+        fx(() -> {
+            clear.fire();
+            return null;
+        });
         assertEquals("", fx(search::getText));
 
-        fx(() -> { search.setText("fam"); return null; });
+        fx(() -> {
+            search.setText("fam");
+            return null;
+        });
         press(search, KeyCode.ESCAPE, false);
         assertEquals("", fx(search::getText), "Esc empties it");
 

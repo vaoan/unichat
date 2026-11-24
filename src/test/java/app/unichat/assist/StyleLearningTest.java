@@ -21,8 +21,10 @@ class StyleLearningTest {
     void requestsWhileOneRunsBecomeOneMoreRunAfterIt() throws Exception {
         WritingStyle style = new WritingStyle(dir);
         StyleLearning learning = new StyleLearning(() -> style);
-        AtomicInteger now = new AtomicInteger(), most = new AtomicInteger();
-        CountDownLatch inside = new CountDownLatch(1), release = new CountDownLatch(1);
+        AtomicInteger now = new AtomicInteger();
+        AtomicInteger most = new AtomicInteger();
+        CountDownLatch inside = new CountDownLatch(1);
+        CountDownLatch release = new CountDownLatch(1);
         List<String> prompts = new CopyOnWriteArrayList<>();
         StyleLearner.Program program = p -> {
             most.accumulateAndGet(now.incrementAndGet(), Math::max);
@@ -57,7 +59,10 @@ class StyleLearningTest {
     void withNothingNewTheProgramIsntCalled() throws Exception {
         WritingStyle style = new WritingStyle(dir);
         AtomicInteger calls = new AtomicInteger();
-        new StyleLearning(() -> style).request("!a", List.of(), p -> { calls.incrementAndGet(); return "- x"; }).get();
+        new StyleLearning(() -> style).request("!a", List.of(), p -> {
+            calls.incrementAndGet();
+            return "- x";
+        }).get();
         assertEquals(0, calls.get());
     }
 

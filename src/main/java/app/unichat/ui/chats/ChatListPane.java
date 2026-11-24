@@ -146,7 +146,10 @@ public final class ChatListPane extends VBox {
         search.textProperty().addListener((o, a, q) -> filter.set(filter.get().withQuery(q)));
         search.setOnKeyPressed(e -> {
             if (e.getCode() == KeyCode.ESCAPE) search.clear();
-            if (e.getCode() == KeyCode.DOWN) { list.requestFocus(); list.getSelectionModel().selectFirst(); }
+            if (e.getCode() == KeyCode.DOWN) {
+                list.requestFocus();
+                list.getSelectionModel().selectFirst();
+            }
             if (e.getCode() == KeyCode.ENTER && !items.isEmpty()) open(items.get(0));
         });
         Node searchIcon = Icons.icon(Icons.SEARCH, 14);
@@ -419,19 +422,19 @@ public final class ChatListPane extends VBox {
 
     /** "Todas · Personal · Trabajo" chips, shown only for a network with several accounts. */
     private void refreshAccountRow(ChatFilter f) {
-        List<Account> accounts = f.network() == null ? List.of() : Accounts.of(this.accounts, f.network());
+        List<Account> ofNetwork = f.network() == null ? List.of() : Accounts.of(this.accounts, f.network());
         // Only offer per-account filters when every chat of the network knows its account; otherwise a filter
         // would silently hide chats (Matrix bridges don't always say which login a portal belongs to).
         boolean attributed = f.network() != null && svc.chats().stream()
                 .filter(c -> c.network() == f.network() && !c.bridgeBot()).allMatch(c -> c.accountId() != null);
-        boolean show = accounts.size() > 1 && !f.searching() && attributed;
+        boolean show = ofNetwork.size() > 1 && !f.searching() && attributed;
         Nodes.show(accountRow, show);
         accountRow.getChildren().clear();
         if (!show) return;
         ToggleGroup group = new ToggleGroup();
         accountRow.getChildren().add(accountChip(I18n.t("chatList.allAccounts"), f.accountId() == null, group,
                 () -> filter.set(filter.get().withAccount(f.network(), null))));
-        for (Account a : accounts) {
+        for (Account a : ofNetwork) {
             accountRow.getChildren().add(accountChip(Accounts.name(a), a.id().equals(f.accountId()), group,
                     () -> filter.set(filter.get().withAccount(f.network(), a.id()))));
         }
@@ -600,14 +603,14 @@ public final class ChatListPane extends VBox {
     /** Opens the next/previous visible chat (Alt+↓ / Alt+↑). */
     public void move(int delta, boolean unreadOnly) {
         boolean folder = !channels.isOpen() && foldersOpen();
-        List<Chat> items = folder ? folderView.rows() : this.items;
-        if (items.isEmpty()) return;
+        List<Chat> rowsNow = folder ? folderView.rows() : this.items;
+        if (rowsNow.isEmpty()) return;
         int idx = -1;
-        for (int i = 0; i < items.size(); i++) if (items.get(i).id().equals(selectedId)) idx = i;
-        for (int step = 1; step <= items.size(); step++) {
-            int i = Math.floorMod(idx + delta * step, items.size());
-            if (idx < 0) i = delta > 0 ? step - 1 : items.size() - step;
-            Chat c = items.get(i);
+        for (int i = 0; i < rowsNow.size(); i++) if (rowsNow.get(i).id().equals(selectedId)) idx = i;
+        for (int step = 1; step <= rowsNow.size(); step++) {
+            int i = Math.floorMod(idx + delta * step, rowsNow.size());
+            if (idx < 0) i = delta > 0 ? step - 1 : rowsNow.size() - step;
+            Chat c = rowsNow.get(i);
             if (channels.actsLikeChat(c) && (!unreadOnly || c.isUnread())) {
                 open(c);
                 if (folder) folderView.reveal(i);

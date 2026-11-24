@@ -21,7 +21,8 @@ import static app.unichat.ui.settings.SettingsForm.stacked;
 final class VaultPasswordForm extends VBox {
     /** @param added run on the FX thread once the password opens the vault */
     VaultPasswordForm(Cloud cloud, Runnable added, Runnable cancel) {
-        PasswordField first = new PasswordField(), again = new PasswordField();
+        PasswordField first = new PasswordField();
+        PasswordField again = new PasswordField();
         first.setAccessibleText(I18n.t("settings.vault.password.field"));
         again.setAccessibleText(I18n.t("settings.vault.password.again"));
         first.getStyleClass().add("vault-password");
@@ -36,7 +37,8 @@ final class VaultPasswordForm extends VBox {
         no.getStyleClass().add("secondary-button");
         no.setOnAction(e -> cancel.run());
         add.setOnAction(e -> {
-            char[] password = first.getText().toCharArray(), repeated = again.getText().toCharArray();
+            char[] password = first.getText().toCharArray();
+            char[] repeated = again.getText().toCharArray();
             first.clear();
             again.clear();
             boolean same = Arrays.equals(password, repeated);

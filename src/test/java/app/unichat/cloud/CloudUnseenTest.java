@@ -28,13 +28,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * the settings, what the AI learned, the texts and the vault. Seen again, a round sends what waited.
  */
 class CloudUnseenTest {
-    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44", TEXT = "3f2a9c1b2d4e 2026-11.jsonl";
-    private static final String PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg", SECOND = CloudAccount.MEDIA + "/Ana/b.jpg";
+    private static final String DESK = "1b6a3f3e-0d1c-4c0e-9a51-6f2d7c1e2b44";
+    private static final String TEXT = "3f2a9c1b2d4e 2026-11.jsonl";
+    private static final String PHOTO = CloudAccount.MEDIA + "/Ana/a.jpg";
+    private static final String SECOND = CloudAccount.MEDIA + "/Ana/b.jpg";
 
     @TempDir
     Path dir;
     private FakeDav account;
-    private Map<String, String> portableWere, keysWere;
+    private Map<String, String> portableWere;
+    private Map<String, String> keysWere;
     private final List<CountDownLatch> held = new java.util.ArrayList<>();
     private VaultComputer desk;
 

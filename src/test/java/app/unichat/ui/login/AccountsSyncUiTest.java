@@ -54,7 +54,7 @@ class AccountsSyncUiTest {
                 .filter(b -> "Sincronizar chats".equals(b.getText())).toList());
         assertEquals(1, sync.size(), "only Telegram has it");
         assertTrue(fx(() -> sync.get(0).getAccessibleText()).contains("Telegram"));
-        fx(() -> { sync.get(0).fire(); return null; });
+        FxWait.onFx(() -> sync.get(0).fire());
         FxWait.until("a toast about Telegram", () -> toasts.stream().anyMatch(t -> t.contains("Telegram")));
         assertTrue(toasts.stream().anyMatch(t -> t.contains("Telegram")), toasts.toString());
         svc.stop();

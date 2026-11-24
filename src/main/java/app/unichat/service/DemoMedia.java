@@ -43,7 +43,8 @@ final class DemoMedia {
         Files.createDirectories(dir);
         Path file = dir.resolve(name + ".png");
         if (Files.exists(file)) return file;
-        int w = 640, h = 420;
+        int w = 640;
+        int h = 420;
         BufferedImage img = new BufferedImage(w, h, BufferedImage.TYPE_INT_RGB);
         Graphics2D g = img.createGraphics();
         g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);

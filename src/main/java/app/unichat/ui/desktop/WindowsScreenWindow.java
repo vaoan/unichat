@@ -45,8 +45,8 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
     /** Kept in a field: a callback JNA hands to Windows must outlive every message, or it's collected under it. */
     private final WindowProc proc = new WindowProc() {
         @Override
-        public Pointer callback(Pointer hwnd, int msg, Pointer wParam, Pointer lParam) {
-            return message(hwnd, msg, wParam, lParam);
+        public Pointer callback(Pointer window, int msg, Pointer wParam, Pointer lParam) {
+            return message(window, msg, wParam, lParam);
         }
     };
     private final WString className = new WString("UnichatScreen" + CLASSES.incrementAndGet());
@@ -233,7 +233,7 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
         public Pointer hIconSm;
     }
 
-    @SuppressWarnings({"PMD.MethodNamingConventions", "PMD.ExcessiveParameterList"}) // JNA binds each by its Win32 name and signature
+    @SuppressWarnings({"PMD.MethodNamingConventions", "checkstyle:MethodName", "PMD.ExcessiveParameterList"}) // JNA binds each by its Win32 name and signature
     interface User32 extends StdCallLibrary {
         User32 LIB = Native.load("user32", User32.class);
 
@@ -262,14 +262,14 @@ final class WindowsScreenWindow implements WindowsScreen.MessageWindow {
     }
 
     @FunctionalInterface
-    @SuppressWarnings("PMD.MethodNamingConventions") // JNA binds each by its Win32 name
+    @SuppressWarnings({"PMD.MethodNamingConventions", "checkstyle:MethodName"}) // JNA binds each by its Win32 name
     interface Kernel32 extends StdCallLibrary {
         Kernel32 LIB = Native.load("kernel32", Kernel32.class);
 
         Pointer GetModuleHandleW(WString name);
     }
 
-    @SuppressWarnings("PMD.MethodNamingConventions") // JNA binds each by its Win32 name
+    @SuppressWarnings({"PMD.MethodNamingConventions", "checkstyle:MethodName"}) // JNA binds each by its Win32 name
     interface Wtsapi32 extends StdCallLibrary {
         Wtsapi32 LIB = Native.load("wtsapi32", Wtsapi32.class);
 

@@ -43,7 +43,9 @@ class QuietRuleTest {
 
     @Test
     void chatsMutedElsewhereAreTheOnesToArchive() throws Exception {
-        Chat a = new Chat("!a"), b = new Chat("!b"), c = new Chat("!c");
+        Chat a = new Chat("!a");
+        Chat b = new Chat("!b");
+        Chat c = new Chat("!c");
         a.setMuted(true);
         b.setMuted(true);
         b.setArchived(true);
@@ -54,8 +56,11 @@ class QuietRuleTest {
 
     @Test
     void aChannelArrivingInAnArchivedServerGoesQuietToo() throws Exception {
-        Chat server = new Chat("!srv"), category = new Chat("!cat"), old = new Chat("!old"), fresh = new Chat("!new"),
-                elsewhere = new Chat("!dm");
+        Chat server = new Chat("!srv");
+        Chat category = new Chat("!cat");
+        Chat old = new Chat("!old");
+        Chat fresh = new Chat("!new");
+        Chat elsewhere = new Chat("!dm");
         server.setSpace(true);
         server.setArchived(true);
         server.setSpaceChildren(List.of("!cat"));

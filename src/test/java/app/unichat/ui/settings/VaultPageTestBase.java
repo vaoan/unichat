@@ -33,8 +33,9 @@ import java.util.function.Function;
 
 /** What the vault page's tests share: the page alone in a window over an account in memory, and how they look and click. */
 abstract class VaultPageTestBase { // NOPMD: AbstractClassWithoutAbstractMethod, a base for the vault page's tests, never run alone
-    protected static final String PASSWORD = "una contraseña larga", LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55",
-        LATE = "5f0e7d7c-4b5a-4a4c-9e95-0d6b1a5c6f88";
+    protected static final String PASSWORD = "una contraseña larga";
+    protected static final String LAPTOP = "2c7b4a4f-1e2d-4d1f-8b62-7a3e8d2f3c55";
+    protected static final String LATE = "5f0e7d7c-4b5a-4a4c-9e95-0d6b1a5c6f88";
 
     @TempDir
     Path dir;
@@ -45,7 +46,8 @@ abstract class VaultPageTestBase { // NOPMD: AbstractClassWithoutAbstractMethod,
     protected RecoveryCodeSheet.Clip clipboardWas;
     /** What the system's clipboard holds now, as the sheet put it there or the person copied over it. */
     protected String clip;
-    protected final List<String> copied = new ArrayList<>(), printed = new ArrayList<>();
+    protected final List<String> copied = new ArrayList<>();
+    protected final List<String> printed = new ArrayList<>();
 
     @BeforeAll
     static void toolkit() throws Exception {
@@ -84,10 +86,9 @@ abstract class VaultPageTestBase { // NOPMD: AbstractClassWithoutAbstractMethod,
     }
 
     @AfterEach
-    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set in @BeforeEach (or the JavaFX start) before any test uses it")
     void stop() throws Exception {
         app.unichat.support.Seen.reset(true);
-        if (stage != null) FxWait.fx(() -> { stage.close(); return null; });
+        if (stage != null) FxWait.onFx(stage::close);
         RecoveryCodeSheet.saveTo = saveWas;
         RecoveryCodeSheet.printer = printWas;
         RecoveryCodeSheet.clipboard = clipboardWas;
@@ -96,9 +97,8 @@ abstract class VaultPageTestBase { // NOPMD: AbstractClassWithoutAbstractMethod,
     }
 
     /** The section alone in a window of its own (a new one each time: the page as it's opened again). */
-    @SuppressFBWarnings(value = "UWF_FIELD_NOT_INITIALIZED_IN_CONSTRUCTOR", justification = "set in @BeforeEach (or the JavaFX start) before any test uses it")
     protected void page() throws InterruptedException {
-        if (stage != null) FxWait.fx(() -> { stage.close(); return null; });
+        if (stage != null) FxWait.onFx(stage::close);
         stage = FxWait.fx(() -> {
             Stage s = new Stage();
             s.setOpacity(0);
@@ -149,11 +149,11 @@ abstract class VaultPageTestBase { // NOPMD: AbstractClassWithoutAbstractMethod,
     }
 
     protected void click(String text) throws InterruptedException {
-        FxWait.fx(() -> { button(text).fire(); return null; });
+        FxWait.onFx(() -> button(text).fire());
     }
 
     protected void type(String accessible, String text) throws InterruptedException {
-        FxWait.fx(() -> { field(accessible).setText(text); return null; });
+        FxWait.onFx(() -> field(accessible).setText(text));
     }
 
     /** The code on screen, as one would copy it from there (two lines, read as one). */

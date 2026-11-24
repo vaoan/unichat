@@ -19,10 +19,13 @@ import java.util.TreeMap;
  * file) are moved or deleted, and nothing else in an old folder is touched.
  */
 final class CloudNames {
-    static final String OLD_MEDIA = CloudAccount.ROOT + "/Multimedia", OLD_SETTINGS = CloudAccount.ROOT + "/Ajustes",
-        OLD_TEXTS = CloudAccount.ROOT + "/Textos", OLD_VAULT = CloudAccount.ROOT + "/Bóveda";
+    static final String OLD_MEDIA = CloudAccount.ROOT + "/Multimedia";
+    static final String OLD_SETTINGS = CloudAccount.ROOT + "/Ajustes";
+    static final String OLD_TEXTS = CloudAccount.ROOT + "/Textos";
+    static final String OLD_VAULT = CloudAccount.ROOT + "/Bóveda";
     static final String OLD_OFF = OLD_SETTINGS + "/boveda-apagada.json";
-    static final String OLD_INFO = OLD_VAULT + "/boveda.json", OLD_SLOTS = OLD_VAULT + "/llaves";
+    static final String OLD_INFO = OLD_VAULT + "/boveda.json";
+    static final String OLD_SLOTS = OLD_VAULT + "/llaves";
     /** Machine-only: this computer found every plain old folder moved and deleted, so it never looks for them again. */
     static final String DONE = "cloud.names.done";
     /**
@@ -106,7 +109,8 @@ final class CloudNames {
             return merged.equals(TextIndex.read(now)) ? null : TextIndex.write(merged);
         }
         if (TextIndex.FILE.matcher(name).matches()) return old.length > now.length ? old : null;
-        Bundle a = Bundle.parse(old), b = Bundle.parse(now);
+        Bundle a = Bundle.parse(old);
+        Bundle b = Bundle.parse(now);
         if (a != null && b != null) return a.hash().equals(b.hash()) || !a.savedAt().isAfter(b.savedAt()) ? null : old;
         return oldLive ? old : null;
     }
@@ -146,7 +150,8 @@ final class CloudNames {
             String path = OLD_SETTINGS + "/" + name;
             if (!path.equals(OLD_OFF) && Cloud.Part.of(name) == null) continue; // not ours: left, and the folder kept
             String target = renamed(path);
-            byte[] old = dav.get(path), now = dav.get(target);
+            byte[] old = dav.get(path);
+            byte[] now = dav.get(target);
             if (old == null) continue;
             if (now == null) {
                 moveInto(dav, path, target);
@@ -170,7 +175,8 @@ final class CloudNames {
         }
         for (String machine : dav.list(OLD_TEXTS)) {
             if (!Ids.ours(machine)) continue;
-            String from = OLD_TEXTS + "/" + machine, to = TextSync.ROOT + "/" + machine;
+            String from = OLD_TEXTS + "/" + machine;
+            String to = TextSync.ROOT + "/" + machine;
             if (!dav.exists(to)) {
                 dav.move(from, to);
                 continue;
@@ -184,7 +190,8 @@ final class CloudNames {
 
     /** One text file or index under both names: the new name holds what wins (the old one whole is moved, not sent again). */
     private static void text(Storage dav, String from, String to) throws IOException {
-        byte[] old = dav.get(from), now = dav.get(to);
+        byte[] old = dav.get(from);
+        byte[] now = dav.get(to);
         if (old == null) return;
         if (now == null) {
             dav.move(from, to);
@@ -213,7 +220,8 @@ final class CloudNames {
         }
         for (String folder : dav.list(OLD_MEDIA)) {
             if (!Storage.plainName(folder)) continue;
-            String from = OLD_MEDIA + "/" + folder, to = CloudAccount.MEDIA + "/" + folder;
+            String from = OLD_MEDIA + "/" + folder;
+            String to = CloudAccount.MEDIA + "/" + folder;
             if (!dav.exists(to)) {
                 dav.move(from, to);
                 continue;
@@ -266,10 +274,12 @@ final class CloudNames {
     private static boolean held(Storage dav, String path) throws IOException {
         String target = renamed(path);
         if (path.startsWith(OLD_MEDIA + "/")) {
-            Storage.RemoteFile old = dav.info(path), now = dav.info(target);
+            Storage.RemoteFile old = dav.info(path);
+            Storage.RemoteFile now = dav.info(target);
             return old != null && now != null && same(old, now);
         }
-        byte[] old = dav.get(path), now = dav.get(target);
+        byte[] old = dav.get(path);
+        byte[] now = dav.get(target);
         return old != null && now != null && winner(target, old, now, false) == null;
     }
 

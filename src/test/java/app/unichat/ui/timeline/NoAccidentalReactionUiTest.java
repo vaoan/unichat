@@ -111,7 +111,7 @@ class NoAccidentalReactionUiTest {
     @Test
     void aDigitTypedOnTheMessagesWritesItNeverReacts() throws Exception {
         Map<String, Set<String>> before = reactions();
-        FxWait.fx(() -> { thread.focusTimeline(); return null; });
+        FxWait.onFx(thread::focusTimeline);
         for (var type : List.of(javafx.scene.input.KeyEvent.KEY_PRESSED, javafx.scene.input.KeyEvent.KEY_TYPED)) {
             FxWait.fx(() -> {
                 Node target = stage.getScene().getFocusOwner() != null ? stage.getScene().getFocusOwner() : stage.getScene().getRoot();
@@ -133,7 +133,7 @@ class NoAccidentalReactionUiTest {
         String first = FxWait.fx(() -> thread.actions().quick().getFirst());
         javafx.scene.control.MenuItem react = FxWait.fx(() -> thread.actions().messageMenu(last).getItems().stream()
                 .filter(i -> ("Reaccionar " + first).equals(i.getText())).findFirst().orElseThrow());
-        FxWait.fx(() -> { react.fire(); return null; });
+        FxWait.onFx(react::fire);
         FxWait.until("reacted, as meant", () -> last.reactions().containsKey(first));
     }
 }

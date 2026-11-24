@@ -32,7 +32,8 @@ class HttpProbeTest {
 
     @Test
     void readyNeedsA200AliveAnyAnswer() throws Exception {
-        HttpServer ok = answering(200), starting = answering(503);
+        HttpServer ok = answering(200);
+        HttpServer starting = answering(503);
         try {
             assertTrue(HttpProbe.answers(HTTP, ok.getAddress().getPort(), NO_LIMIT, HttpProbe.Up.READY));
             assertTrue(HttpProbe.answers(HTTP, ok.getAddress().getPort(), NO_LIMIT, HttpProbe.Up.ALIVE));

@@ -62,7 +62,10 @@ class RecoveryTest {
     void garbageInTheOldGenerationIsCollectedNotRestartedFor() {
         java.util.concurrent.atomic.AtomicInteger collections = new java.util.concurrent.atomic.AtomicInteger();
         long[] used = {950};
-        assertFalse(Recovery.reallyFull(() -> { collections.incrementAndGet(); used[0] = 160; }, () -> used[0], 950),
+        assertFalse(Recovery.reallyFull(() -> {
+            collections.incrementAndGet();
+            used[0] = 160;
+        }, () -> used[0], 950),
                 "mostly garbage: collected, no restart");
         assertEquals(1, collections.get(), "a full collection ran first");
         assertTrue(Recovery.reallyFull(() -> used[0] = 960, () -> used[0], 950), "still full after it: restart");

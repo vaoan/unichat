@@ -188,7 +188,8 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
     /** ← → along the emoji, ↑ ↓ between rows: to the emoji there, scrolling it into view first if needed. */
     private void move(int row, int col, KeyCode key) {
         List<EmojiRows.Row> rows = list.getItems();
-        int r = row, c = col;
+        int r = row;
+        int c = col;
         switch (key) {
             case LEFT -> {
                 if (--c < 0) {
@@ -209,7 +210,8 @@ public final class EmojiGrid extends javafx.scene.layout.VBox {
             }
         }
         if (r < 0) return;
-        int target = r, at = Math.min(c, ((EmojiRows.Emojis) rows.get(r)).emoji().size() - 1);
+        int target = r;
+        int at = Math.min(c, ((EmojiRows.Emojis) rows.get(r)).emoji().size() - 1);
         if (!focus(target, at)) {
             list.scrollTo(target);
             Platform.runLater(() -> focus(target, at));

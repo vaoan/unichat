@@ -16,6 +16,7 @@ import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
 import java.util.concurrent.CountDownLatch;
 
 import static app.unichat.ui.FxWait.fx;
+import static app.unichat.ui.FxWait.onFx;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -70,11 +71,11 @@ class AutoFixSettingUiTest {
         assertEquals(AiSettings.FixMode.OFF, AiSettings.fixMode(), "off unless chosen");
         Parent root = page();
         assertTrue(fx(() -> chip(root, "Apagado").isSelected()));
-        fx(() -> { chip(root, "Antes de enviar").fire(); return null; });
+        onFx(() -> chip(root, "Antes de enviar").fire());
         assertEquals(AiSettings.FixMode.BEFORE, AiSettings.fixMode());
-        fx(() -> { chip(root, "Después de enviar").fire(); return null; });
+        onFx(() -> chip(root, "Después de enviar").fire());
         assertEquals(AiSettings.FixMode.AFTER, AiSettings.fixMode());
-        fx(() -> { chip(root, "Apagado").fire(); return null; });
+        onFx(() -> chip(root, "Apagado").fire());
         assertEquals(AiSettings.FixMode.OFF, AiSettings.fixMode());
     }
 
@@ -86,9 +87,9 @@ class AutoFixSettingUiTest {
                 .filter(c -> c.getAccessibleText() != null && c.getAccessibleText().startsWith("Responder al mensaje correcto"))
                 .findFirst().orElseThrow());
         assertTrue(fx(on::isSelected));
-        fx(() -> { on.fire(); return null; });
+        onFx(on::fire);
         assertFalse(AiSettings.keepThread());
-        fx(() -> { on.fire(); return null; });
+        onFx(on::fire);
         assertTrue(AiSettings.keepThread());
     }
 }

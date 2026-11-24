@@ -154,8 +154,14 @@ public final class MediaViewer {
         if (items.size() < 2 || e.isShortcutDown()) return false;
         boolean panning = !photo.zoom().isFitted() && photo.zoom().canPan();
         switch (e.getCode()) {
-            case LEFT -> { if (panning) return false; go(items, at, -1, show); }
-            case RIGHT -> { if (panning) return false; go(items, at, 1, show); }
+            case LEFT -> {
+                if (panning) return false;
+                go(items, at, -1, show);
+            }
+            case RIGHT -> {
+                if (panning) return false;
+                go(items, at, 1, show);
+            }
             case PAGE_UP -> go(items, at, -1, show);
             case PAGE_DOWN -> go(items, at, 1, show);
             case HOME -> go(items, at, -at[0], show);
