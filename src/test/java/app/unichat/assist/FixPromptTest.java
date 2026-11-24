@@ -83,4 +83,15 @@ class FixPromptTest {
                 FixPrompt.marks("ve a evil.example/x, dile a @ana #tag o llama al +57 300 1234567"));
         assertEquals(java.util.Set.of("mi-sitio.co"), FixPrompt.marks("(mi-sitio.co)"));
     }
+
+    @Test
+    void aLongRunOfDottedWordsNeverOverflowsTheStack() {
+        // "a.a.a.…" made the domain's repeated group recurse once a part: 4 000 of them ended the correction's thread.
+        String dotted = "a.".repeat(200_000) + "a";
+        assertEquals(java.util.Set.of(dotted), FixPrompt.marks(dotted));
+        CountedReads reads = new CountedReads(dotted);
+        assertEquals(1, FixPrompt.marks(reads).size());
+        assertTrue(reads.perChar() < 20, "still linear: " + reads.perChar());
+        assertFalse(FixPrompt.addsWhatWasntThere("a.".repeat(4000), "a.".repeat(4000)), "and the check it's for answers");
+    }
 }

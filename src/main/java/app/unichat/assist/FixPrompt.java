@@ -63,10 +63,10 @@ public final class FixPrompt {
 
     private static final java.util.regex.Pattern MARK = mark();
 
-    @SuppressFBWarnings(value = "REDOS", justification = "linear: a domain is tried only where a word starts (the lookbehind), each repeated group starts with a literal dot, and the others end at the first char outside their class (FixPromptTest.aLongWordIsReadInLinearTime)")
+    @SuppressFBWarnings(value = "REDOS", justification = "linear: a domain is tried only where a word starts (the lookbehind), each repeated group starts with a literal dot and is possessive (no backtracking into it, and no recursion: a long a.a.a… overflowed the stack), and the others end at the first char outside their class (FixPromptTest.aLongWordIsReadInLinearTime, aLongRunOfDottedWordsNeverOverflowsTheStack)")
     private static java.util.regex.Pattern mark() {
         return java.util.regex.Pattern.compile(
-                "(?<![\\p{L}\\p{N}-])[\\p{L}\\p{N}-]+(?:\\.[\\p{L}\\p{N}-]+)+(?:/\\S*)?|[@#][\\p{L}\\p{N}_.]+|\\+?\\d[\\d ]{2,}\\d");
+                "(?<![\\p{L}\\p{N}-])[\\p{L}\\p{N}-]+(?:\\.[\\p{L}\\p{N}-]+)++(?:/\\S*)?|[@#][\\p{L}\\p{N}_.]+|\\+?\\d[\\d ]{2,}\\d");
     }
 
     /** {@link ReplyPrompt#clean} takes off quotes or a code fence around the answer: those were the person's own. */
