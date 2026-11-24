@@ -4,10 +4,12 @@ import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class FileNamesTest {
     @Test
@@ -17,6 +19,31 @@ class FileNamesTest {
         assertEquals("_", FileNames.folder(".."));
         assertEquals("_", FileNames.folder(null));
         assertEquals("_CON", FileNames.folder("CON"), "a Windows device name");
+    }
+
+    /** Linux takes 255 bytes a name: an emoji is 4 there, 2 UTF-16 units on the Mac (CI's CaptureUiTest, "File name too long"). */
+    @Test
+    void aLongNameFitsLinuxsBytesInWholeCharacters() {
+        String emoji = "😀";
+        assertEquals(emoji.repeat(50), FileNames.folder(emoji.repeat(120)), "200 bytes: 100 emoji were 400");
+        assertEquals("a" + emoji.repeat(49), FileNames.safe("a" + emoji.repeat(120)), "never half an emoji");
+        assertEquals(emoji.repeat(49) + ".png", FileNames.safe(emoji.repeat(120) + ".png"), "the extension kept");
+        assertEquals("á".repeat(100), FileNames.safe("á".repeat(150)));
+        assertEquals("a".repeat(200), FileNames.safe("a".repeat(300)), "as before for plain letters");
+        assertEquals("ab", FileNames.safe("ab" + " ".repeat(198) + "c"), "no trailing space once cut: Windows refuses it");
+    }
+
+    @Test
+    void aLongNameSavedFitsWithItsIdAndIsKnownAgain(@TempDir Path dir) throws Exception {
+        app.unichat.model.Message m = new app.unichat.model.Message("$" + "x".repeat(70), "!c", "@a", "Ana", false,
+                java.time.Instant.parse("2026-11-03T10:00:00Z"));
+        m.setType(app.unichat.model.MessageType.FILE);
+        m.setFileName("😀".repeat(120) + ".url");
+        String name = FileNames.forSaving(m, java.time.ZoneOffset.UTC);
+        assertTrue(name.getBytes(StandardCharsets.UTF_8).length <= 245, name.getBytes(StandardCharsets.UTF_8).length + " bytes: " + name);
+        assertTrue(name.endsWith(" [" + "x".repeat(60) + "].url.txt"), "the id and what keeps it inert, whole: " + name);
+        Files.writeString(dir.resolve(name), "");
+        assertTrue(FileNames.savedIn(dir, m));
     }
 
     @Test

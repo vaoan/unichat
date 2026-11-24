@@ -249,11 +249,20 @@ class CaptureUiTest {
         Button save = FxWait.fx(() -> sheet().lookupAll(".button").stream().map(n -> (Button) n)
                 .filter(b -> "Guardar…".equals(b.getText())).findFirst().orElseThrow());
         FxWait.onFx(save::fire);
-        FxWait.until("saved", () -> {
-            try (var s = Files.list(dir)) {
-                return s.anyMatch(p -> PathParts.name(p).startsWith("Conversación ") && p.toString().endsWith(".png"));
-            }
-        });
+        // A failed save says so in a toast: waited for too, or the test runs to JUnit's limit without a word.
+        FxWait.until("saved, or its failure said", () -> failureSaid() != null || saved());
+        org.junit.jupiter.api.Assertions.assertNull(FxWait.fx(this::failureSaid), "the capture wasn't saved");
+    }
+
+    private boolean saved() throws IOException {
+        try (var s = Files.list(dir)) {
+            return s.anyMatch(p -> PathParts.name(p).startsWith("Conversación ") && p.toString().endsWith(".png"));
+        }
+    }
+
+    private @Nullable String failureSaid() {
+        return stage.getScene().getRoot().lookup(".toast") instanceof Label t && t.isVisible()
+                && t.getText() != null && t.getText().startsWith("No se pudo hacer la captura") ? t.getText() : null;
     }
 
     @Test
