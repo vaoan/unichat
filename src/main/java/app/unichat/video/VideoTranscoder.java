@@ -75,7 +75,7 @@ public final class VideoTranscoder {
      * Pictures (still or animated) are left as they are.
      * Whole or not at all: the converted copy replaces it only once finished. The file it ends up as.
      */
-    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "ffmpeg with the file through Ffmpeg.input (the whitelists), as a list, no shell")
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "ffmpeg with the file through Ffmpeg.input (only that file, read only as one of Unichat's formats: -protocol_whitelist file, -format_whitelist), as a list, no shell")
     public static Path makePlayable(Path ffmpeg, Path file) throws IOException, InterruptedException {
         List<String> probe = new ArrayList<>(List.of(ffmpeg.toString(), "-hide_banner", "-nostdin"));
         probe.addAll(Ffmpeg.input(file)); // the file comes from other people

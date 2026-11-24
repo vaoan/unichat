@@ -1,5 +1,6 @@
 package app.unichat.assist;
 
+import app.unichat.CountedReads;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -66,5 +67,20 @@ class FixPromptTest {
         assertFalse(FixPrompt.addsWhatWasntThere("nos vemos a las 5 en casa.com de ana", "Nos vemos a las 5 en casa.com de Ana."), "its own");
         assertFalse(FixPrompt.addsWhatWasntThere("@Ana ven q t digo", "@ana, ven que te digo"), "its own mention, another case");
         assertFalse(FixPrompt.addsWhatWasntThere("eso es todo... gracias", "Eso es todo... Gracias."), "dots aren't a domain");
+    }
+
+    @Test
+    void aLongWordIsReadInLinearTime() {
+        // A 20 000-letter word took 2.4 s: the domain pattern was tried again from each letter of it.
+        CountedReads word = new CountedReads("a".repeat(20_000));
+        assertEquals(java.util.Set.of(), FixPrompt.marks(word));
+        assertTrue(word.perChar() < 20, "each char read a few times, not once per letter before it: " + word.perChar());
+    }
+
+    @Test
+    void aWordIsStillFoundWhereverItStarts() {
+        assertEquals(java.util.Set.of("evil.example/x", "@ana", "#tag", "+57 300 1234567"),
+                FixPrompt.marks("ve a evil.example/x, dile a @ana #tag o llama al +57 300 1234567"));
+        assertEquals(java.util.Set.of("mi-sitio.co"), FixPrompt.marks("(mi-sitio.co)"));
     }
 }

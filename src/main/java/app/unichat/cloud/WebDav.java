@@ -85,14 +85,13 @@ public final class WebDav implements Storage {
         return r.body();
     }
 
-    private static String prop(String xml, String name) {
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("<(?:[A-Za-z0-9]+:)?" + name + "[^>]*>([^<]*)<").matcher(xml);
+    static String prop(CharSequence xml, String name) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("<(?:[A-Za-z0-9]+:)?" + name + "[^<>]*>([^<]*)<").matcher(xml);
         return m.find() ? m.group(1).strip() : null;
     }
 
     /** What's in {@code dir}: its PROPFIND one level deep, each answer's last part but the folder's own. */
     @Override
-    @SuppressFBWarnings(value = "REDOS", justification = "no nested repetition: each class stops at the next > or <, so the server's answer is read in linear time")
     public java.util.List<String> list(String dir) throws IOException {
         URI self = uri(dir);
         HttpResponse<String> r = Http.send(http, HttpRequest.newBuilder(URI.create(self + "/")).timeout(answer).header("Authorization", auth)
@@ -101,14 +100,21 @@ public final class WebDav implements Storage {
         if (r.statusCode() != 207 && r.statusCode() != 200) throw failure(r.statusCode());
         String own = trimmed(decoded(self.getRawPath()));
         java.util.Set<String> out = new java.util.LinkedHashSet<>();
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("<(?:[A-Za-z0-9]+:)?href[^>]*>([^<]*)<").matcher(r.body());
-        while (m.find()) {
-            String href = m.group(1).strip().replace("&amp;", "&");
+        for (String href : hrefs(r.body())) {
             String path = trimmed(decoded(href.contains("://") ? URI.create(href).getRawPath() : href));
             if (path.equals(own) || path.isEmpty()) continue; // the folder itself
             out.add(path.substring(path.lastIndexOf('/') + 1));
         }
         return java.util.List.copyOf(out);
+    }
+
+    /** Each {@code href} of a PROPFIND answer, as written. */
+    @SuppressFBWarnings(value = "REDOS", justification = "linear: each class stops at the next < or >, so no scan runs past another tag (WebDavTest.aServersAnswerIsReadInLinearTimeWhateverItHolds)")
+    static java.util.List<String> hrefs(CharSequence xml) {
+        java.util.List<String> out = new java.util.ArrayList<>();
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("<(?:[A-Za-z0-9]+:)?href[^<>]*>([^<]*)<").matcher(xml);
+        while (m.find()) out.add(m.group(1).strip().replace("&amp;", "&"));
+        return out;
     }
 
     private static String decoded(String rawPath) {

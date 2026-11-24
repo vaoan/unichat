@@ -131,7 +131,7 @@ class BuildRulesTest {
     @Test
     void noExecutionIsUnbound() {
         for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin", "maven-pmd-plugin",
-                "spotbugs-maven-plugin")) {
+                "spotbugs-maven-plugin", "exec-maven-plugin", "properties-maven-plugin")) {
             Element executions = elements(plugin(plugin), "executions").stream().findFirst().orElse(null);
             if (executions == null) continue;
             for (Element e : elements(executions, "execution")) {
@@ -144,7 +144,8 @@ class BuildRulesTest {
     void noProfileChangesTheChecks() {
         for (Element profile : elements(child(POM.getDocumentElement(), "profiles"), "profile")) {
             for (String plugin : List.of("maven-compiler-plugin", "maven-enforcer-plugin", "modernizer-maven-plugin", "maven-pmd-plugin",
-                    "spotbugs-maven-plugin", "findsecbugs-plugin", "spotbugs-exclude.xml")) {
+                    "spotbugs-maven-plugin", "findsecbugs-plugin", "spotbugs-exclude.xml", "exec-maven-plugin",
+                    "properties-maven-plugin", "SpotBugsCache")) {
                 assertFalse(profile.getTextContent().contains(plugin), text(profile, "id") + " leaves " + plugin + " as it is");
             }
         }
@@ -232,6 +233,38 @@ class BuildRulesTest {
     }
 
     @Test
+    void spotBugsSkipsOnlyARepeatOfARunThatPassed() {
+        // Before SpotBugs: SpotBugsCache checks what it reads and writes spotbugs.skip, which properties-maven-plugin reads.
+        Element check = executionById("exec-maven-plugin", "spotbugs-inputs");
+        Element passed = executionById("exec-maven-plugin", "spotbugs-passed");
+        assertEquals(2, elements(child(plugin("exec-maven-plugin"), "executions"), "execution").size(), "exec runs only these two");
+        for (Element e : List.of(check, passed)) {
+            Element c = child(e, "configuration");
+            assertEquals(List.of("java"), texts(child(e, "goals"), "goal"));
+            assertEquals("app.unichat.build.SpotBugsCache", text(c, "mainClass"));
+            assertEquals("test", text(c, "classpathScope"));
+        }
+        assertEquals(List.of("check", "${project.basedir}"), texts(child(child(check, "configuration"), "arguments"), "argument"));
+        assertEquals(List.of("passed", "${project.basedir}"), texts(child(child(passed, "configuration"), "arguments"), "argument"));
+        Element decision = executionById("properties-maven-plugin", "spotbugs-decision");
+        assertEquals(1, elements(child(plugin("properties-maven-plugin"), "executions"), "execution").size(), "properties reads only it");
+        assertEquals(List.of("read-project-properties"), texts(child(decision, "goals"), "goal"));
+        assertEquals(List.of("${project.build.directory}/spotbugs-cache/skip.properties"),
+                texts(child(child(decision, "configuration"), "files"), "file"), "only SpotBugsCache's decision");
+        // The order Maven runs them in: the check, then the read (post-integration-test), then SpotBugs, then the mark (verify).
+        assertEquals("post-integration-test", text(check, "phase"));
+        assertEquals("post-integration-test", text(decision, "phase"));
+        assertEquals("verify", text(execution("spotbugs-maven-plugin", "check"), "phase"));
+        assertEquals("verify", text(passed, "phase"), "marked after SpotBugs passed, never before");
+        List<String> order = elements(child(child(POM.getDocumentElement(), "build"), "plugins"), "plugin").stream()
+                .map(p -> text(p, "artifactId")).toList();
+        assertTrue(order.indexOf("spotbugs-maven-plugin") < order.indexOf("exec-maven-plugin")
+                && order.indexOf("exec-maven-plugin") < order.indexOf("properties-maven-plugin"),
+                "SpotBugs before exec (the mark runs after it in verify), exec before properties (the read after the check)");
+        assertFalse(codeText(POM.getDocumentElement()).contains("spotbugs.skip"), "spotbugs.skip comes only from SpotBugsCache");
+    }
+
+    @Test
     void everySpotBugsPatternLeftOutSaysWhyAndIsAPatternNotAPlace() {
         Element filter = read("spotbugs-exclude.xml").getDocumentElement();
         List<Element> matches = elements(filter, "Match");
@@ -270,6 +303,27 @@ class BuildRulesTest {
     /** The plugin's own configuration, under build/plugins (not pluginManagement, which only pins versions). */
     private static Element configuration(String artifactId) {
         return child(plugin(artifactId), "configuration");
+    }
+
+    /** The plugin's execution named {@code id}. */
+    private static Element executionById(String artifactId, String id) {
+        for (Element e : elements(child(plugin(artifactId), "executions"), "execution")) {
+            if (id.equals(text(e, "id"))) return e;
+        }
+        throw new AssertionError(artifactId + " has the execution " + id);
+    }
+
+    /** The text of {@code e} and all below it, comments left out. */
+    private static String codeText(Node e) {
+        StringBuilder out = new StringBuilder();
+        NodeList all = e.getChildNodes();
+        for (int i = 0; i < all.getLength(); i++) {
+            Node n = all.item(i);
+            if (n instanceof Comment) continue;
+            if (n.getNodeType() == Node.TEXT_NODE) out.append(n.getNodeValue());
+            else out.append(codeText(n));
+        }
+        return out.toString();
     }
 
     /** The plugin's execution that runs {@code goal}, bound to a phase of the build. */

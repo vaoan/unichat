@@ -57,7 +57,8 @@ public final class Ffmpeg {
     /**
      * The input options for a file from other people: only it may be read. ffmpeg tells the format by the content, and
      * an HLS playlist, a concat list or a DASH manifest names other files, which {@code -protocol_whitelist file} still
-     * lets it read (a "video" could carry ~/.ssh/id_rsa into what is saved and uploaded): those are refused.
+     * lets it read (a "video" could carry ~/.ssh/id_rsa into what is saved and uploaded): those are refused here by how
+     * they begin, and by ffmpeg itself through {@link #FORMATS}, which also covers one that begins otherwise.
      */
     public static List<String> input(Path file) throws IOException {
         byte[] head;
@@ -68,8 +69,17 @@ public final class Ffmpeg {
         for (String list : LISTS) {
             if (start.regionMatches(true, 0, list, 0, list.length())) throw new IOException(I18n.t("video.notAVideo"));
         }
-        return List.of("-protocol_whitelist", "file", "-i", file.toString()); // lesson-ok: ffmpeg-input
+        return List.of("-protocol_whitelist", "file", "-format_whitelist", FORMATS, "-i", file.toString());
     }
+
+    /**
+     * The only formats ffmpeg may read a stranger's file as (its demuxers' names): what Unichat converts, plays or
+     * transcribes. Videos (MP4, MOV, 3GP and HEIC/AVIF pictures are "mov"; WebM is "matroska"), voice and audio, and
+     * pictures ("image2" is a single picture named .jpg). Never a list of other files (hls, concat, dash), nor anything
+     * else ffmpeg can read.
+     */
+    static final String FORMATS = "mov,matroska,avi,flv,mpegts,mpeg,asf,ogg,mp3,wav,w64,flac,aac,amr,caf,"
+            + "gif,apng,image2,png_pipe,jpeg_pipe,webp_pipe,tiff_pipe,bmp_pipe,gif_pipe";
 
     /** How the formats that name other files begin: HLS, ffmpeg's concat list, a DASH manifest (XML). */
     private static final List<String> LISTS = List.of("#EXTM3U", "ffconcat", "<?xml", "<MPD");

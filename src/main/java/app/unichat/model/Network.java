@@ -49,7 +49,7 @@ public enum Network {
     /** Initial letter shown in the small network badge. */
     public String badgeLetter() { return displayName.substring(0, 1).toUpperCase(Locale.ROOT); }
 
-    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a bridge's protocol id, looked up among ours (ASCII): a look-alike finds no network")
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a bridge's protocol id, lowered (a Kelvin sign becomes k, so a look-alike may match one of ours) and looked up among our own: what comes out is always one of our networks, and only labels the account")
     public static Network fromProtocolId(String id) {
         if (id == null) return null;
         String p = id.toLowerCase(Locale.ROOT);

@@ -22,15 +22,15 @@ import java.util.regex.Pattern;
 /** What the mautrix bridges understand and answer: bot commands, their replies and account states. No state, no I/O. */
 final class BridgeProtocol {
     /** One line of bridgev2 {@code list-logins}: {@code * `id` (Remote name) - `STATE`}. */
-    private static final Pattern LOGIN_LINE = loginLine();
+    static final Pattern LOGIN_LINE = loginLine();
     private static final Pattern DISCORD_LOGGED_IN = Pattern.compile("logged in as @?([^\\s(]+)\\s*\\(`?(\\d+)`?\\)");
     private static final Pattern GUILD_LINE = Pattern.compile("(?m)^\\s*[*-]\\s*(.+?)\\s*\\(`?(\\d{5,})`?\\)\\s*-\\s*(.+)$");
     /** A drop shorter than this still shows as connected: bridges usually reconnect within seconds. */
     static final long LIVE_GRACE_MS = 60_000;
 
-    @SuppressFBWarnings(value = "REDOS", justification = "no nested repetition, each part bounded by a literal (backticks, parentheses) and anchored at a line's start, so no exponential case; it reads only the bridge bot's own answers")
+    @SuppressFBWarnings(value = "REDOS", justification = "linear: it starts only where a line starts with spaces or tabs before its mark, and each part ends at a literal (LoginsParsingTest.aBotAnswerIsReadInLinearTimeWhateverItsBlankLines)")
     private static Pattern loginLine() {
-        return Pattern.compile("(?m)^\\s*[*-]\\s*`([^`\\s]+)`\\s*(?:\\(([^)\\n]*)\\))?\\s*(?:-\\s*`?([A-Z_]+)`?)?");
+        return Pattern.compile("(?m)^[ \\t]*[*-]\\s*`([^`\\s]+)`\\s*(?:\\(([^)\\n]*)\\))?\\s*(?:-\\s*`?([A-Z_]+)`?)?");
     }
 
     private static final Pattern LOGGED_IN_AS = Pattern.compile("(?i)logged in as ([^\\n.]+)");

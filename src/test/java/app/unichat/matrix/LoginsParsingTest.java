@@ -1,5 +1,6 @@
 package app.unichat.matrix;
 
+import app.unichat.CountedReads;
 import app.unichat.model.AccountStatus;
 import app.unichat.model.Message;
 import app.unichat.model.Network;
@@ -86,5 +87,13 @@ class LoginsParsingTest {
         assertEquals(AccountStatus.NEEDS_LOGIN, BridgeProtocol.liveStatus("LOGGED_OUT", t, t),
                 "a closed session shows at once");
         assertEquals(AccountStatus.CONNECTED, BridgeProtocol.liveStatus("BACKFILLING", t - 999_999, t));
+    }
+
+    @Test
+    void aBotAnswerIsReadInLinearTimeWhateverItsBlankLines() {
+        // "^\\s*" crossed line ends, so every blank line began a scan over all the blank lines after it.
+        CountedReads reply = new CountedReads("\n".repeat(20_000) + "no logins");
+        assertFalse(BridgeProtocol.LOGIN_LINE.matcher(reply).find());
+        assertTrue(reply.perChar() < 20, "each char read a few times: " + reply.perChar());
     }
 }

@@ -383,6 +383,53 @@
           </execution>
         </executions>
       </plugin>
+      <!-- SpotBugs' one allowed skip, a repeat of a run that passed (it has no cache of its own: a minute each build).
+           Before it, app.unichat.build.SpotBugsCache (test code, SpotBugsCacheTest) hashes all it reads (the classes, the
+           tests' classes, this pom, spotbugs-exclude.xml, the libraries, the JDK) and writes spotbugs.skip, true only
+           when that hash is the one marked after its last pass; properties-maven-plugin reads it into the build. After
+           SpotBugs, in verify, the hash is marked: a run that fails never is. BuildRulesTest keeps it to exactly this. -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>exec-maven-plugin</artifactId>
+        <version>3.7.0</version>
+        <executions>
+          <execution>
+            <id>spotbugs-inputs</id>
+            <phase>post-integration-test</phase>
+            <goals><goal>java</goal></goals>
+            <configuration>
+              <mainClass>app.unichat.build.SpotBugsCache</mainClass>
+              <classpathScope>test</classpathScope>
+              <arguments><argument>check</argument><argument>${project.basedir}</argument></arguments>
+            </configuration>
+          </execution>
+          <execution>
+            <id>spotbugs-passed</id>
+            <phase>verify</phase>
+            <goals><goal>java</goal></goals>
+            <configuration>
+              <mainClass>app.unichat.build.SpotBugsCache</mainClass>
+              <classpathScope>test</classpathScope>
+              <arguments><argument>passed</argument><argument>${project.basedir}</argument></arguments>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>properties-maven-plugin</artifactId>
+        <version>1.4.0</version>
+        <executions>
+          <execution>
+            <id>spotbugs-decision</id>
+            <phase>post-integration-test</phase>
+            <goals><goal>read-project-properties</goal></goals>
+            <configuration>
+              <files><file>${project.build.directory}/spotbugs-cache/skip.properties</file></files>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.openjfx</groupId>
         <artifactId>javafx-maven-plugin</artifactId>

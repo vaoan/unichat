@@ -1,5 +1,6 @@
 package app.unichat.cloud;
 
+import app.unichat.CountedReads;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 
@@ -104,5 +105,19 @@ class WebDavTest {
             assertEquals(new Storage.RemoteFile(5, null, null), dav.info("a.jpg"), "WebDAV gives the size, no checksum");
             assertNull(dav.info("nada.jpg"));
         }
+    }
+
+    @Test
+    void aServersAnswerIsReadInLinearTimeWhateverItHolds() {
+        // A tag that never closes made each pattern scan to the end of the answer again from every one of them.
+        CountedReads open = new CountedReads("<d:href ".repeat(5_000));
+        assertEquals(java.util.List.of(), WebDav.hrefs(open));
+        assertTrue(open.perChar() < 20, "each char read a few times: " + open.perChar());
+        CountedReads props = new CountedReads("<d:getetag ".repeat(5_000));
+        assertNull(WebDav.prop(props, "getetag"));
+        assertEquals(java.util.List.of("/dav/a b.txt", "/dav/x&y"), WebDav.hrefs(
+                "<d:response><d:href>/dav/a b.txt</d:href></d:response><D:href lang=\"x\">/dav/x&amp;y</D:href>"));
+        assertEquals("\"x\"", WebDav.prop("<d:getetag>\"x\"</d:getetag>", "getetag"));
+        assertTrue(props.perChar() < 20, "each char read a few times: " + props.perChar());
     }
 }

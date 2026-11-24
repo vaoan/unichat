@@ -41,7 +41,7 @@ public final class MimeTypes {
     private MimeTypes() {}
 
     /** The extension for a type, whatever parameters it carries ({@code audio/ogg; codecs=opus}); "" when unknown. */
-    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a message's MIME type, looked up in our table of ASCII types: a look-alike finds no extension")
+    @SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "a message's MIME type, lowered (a Kelvin sign becomes k, so a look-alike may match one of ours) and looked up in our own table: what comes out is always one of our extensions, which only names the saved file")
     public static String extension(String mimeType) {
         if (mimeType == null) return "";
         int parameters = mimeType.indexOf(';');

@@ -48,7 +48,7 @@ public final class Processes {
      *
      * @param dir where it runs; null: wherever Unichat does
      */
-    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the one place programs start: callers pass argument lists (no shell), and untrusted values only after -- or through Ffmpeg.input")
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the one place programs start: callers pass argument lists, never a shell, so each value is one argument whatever it holds; a file from other people reaches ffmpeg only through Ffmpeg.input (only that file, only Unichat's formats)")
     public static Result quiet(List<String> cmd, Path dir, long seconds) throws IOException, InterruptedException {
         ProcessBuilder b = new ProcessBuilder(cmd).redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD);
         if (dir != null) b.directory(dir.toFile());
@@ -56,7 +56,7 @@ public final class Processes {
     }
 
     /** Runs {@code cmd} and keeps its standard output; errors are left out, so they can't pass for the answer. */
-    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the one place programs start: callers pass argument lists (no shell), and untrusted values only after -- or through Ffmpeg.input")
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the one place programs start: callers pass argument lists, never a shell, so each value is one argument whatever it holds; a file from other people reaches ffmpeg only through Ffmpeg.input (only that file, only Unichat's formats)")
     public static Result capture(List<String> cmd, long seconds) throws IOException, InterruptedException {
         return capture(new ProcessBuilder(cmd).redirectError(ProcessBuilder.Redirect.DISCARD), seconds);
     }
