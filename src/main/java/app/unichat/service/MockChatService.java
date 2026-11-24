@@ -1,7 +1,6 @@
 package app.unichat.service;
 
 import app.unichat.model.Account;
-import app.unichat.model.AccountStatus;
 import app.unichat.model.Chat;
 import app.unichat.model.ConnectionState;
 import app.unichat.model.Contact;
@@ -14,6 +13,7 @@ import app.unichat.model.MimeTypes;
 import app.unichat.model.Network;
 import app.unichat.model.VoiceNote;
 import app.unichat.support.I18n;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 
 import javax.imageio.ImageIO;
 import java.awt.image.BufferedImage;
@@ -62,6 +62,7 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     private final PreferencesFile prefs;
     private final FolderActions folders;
+    private final DemoAccounts demoAccounts = new DemoAccounts(this);
 
     /** Demo mode with nothing kept on disk (tests, snapshots). */
     public MockChatService() {
@@ -70,7 +71,8 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     /** Demo mode whose choices and folders live in {@code prefs}, like the real service. */
     @SuppressWarnings("this-escape") // the demo seeds its own chats; subclasses (tests) only change how it answers
-    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "PREDICTABLE_RANDOM", justification = "the demo's made-up chat (random, a field), the same on every run on purpose; nothing secret") public MockChatService(PreferencesFile prefs) {
+    @SuppressFBWarnings(value = "PREDICTABLE_RANDOM", justification = "the demo's made-up chat (random, a field), the same on every run on purpose; nothing secret")
+    public MockChatService(PreferencesFile prefs) {
         this.prefs = prefs;
         this.folders = new FolderActions(prefs, this::fireChats);
         DemoChats.seed(this);
@@ -308,7 +310,7 @@ public class MockChatService implements ChatService, FolderForwarding {
         });
         Chat chat = chats.get(chatId);
         if (chat != null) {
-            if (chat.bridgeBot()) answerBridgeBot(chat, text.trim());
+            if (chat.bridgeBot()) demoAccounts.answer(chat, text.trim());
             else if (autoReplies && random.nextInt(3) == 0) replyLater(chat, 3 + random.nextInt(4));
         }
         return sent;
@@ -544,140 +546,28 @@ public class MockChatService implements ChatService, FolderForwarding {
 
     // ---------------------------------------------------------------- accounts
 
-    @Override
-    public List<Account> accounts() {
-        List<Account> out;
-        synchronized (accounts) {
-            out = new ArrayList<>(accounts.values());
-        }
-        // Snapshots of the "not working" strip: -Dunichat.demoAccounts=WHATSAPP:NEEDS_LOGIN,DISCORD:CONNECTING
-        String broken = System.getProperty("unichat.demoAccounts", "");
-        for (String part : broken.split(",")) {
-            String[] nv = part.split(":");
-            if (nv.length != 2) continue;
-            Network n = Network.valueOf(nv[0].strip());
-            AccountStatus st = AccountStatus.valueOf(nv[1].strip());
-            out.replaceAll(acc -> acc.network() == n ? new Account(acc.id(), n, acc.label(), st, null) : acc);
-        }
-        return out;
-    }
+    @Override public List<Account> accounts() { return demoAccounts.list(); }
 
     @Override public List<Network> availableNetworks() { return AVAILABLE; }
 
-    @Override
-    public CompletableFuture<String> connectNetwork(Network network) {
-        boolean hasAccount;
-        synchronized (accounts) {
-            hasAccount = accounts.values().stream().anyMatch(a -> a.network() == network);
-        }
-        return hasAccount ? CompletableFuture.completedFuture(botChat(network).id()) : addAccount(network);
-    }
+    @Override public CompletableFuture<String> connectNetwork(Network network) { return demoAccounts.connect(network); }
 
-    @Override
-    public CompletableFuture<String> addAccount(Network network) {
-        Chat chat = botChat(network);
-        synchronized (accounts) {
-            accounts.put(pendingId(network), new Account(pendingId(network), network, I18n.t("demo.newAccount"), AccountStatus.NEEDS_LOGIN, null));
-        }
-        answerBridgeBot(chat, "login");
-        listeners.forEach(Listener::accountsChanged);
-        return CompletableFuture.completedFuture(chat.id());
-    }
+    @Override public CompletableFuture<String> addAccount(Network network) { return demoAccounts.add(network); }
 
-    @Override
-    public CompletableFuture<Void> disconnectNetwork(Network network) {
-        synchronized (accounts) {
-            accounts.values().removeIf(a -> a.network() == network);
-        }
-        chats.values().removeIf(c -> c.network() == network);
-        listeners.forEach(Listener::accountsChanged);
-        fireChats();
-        return CompletableFuture.completedFuture(null);
-    }
+    @Override public CompletableFuture<Void> disconnectNetwork(Network network) { return demoAccounts.disconnect(network); }
 
-    @Override
-    public CompletableFuture<Void> disconnectAccount(Account account) {
-        boolean last;
-        synchronized (accounts) {
-            accounts.remove(account.id());
-            last = accounts.values().stream().noneMatch(a -> a.network() == account.network());
-        }
-        chats.values().removeIf(c -> account.id().equals(c.accountId()) || (last && c.network() == account.network() && !c.bridgeBot()));
-        listeners.forEach(Listener::accountsChanged);
-        fireChats();
-        return CompletableFuture.completedFuture(null);
-    }
+    @Override public CompletableFuture<Void> disconnectAccount(Account account) { return demoAccounts.disconnect(account); }
 
     @Override
     public CompletableFuture<Void> cancelLogin(Network network, String botChatId) {
-        synchronized (accounts) {
-            accounts.remove(pendingId(network));
-        }
-        Chat chat = chats.get(botChatId);
-        if (chat != null) incoming(chat, botMember(network), "Login cancelled.", false);
-        listeners.forEach(Listener::accountsChanged);
-        return CompletableFuture.completedFuture(null);
+        return demoAccounts.cancelLogin(network, botChatId);
     }
 
-    private static String pendingId(Network n) {
-        return n.protocolId() + ":pending";
-    }
-
-    private Chat botChat(Network network) {
-        String id = "!bot-" + network.name().toLowerCase(java.util.Locale.ROOT) + ":demo";
-        return chats.computeIfAbsent(id, k -> {
-            Chat bot = new Chat(k);
-            bot.setNetwork(network);
-            bot.setTitle(network.displayName() + " bridge bot");
-            bot.setBridgeBot(true);
-            bot.setMembers(List.of(botMember(network)));
-            adopt(bot);
-            messages.put(k, new ArrayList<>());
-            return bot;
-        });
-    }
-
-    private Member botMember(Network n) {
-        return new Member("@" + n.botLocalpart() + ":demo.unichat", n.displayName() + " bridge bot", null);
-    }
-
-    @edu.umd.cs.findbugs.annotations.SuppressFBWarnings(value = "IMPROPER_UNICODE", justification = "the demo's pretend bridge bot, answering the person's own commands") private void answerBridgeBot(Chat chat, String command) {
-        Network n = chat.network();
-        Member bot = botMember(n);
-        var _ = scheduler().schedule(() -> {
-            if (command.equalsIgnoreCase("login")) {
-                Message qr = new Message(UUID.randomUUID().toString(), chat.id(), bot.id(), bot.name(), false, Instant.now());
-                qr.setType(MessageType.IMAGE);
-                qr.setMediaUrl("demo://" + I18n.t("demo.image.qr") + "-" + n.protocolId());
-                qr.setFileName("qr.png");
-                qr.setSize(640, 420);
-                append(chat, qr);
-                incoming(chat, bot, "Scan the QR code with the " + n.displayName() + " mobile app to log in.", false);
-                var _ = scheduler().schedule(() -> answerBridgeBot(chat, "ok"), 6, TimeUnit.SECONDS); // demo: simulated scan
-            } else if (command.equalsIgnoreCase("ok")) {
-                incoming(chat, bot, "Successfully logged in as demo_" + n.protocolId(), false);
-                synchronized (accounts) {
-                    accounts.remove(pendingId(n));
-                    long k = accounts.values().stream().filter(a -> a.network() == n).count() + 1;
-                    String id = n.protocolId() + ":demo" + k;
-                    accounts.put(id, new Account(id, n, "demo_" + n.protocolId() + "_" + k, AccountStatus.CONNECTED, null));
-                }
-                listeners.forEach(Listener::accountsChanged);
-            } else if (command.equalsIgnoreCase("logout")) {
-                incoming(chat, bot, I18n.t("demo.loggedOut"), false);
-                synchronized (accounts) {
-                    accounts.values().removeIf(a -> a.network() == n);
-                }
-                listeners.forEach(Listener::accountsChanged);
-            } else {
-                incoming(chat, bot, I18n.t("demo.unknownCommand"), false);
-            }
-        }, 900, TimeUnit.MILLISECONDS);
-    }
+    final void fireAccounts() { listeners.forEach(Listener::accountsChanged); }
 
     // ---------------------------------------------------------------- simulation
 
-    private ScheduledExecutorService scheduler() {
+    final ScheduledExecutorService scheduler() {
         if (scheduler == null) start();
         return scheduler;
     }
@@ -786,7 +676,7 @@ public class MockChatService implements ChatService, FolderForwarding {
         return null;
     }
 
-    private void fireChats() { listeners.forEach(Listener::chatsChanged); }
+    final void fireChats() { listeners.forEach(Listener::chatsChanged); }
 
     @Override public byte[] preferencesJson() { return prefs.json(); }
 
