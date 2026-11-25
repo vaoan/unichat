@@ -12,6 +12,7 @@ import app.unichat.gif.GifSearch;
 import app.unichat.model.Chat;
 import app.unichat.model.MediaLibrary;
 import app.unichat.model.RoomFeatures;
+import app.unichat.service.CantSend;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
@@ -199,6 +200,13 @@ public final class GifGrid extends VBox {
         send(i, file);
     }
 
+    /** What the notice says when a GIF didn't go: why, when it can't go as it is ({@link CantSend}), else that it failed. */
+    static String failure(Throwable err) {
+        CantSend cant = CantSend.behind(err);
+        String why = cant == null ? null : cant.getMessage();
+        return why != null ? why : I18n.t("gif.sendFailed");
+    }
+
     private void send(MediaLibrary.Item item, CompletableFuture<Path> file) {
         Chat c = chat.get();
         if (c == null) return;
@@ -207,7 +215,7 @@ public final class GifGrid extends VBox {
         var _ = file.thenCompose(p -> svc.sendGif(c.id(), p, item.mime() == null ? "image/gif" : item.mime(), item.width(), item.height(), reply))
                 .whenComplete((v, err) -> Platform.runLater(() -> {
                     if (err != null) {
-                        toast.accept(I18n.t("gif.sendFailed"));
+                        toast.accept(failure(err));
                         return;
                     }
                     library.addRecent(item);

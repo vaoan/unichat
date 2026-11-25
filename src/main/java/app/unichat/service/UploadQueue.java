@@ -221,7 +221,7 @@ public final class UploadQueue {
         var _ = sending.whenComplete((v, err) -> {
             long wait;
             int tries;
-            CantSend cant = cantSend(err);
+            CantSend cant = CantSend.behind(err);
             synchronized (this) {
                 wait = err == null || cant != null || abandoned || !Files.isReadable(u.file()) ? -1 : retryDelay(++retries);
                 tries = retries;
@@ -248,14 +248,6 @@ public final class UploadQueue {
             waiting = false;
         }
         attempt(u);
-    }
-
-    /** The {@link CantSend} behind a failure (it comes wrapped by the futures it went through), or null. */
-    private static @Nullable CantSend cantSend(@Nullable Throwable err) {
-        for (Throwable t = err; t != null; t = t.getCause()) {
-            if (t instanceof CantSend c) return c;
-        }
-        return null;
     }
 
     /** 30 s, 1 min, 2 min, 4 min, then every 5 min. */

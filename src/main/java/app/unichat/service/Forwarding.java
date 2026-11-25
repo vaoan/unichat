@@ -40,6 +40,7 @@ public final class Forwarding {
         private volatile @Nullable Message current;
         private volatile @Nullable String currentChat;
         private volatile boolean cancelled;
+        private volatile @Nullable String refused;
 
         Job(int total, List<String> chatIds) {
             this.total = total;
@@ -54,6 +55,8 @@ public final class Forwarding {
         public @Nullable Message current() { return current; }
         public @Nullable String currentChat() { return currentChat; }
         public boolean cancelled() { return cancelled; }
+        /** Why the last one that failed couldn't go as it was ({@link CantSend}, a GIF no MP4 could be made of), null when none said. */
+        public @Nullable String refused() { return refused; }
         public boolean finished() { return done.isDone(); }
         /** Completes when the last one went (or failed), or after a cancel when the one going ends. */
         public CompletableFuture<Void> done() { return done; }
@@ -99,6 +102,8 @@ public final class Forwarding {
                             .thenCompose(x -> svc.forward(chatId, m, gifs))
                             .handle((x, err) -> {
                                 if (err != null) System.err.println("Forward failed: " + err);
+                                CantSend cant = CantSend.behind(err);
+                                if (cant != null) job.refused = cant.getMessage();
                                 (err == null ? job.sent : job.failed).incrementAndGet();
                                 return null;
                             });

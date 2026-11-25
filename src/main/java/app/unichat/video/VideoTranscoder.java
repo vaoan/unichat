@@ -25,17 +25,31 @@ public final class VideoTranscoder {
 
     /** Blocking, as long as the video takes to convert. */
     public static Path toPlayable(Path video, DoubleConsumer installProgress) throws IOException, InterruptedException {
-        Path out = ConvertedFiles.beside(video, "mp4");
+        return convert(video, "mp4", true, installProgress);
+    }
+
+    /**
+     * {@code video} (a GIF that came as a WebM, say) as the silent H.264 MP4 Telegram's and WhatsApp's bridges take as
+     * a GIF: their {@code fi.mau.gif} takes only video/mp4 (or image/gif). Beside it, made once; blocking.
+     * {@link WebmStickers.NoConverter} without ffmpeg, an IOException when it fails.
+     */
+    public static Path toGifMp4(Path video, DoubleConsumer installProgress) throws IOException, InterruptedException {
+        return convert(video, "gif.mp4", false, installProgress);
+    }
+
+    private static Path convert(Path video, String extension, boolean sound, DoubleConsumer installProgress)
+            throws IOException, InterruptedException {
+        Path out = ConvertedFiles.beside(video, extension);
         if (ConvertedFiles.reuse(out)) return out;
         Path ffmpeg = Ffmpeg.whenNeeded(installProgress);
         if (ffmpeg == null) throw new WebmStickers.NoConverter();
-        if (PartFile.firstOf(out, TIMEOUT_SECONDS, ways(ffmpeg, video)) == null) throw new IOException(I18n.t("video.convertFailed"));
+        if (PartFile.firstOf(out, TIMEOUT_SECONDS, ways(ffmpeg, video, sound)) == null) throw new IOException(I18n.t("video.convertFailed"));
         return out;
     }
 
     /** One way per encoder, best first. */
-    private static List<PartFile.Way> ways(Path ffmpeg, Path video) {
-        return encoders().stream().map(e -> (PartFile.Way) into -> command(ffmpeg, video, into, e)).toList();
+    private static List<PartFile.Way> ways(Path ffmpeg, Path video, boolean sound) {
+        return encoders().stream().map(e -> (PartFile.Way) into -> command(ffmpeg, video, into, e, sound)).toList();
     }
 
     private static final java.util.regex.Pattern STREAM = java.util.regex.Pattern.compile("Stream #\\S+.*?: (Video|Audio): (\\w+)");
@@ -83,7 +97,7 @@ public final class VideoTranscoder {
         if (picture(info.out()) || playsEverywhere(info.out())) return file; // a picture stays one
         String name = PathParts.name(file);
         Path out = file.resolveSibling((name.contains(".") ? name.substring(0, name.lastIndexOf('.')) : name) + ".mp4");
-        if (PartFile.firstOf(out, TIMEOUT_SECONDS, ways(ffmpeg, file)) == null) throw new IOException(I18n.t("video.convertFailed"));
+        if (PartFile.firstOf(out, TIMEOUT_SECONDS, ways(ffmpeg, file, true)) == null) throw new IOException(I18n.t("video.convertFailed"));
         if (!out.equals(file)) Files.deleteIfExists(file);
         return out;
     }
@@ -93,14 +107,17 @@ public final class VideoTranscoder {
         return Os.mac() ? List.of("h264_videotoolbox", "libx264") : List.of("libx264");
     }
 
-    static List<String> command(Path ffmpeg, Path video, Path out, String encoder) throws IOException {
+    /** {@code sound}: its first audio stream as AAC; without it, none (a GIF: Telegram takes only a silent video as one). */
+    static List<String> command(Path ffmpeg, Path video, Path out, String encoder, boolean sound) throws IOException {
         List<String> c = new ArrayList<>(List.of(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error"));
         c.addAll(Ffmpeg.input(video)); // the file comes from other people
-        c.addAll(List.of("-map", "0:v:0", "-map", "0:a:0?",
-                // H.264 needs even sizes and this pixel format to play everywhere.
-                "-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", "-c:v", encoder));
+        c.addAll(List.of("-map", "0:v:0"));
+        if (sound) c.addAll(List.of("-map", "0:a:0?"));
+        // H.264 needs even sizes and this pixel format to play everywhere.
+        c.addAll(List.of("-vf", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "-pix_fmt", "yuv420p", "-c:v", encoder));
         c.addAll(encoder.equals("libx264") ? List.of("-preset", "veryfast", "-crf", "23") : List.of("-b:v", "4M"));
-        c.addAll(List.of("-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", "-f", "mp4", out.toString()));
+        c.addAll(sound ? List.of("-c:a", "aac", "-b:a", "128k") : List.of("-an"));
+        c.addAll(List.of("-movflags", "+faststart", "-f", "mp4", out.toString()));
         return c;
     }
 }

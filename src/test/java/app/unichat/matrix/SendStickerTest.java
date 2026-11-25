@@ -17,6 +17,7 @@ import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -31,6 +32,10 @@ class SendStickerTest {
     private volatile @Nullable String body;
     private final java.util.List<String> puts = new java.util.concurrent.CopyOnWriteArrayList<>();
     private volatile @Nullable String uploadedType;
+    /** The bytes of the last upload. */
+    private final AtomicReference<byte @Nullable []> uploaded = new AtomicReference<>();
+    /** The last upload's query: the name it went up under. */
+    private volatile @Nullable String uploadedQuery;
     /** What the fake server serves as any media; null = a 16 px GIF. */
     private volatile java.nio.file.@Nullable Path served;
 
@@ -49,7 +54,8 @@ class SendStickerTest {
         });
         server.createContext("/_matrix/media/v3/upload", ex -> {
             uploadedType = ex.getRequestHeaders().getFirst("Content-Type");
-            ex.getRequestBody().readAllBytes();
+            uploaded.set(ex.getRequestBody().readAllBytes());
+            uploadedQuery = ex.getRequestURI().getQuery();
             byte[] b = "{\"content_uri\":\"mxc://s/converted\"}".getBytes(StandardCharsets.UTF_8);
             ex.getResponseHeaders().add("Content-Type", "application/json");
             ex.sendResponseHeaders(200, b.length);
@@ -465,5 +471,156 @@ class SendStickerTest {
         assertEquals("image/webp", uploadedType);
         assertEquals("sticker.webp", sent.path("body").asText(), "named as the file was");
         assertTrue(sent.path("info").path("w").asInt() > 0, "its size, for the chat to make room");
+    }
+
+    /**
+     * A favourite from Discord (or a provider's GIF) that is a WebM, sent to Telegram from the GIF tab: its bridge
+     * answered "unsupported media type (video/webm in fi.mau.gif)", as WhatsApp's would (both take only video/mp4 so).
+     */
+    @Test
+    void aWebmGifGoesToTelegramAndWhatsappAsASilentMp4MarkedAsAGif(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        java.nio.file.Path ffmpeg = Present.orSkip(app.unichat.video.Ffmpeg.find(), "no ffmpeg");
+        java.nio.file.Path webm = webmWithSound(ffmpeg, dir.resolve("gif.webm"));
+        for (String network : java.util.List.of("telegram", "whatsapp")) {
+            uploaded.set(null);
+            chatOn(network).sendGif("!c:example.org", webm, "video/webm", 64, 48, null).get();
+            assertEquals("video/mp4", uploadedType, network);
+            java.nio.file.Path sentFile = dir.resolve(network + ".mp4");
+            java.nio.file.Files.write(sentFile, Present.of(uploaded.get()));
+            assertTrue(app.unichat.support.ImageHeaders.isMp4(sentFile), "what goes up really is an MP4: " + network);
+            assertFalse(ffmpegSays(ffmpeg, sentFile).contains("Audio:"), "silent, as Telegram's GIFs are");
+            JsonNode sent = MatrixClient.JSON.readTree(body);
+            assertEquals("m.video", sent.path("msgtype").asText());
+            assertEquals("video/mp4", sent.path("info").path("mimetype").asText());
+            assertTrue(sent.path("info").path("fi.mau.gif").asBoolean(), "still a GIF");
+            assertEquals("filename=gif.mp4", uploadedQuery, "a name the friend can read, not the cache's converted-<hash>");
+            assertEquals("gif.mp4", sent.path("filename").asText());
+            assertEquals("gif.mp4", sent.path("body").asText());
+        }
+    }
+
+    /** Labels lie: a stranger's WebM that says video/mp4, forwarded to Telegram, is still made the MP4 it says it is. */
+    @Test
+    void aForwardedGifLabelledMp4ThatIsReallyAWebmIsMadeAnMp4(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        java.nio.file.Path ffmpeg = Present.orSkip(app.unichat.video.Ffmpeg.find(), "no ffmpeg");
+        served = webmWithSound(ffmpeg, dir.resolve("gif.webm"));
+        app.unichat.model.Message m = webmGif("gif.mp4", "video/mp4", "labelled-mp4");
+        chatOn("telegram").forward("!c:example.org", m, true).get();
+        assertEquals("video/mp4", uploadedType, "it went up converted, not at its own address");
+        java.nio.file.Path sentFile = dir.resolve("sent.mp4");
+        java.nio.file.Files.write(sentFile, Present.of(uploaded.get()));
+        assertTrue(app.unichat.support.ImageHeaders.isMp4(sentFile));
+        assertEquals("mxc://s/converted", MatrixClient.JSON.readTree(body).path("url").asText());
+    }
+
+    /** A forward that can't be made an MP4 fails saying why, which the forward bar shows ({@code service/Forwarding.Job.refused}). */
+    @Test
+    void aForwardedWebmGifThatCantBeMadeAnMp4FailsSayingWhy(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        served = java.nio.file.Files.write(dir.resolve("gif.webm"), new byte[]{0x1A, 0x45, (byte) 0xDF, (byte) 0xA3, 1, 2, 3});
+        String before = System.getProperty("unichat.ffmpeg");
+        System.setProperty("unichat.ffmpeg", dir.resolve("no-ffmpeg").toString());
+        app.unichat.video.Ffmpeg.setAutoInstall(false);
+        try {
+            ExecutionException e = org.junit.jupiter.api.Assertions.assertThrows(ExecutionException.class,
+                    () -> chatOn("telegram").forward("!c:example.org", webmGif("gif.webm", "video/webm", "unreadable-webm"), true).get());
+            assertEquals(app.unichat.support.I18n.t("gif.cantMakeMp4", "Telegram"),
+                    Present.of(app.unichat.service.CantSend.behind(e)).getMessage());
+        } finally {
+            if (before == null) System.clearProperty("unichat.ffmpeg");
+            else System.setProperty("unichat.ffmpeg", before);
+            app.unichat.video.Ffmpeg.setAutoInstall(true);
+        }
+        assertNull(uploadedType, "nothing went up");
+        assertTrue(puts.isEmpty(), "nothing was sent: " + puts);
+    }
+
+    /** A stranger's GIF video named {@code name} and labelled {@code mime}, at the address the fake serves. */
+    private static app.unichat.model.Message webmGif(String name, String mime, String id) throws JsonProcessingException {
+        app.unichat.model.Message m = new app.unichat.model.Message("$w", "!x:example.org", "@someone:example.org", "Ana", false, java.time.Instant.EPOCH);
+        m.setType(app.unichat.model.MessageType.VIDEO);
+        m.setFileName(name);
+        m.setMediaUrl("mxc://s/" + id); // one cached file per test
+        m.setMimeType(mime);
+        m.setSize(64, 48);
+        m.setMediaInfo(MatrixClient.JSON.readTree("{\"mimetype\":\"" + mime + "\",\"fi.mau.gif\":true}"));
+        return m;
+    }
+
+    @Test
+    void aGifThatIsAlreadyAnMp4GoesToTelegramUntouched(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        java.nio.file.Path mp4 = java.nio.file.Files.write(dir.resolve("gif.webm"), // its name and label say WebM; its bytes don't
+                new byte[]{0, 0, 0, 24, 'f', 't', 'y', 'p', 'i', 's', 'o', 'm', 0, 0, 2, 0, 'i', 's', 'o', 'm', 'm', 'p', '4', '1'});
+        chatOn("telegram").sendGif("!c:example.org", mp4, "video/webm", 64, 48, null).get();
+        assertEquals("video/mp4", uploadedType);
+        assertTrue(java.util.Arrays.equals(java.nio.file.Files.readAllBytes(mp4), uploaded.get()), "the file itself, no ffmpeg");
+        assertTrue(MatrixClient.JSON.readTree(body).path("info").path("fi.mau.gif").asBoolean());
+    }
+
+    /** Without ffmpeg nothing the bridge would refuse goes: the send fails saying why (an animated WebP isn't a GIF there). */
+    @Test
+    void aWebmGifThatCantBeMadeAnMp4IsNotSentAndSaysWhy(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        java.nio.file.Path webm = java.nio.file.Files.write(dir.resolve("gif.webm"), new byte[]{0x1A, 0x45, (byte) 0xDF, (byte) 0xA3, 1, 2, 3});
+        String before = System.getProperty("unichat.ffmpeg");
+        System.setProperty("unichat.ffmpeg", dir.resolve("no-ffmpeg").toString());
+        app.unichat.video.Ffmpeg.setAutoInstall(false);
+        try {
+            ExecutionException e = org.junit.jupiter.api.Assertions.assertThrows(ExecutionException.class,
+                    () -> chatOn("telegram").sendGif("!c:example.org", webm, "video/webm", 64, 48, null).get());
+            app.unichat.service.CantSend cant = Present.of(app.unichat.service.CantSend.behind(e));
+            assertTrue(Present.of(cant.getMessage()).contains("Telegram"), cant.getMessage());
+        } finally {
+            if (before == null) System.clearProperty("unichat.ffmpeg");
+            else System.setProperty("unichat.ffmpeg", before);
+            app.unichat.video.Ffmpeg.setAutoInstall(true);
+        }
+        assertNull(uploadedType, "nothing went up");
+        assertTrue(puts.isEmpty(), "nothing was sent: " + puts);
+    }
+
+    /** ffmpeg there but failing (a file that only begins like a WebM): the same, nothing sent. */
+    @Test
+    void aWebmGifFfmpegCantReadIsNotSentEither(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        Present.orSkip(app.unichat.video.Ffmpeg.find(), "no ffmpeg");
+        java.nio.file.Path webm = java.nio.file.Files.write(dir.resolve("gif.webm"), new byte[]{0x1A, 0x45, (byte) 0xDF, (byte) 0xA3, 1, 2, 3});
+        ExecutionException e = org.junit.jupiter.api.Assertions.assertThrows(ExecutionException.class,
+                () -> chatOn("whatsapp").sendGif("!c:example.org", webm, "video/webm", 64, 48, null).get());
+        assertTrue(Present.of(Present.of(app.unichat.service.CantSend.behind(e)).getMessage()).contains("WhatsApp"));
+        assertNull(uploadedType, "nothing went up");
+        assertTrue(puts.isEmpty(), "nothing was sent: " + puts);
+    }
+
+    /** A stranger's GIF video that is a WebM, forwarded to Telegram, goes as the MP4 its bridge takes as a GIF. */
+    @Test
+    void aForwardedWebmGifGoesToTelegramAsAnMp4(@org.junit.jupiter.api.io.TempDir java.nio.file.Path dir) throws Exception {
+        java.nio.file.Path ffmpeg = Present.orSkip(app.unichat.video.Ffmpeg.find(), "no ffmpeg");
+        served = webmWithSound(ffmpeg, dir.resolve("gif.webm"));
+        chatOn("telegram").forward("!c:example.org", webmGif("gif.webm", "video/webm", "real-webm"), true).get();
+        assertEquals("video/mp4", uploadedType);
+        java.nio.file.Path sentFile = dir.resolve("sent.mp4");
+        java.nio.file.Files.write(sentFile, Present.of(uploaded.get()));
+        assertTrue(app.unichat.support.ImageHeaders.isMp4(sentFile));
+        JsonNode sent = MatrixClient.JSON.readTree(body);
+        assertEquals("m.video", sent.path("msgtype").asText());
+        assertEquals("video/mp4", sent.path("info").path("mimetype").asText());
+        assertEquals("gif.mp4", sent.path("filename").asText());
+        assertEquals("mxc://s/converted", sent.path("url").asText());
+        assertTrue(sent.path("info").path("fi.mau.gif").asBoolean());
+    }
+
+    /** A 1 s VP9 WebM with an Opus track, skipping the test where this ffmpeg can't make one. */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own ffmpeg with its own fixed arguments; nothing from outside")
+    private static java.nio.file.Path webmWithSound(java.nio.file.Path ffmpeg, java.nio.file.Path out) throws java.io.IOException, InterruptedException {
+        Process p = new ProcessBuilder(ffmpeg.toString(), "-y", "-loglevel", "error", "-f", "lavfi", "-i", "testsrc=s=64x48:d=1:r=10",
+                "-f", "lavfi", "-i", "sine=d=1", "-c:v", "libvpx-vp9", "-c:a", "libopus", "-shortest", out.toString())
+                .redirectErrorStream(true).redirectOutput(ProcessBuilder.Redirect.DISCARD).start();
+        org.junit.jupiter.api.Assumptions.assumeTrue(p.waitFor() == 0, "this ffmpeg can't make a WebM");
+        return out;
+    }
+
+    /** What ffmpeg says of {@code file} (its streams). */
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own ffmpeg on its own file")
+    private static String ffmpegSays(java.nio.file.Path ffmpeg, java.nio.file.Path file) throws java.io.IOException, InterruptedException {
+        return app.unichat.support.Processes.capture(new ProcessBuilder(ffmpeg.toString(), "-hide_banner", "-nostdin", "-i", file.toString())
+                .redirectErrorStream(true), Long.MAX_VALUE).out();
     }
 }

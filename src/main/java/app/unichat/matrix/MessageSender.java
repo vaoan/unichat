@@ -230,6 +230,10 @@ final class MessageSender {
         }
         Chat chat = core.chat(chatId);
         boolean gif = gifs && chat != null && !NetworkFormats.of(chat.network()).gifVideosAsIs() && app.unichat.video.GifVideos.fits(m);
+        // A GIF video where the bridge sends one on as it is must be an MP4, told by its bytes, not its label (a stranger's
+        // WebM may say video/mp4): one that isn't is made one, else it goes as it is.
+        @Nullable Network mp4For = chat != null && NetworkFormats.of(chat.network()).gifVideosAsIs() && app.unichat.video.GifVideos.is(m)
+                ? chat.network() : null;
         boolean copy = m.isMedia() && (gif || needsCopy(url));
         ObjectNode content = ForwardedContent.of(m, copy);
         keepVoice(content, m, chat);
@@ -238,13 +242,19 @@ final class MessageSender {
             proc.addLocalEcho(chatId, txn, echo -> app.unichat.service.Forwarding.copy(m, echo));
         }
         fireLocal(chatId);
-        if (!copy) return sendEvent(chatId, "m.room.message", txn, content);
-        String copied = Objects.requireNonNull(url, "only media is copied, and its address was checked above");
+        if (!copy && mp4For == null) return sendEvent(chatId, "m.room.message", txn, content);
+        String copied = Objects.requireNonNull(url, "only media is copied or read, and its address was checked above");
         return sendWhenPrepared(chatId, txn, "m.room.message", "Forward", media.media(copied, 0, 0).thenApplyAsync(src -> {
             try {
                 // An animated WebP, as small as it takes to fit (Discord: 10 MB without Nitro), else the video, which still plays.
                 Path file = gif ? app.unichat.video.GifVideos.webpUnder(src, app.unichat.video.GifVideos.maxBytes()) : src;
-                if (file != src) {
+                Path mp4 = mp4For == null ? src : gifAsMp4(src, mp4For);
+                if (mp4 != src) {
+                    ForwardedContent.becomeMp4(content, Files.size(mp4));
+                    content.put("url", client.upload(mp4, MP4, content.path("filename").asText(GIF_MP4_NAME)));
+                } else if (!copy) {
+                    return content; // an MP4 already, at its own address
+                } else if (file != src) {
                     ForwardedContent.becomeWebp(content, Files.size(file));
                     content.put("url", client.upload(file, StickerConverter.WEBP, content.path("filename").asText("gif.webp")));
                 } else {
@@ -402,17 +412,44 @@ final class MessageSender {
     /**
      * A GIF from the GIF tab: m.video (mp4) or m.image (gif) flagged {@code fi.mau.gif}, so bridges send a GIF. One that's
      * an MP4 (a provider's, a favourite from Telegram or WhatsApp) goes where the bridge would show a video (Discord) as
-     * the animated WebP a forward makes ({@code video/GifVideos}), else as it is.
+     * the animated WebP a forward makes ({@code video/GifVideos}), else as it is. Where the bridge sends a GIF video on
+     * (Telegram, WhatsApp) it must be an MP4: one that isn't (a WebM from Discord or a provider) is made one first.
      */
     CompletableFuture<Void> sendGif(String chatId, Path file, String mime, int width, int height, @Nullable String replyToId) {
         Chat chat = core.chat(chatId);
         boolean video = mime != null && mime.startsWith("video/");
-        if (!video || chat == null || NetworkFormats.of(chat.network()).gifVideosAsIs()) {
-            return sendMedia(chatId, file, replyToId, mime, width, height, true);
+        if (!video || chat == null) return sendMedia(chatId, file, replyToId, mime, width, height, true);
+        Network network = chat.network();
+        if (NetworkFormats.of(network).gifVideosAsIs()) {
+            return CompletableFuture.supplyAsync(() -> gifAsMp4(file, network), core.io)
+                    .thenCompose(p -> sendMedia(chatId, p, replyToId, MP4, width, height, true, p == file ? null : GIF_MP4_NAME));
         }
         return CompletableFuture.supplyAsync(() -> app.unichat.video.GifVideos.webpUnder(file, app.unichat.video.GifVideos.maxBytes()), core.io)
                 .thenCompose(p -> p == file ? sendMedia(chatId, file, replyToId, mime, width, height, true)
                         : sendMedia(chatId, p, replyToId, StickerConverter.WEBP, width, height, true));
+    }
+
+    private static final String MP4 = "video/mp4";
+    /** The name a GIF made an MP4 goes under: its file's is the cache's ({@code converted-<hash>.gif.mp4}). */
+    private static final String GIF_MP4_NAME = "gif.mp4";
+
+    /**
+     * {@code file} as an MP4 for {@code network}'s bridge, which takes a video marked {@code fi.mau.gif} only as video/mp4
+     * ("unsupported media type (video/webm in fi.mau.gif)"): itself when its bytes are one, else the silent H.264 MP4
+     * ffmpeg makes of it. Without ffmpeg, or when it fails, nothing the bridge would refuse goes: a {@code CantSend}
+     * saying why (an animated WebP is no GIF there: WhatsApp makes it a still JPEG). Blocking.
+     */
+    private static Path gifAsMp4(Path file, Network network) {
+        try {
+            if (ImageHeaders.isMp4(file)) return file;
+            return app.unichat.video.VideoTranscoder.toGifMp4(file, p -> { });
+        } catch (IOException e) {
+            System.err.println("GIF to MP4 for " + network.displayName() + " failed (" + e.getClass().getSimpleName() + ": " + e.getMessage() + ")");
+            throw new CompletionException(new app.unichat.service.CantSend(I18n.t("gif.cantMakeMp4", network.displayName()), e));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CompletionException(e);
+        }
     }
 
     /**
@@ -454,13 +491,27 @@ final class MessageSender {
 
     private CompletableFuture<Void> sendMedia(String chatId, Path file, @Nullable String replyToId, String mime, int width, int height,
                                               boolean gif) {
-        return sendMedia(chatId, file, replyToId, new Kind(mime, width, height, 0, false, p -> { }), content -> {
+        return sendMedia(chatId, file, replyToId, mime, width, height, gif, null);
+    }
+
+    /** {@code name}: what the other person sees it called, null for the file's own name. */
+    private CompletableFuture<Void> sendMedia(String chatId, Path file, @Nullable String replyToId, String mime, int width, int height,
+                                              boolean gif, @Nullable String name) {
+        return sendMedia(chatId, file, replyToId, new Kind(mime, width, height, 0, false, p -> { }, name), content -> {
             if (gif) content.withObjectProperty("info").put("fi.mau.gif", true);
         }).thenApply(id -> null);
     }
 
-    /** What a file is sent as: its MIME, size and length if known, whether as a plain document, and who hears the upload. */
-    private record Kind(String mime, int width, int height, long durationMs, boolean document, DoubleConsumer progress) {
+    /**
+     * What a file is sent as: its MIME, size and length if known, whether as a plain document, who hears the upload,
+     * and the name it goes under (null: the file's own; a converted copy's is the cache's, {@code converted-<hash>}).
+     */
+    private record Kind(String mime, int width, int height, long durationMs, boolean document, DoubleConsumer progress,
+                        @Nullable String name) {
+        Kind(String mime, int width, int height, long durationMs, boolean document, DoubleConsumer progress) {
+            this(mime, width, height, durationMs, document, progress, null);
+        }
+
         MessageType type() {
             return document ? MessageType.FILE : MessageType.ofMime(mime);
         }
@@ -475,7 +526,8 @@ final class MessageSender {
         String mime = kind.mime();
         long durationMs = kind.durationMs();
         String txn = core.newTxnId();
-        String name = PathParts.name(file);
+        String given = kind.name();
+        String name = given != null ? given : PathParts.name(file);
         MessageType type = kind.type();
         long size;
         try {
