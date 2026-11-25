@@ -496,7 +496,8 @@ public final class Composer extends VBox {
         String text = input.getText().strip();
         if (text.isEmpty() || chatId == null) return;
         if (editing != null) {
-            if (!text.equals(editing.body())) svc.editMessage(chatId, editing.id(), text).exceptionally(this::fail);
+            // Always: the same text confirmed makes the bridge rewrite it on the network as written.
+            svc.editMessage(chatId, editing.id(), text).exceptionally(this::fail);
         } else {
             // Told before it goes: the server may confirm it before the next line runs.
             String replyId = replyTo == null ? null : replyTo.id();
