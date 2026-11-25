@@ -31,7 +31,7 @@ Off by default, only the person runs them: `-Dunichat.networkTests=true` (real d
 - Its virtual screen is a fixed 1000×1000 and a window drawn outside it (moved off-screen, or taller than the rest) throws on every frame, on the UI thread, into whatever test comes next: keep test windows on it, hidden with opacity 0, and close them when done.
 - CI runs them on Linux (`build.yml`, ui-headless): a test mustn't assume the Mac. The shortcut key is Ctrl there (press Ctrl and ⌘ together), the fonts are taller (leave room before a size cap), and there's no sound card (PulseAudio's null sink).
 - How the message list scrolls is checked frame by frame: `ui/TimelineWindow` (the window with `service/ScriptedChatService`, a demo where the test plays the others: messages arriving, typing, history to load) and its `watch(probe)`, which fails with every frame drawn wrong. Add a case there for any scroll complaint.
-- `KeyboardUiTest` checks F6 zones, timeline keys, zoom and screen-reader texts; `FilterUiTest` that the rail keeps the chosen chip when switching network.
+- `KeyboardUiTest` checks F6 zones, timeline keys, zoom and screen-reader texts; `FilterUiTest` that the rail keeps the chosen quick filter when switching network; `chats/FilterBarUiTest` the filter bar itself.
 
 ## Lessons
 - A line taken out because its test still passed without it (run alone) was needed: `SendQueueView`'s `setMaxHeight(USE_PREF_SIZE)` kept the queue's list from being stretched, which only happened with other windows in the run, and the full run failed. Breaking a line to see its test fail proves the test; a test that passes without the line proves nothing about the line until the full run says so.
