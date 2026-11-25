@@ -15,6 +15,12 @@ What each bridge can do was researched at the exact versions Unichat runs (`olde
 - **Restarts are rare and say what they do.** A bridge restart reconnects the network, and Discord's resubscribes to every server.
 - **No notifications** from old chats arriving.
 
+Answers of the person to the design's questions (2026-11-24):
+- **Loaded chats arrive read.** Older chats that come with messages from the last 30 days come in read, not unread: loading them never raises the unread badge.
+- **Instagram:** a new login brings only the first inbox page (page count 0 by default, as on this Mac). The rest comes only through the button, after the warning.
+- **Google Messages:** a single request for 500 chats is fine.
+- **The button:** a plain row under the list is fine.
+
 ## Goals
 - **One button at the end of the inbox list**, shown while some network in view has more to load. Reachable by keyboard, with an accessible text, fine at 160 % text and in high contrast.
 - **A warning sheet before every load**, in the window's overlay like `DeleteSheet` and `ForwardSheet`. It lists each network that will run, how many chats it asks for, whether its bridge restarts, and the risks.
@@ -22,6 +28,7 @@ What each bridge can do was researched at the exact versions Unichat runs (`olde
   - "loaded n" (n new rooms of that network appeared);
   - "nothing more" (the step added none, or the network has nothing to fetch);
   - "not possible", with a reason the person can read (no account, the bridge didn't come back, the patched WhatsApp isn't installed yet, Discord's pause between steps).
+- **Loaded chats arrive read.** Each room a step brings is marked read (`ChatPreferences.markRead`) as soon as it is counted, so the unread badge (rail, inbox, Dock and tray) stays as it was. Only a room whose newest message is newer than the step's start is left as the sync says: that message is news, not history.
 - **Progress in a `TaskBar` on top:** the network, the stage (restarting its bridge, asking for chats, chats arriving: N new), N of M networks, then the result for a few seconds.
 - **The Telegram bug fixed.** Unichat raises `create_limit` but not `update_limit`, which stays at the bridge's default of 100 and caps the walk, so asking for more than 100 does nothing. Both go together from now on.
 - **WhatsApp's stored history chats become reachable** through a small Unichat patch to the bridge (`sync-history-chats <n>`), shipped the way Discord's patch already is (`native/patches/`, `NATIVES_ALL`, natives build, pinned hashes).
@@ -38,7 +45,7 @@ What each bridge can do was researched at the exact versions Unichat runs (`olde
 ## Anti-goals
 - **An account flagged without warning.** Instagram's inbox walk is what Meta flags (checkpoints, "suspicious activity", forced logout). It never runs unless the person ticked it in the sheet on that click. The sheet's Instagram warning is visible text, not a tooltip. No other step walks Meta's inboxes.
 - **A chat lost.** Nothing here deletes or hides a room, and no limit ever goes down in a way that removes rooms (bridges never delete rooms when a limit drops). No step touches a bridge's database.
-- **A notification storm.** Chats arriving with 50 old messages each must not notify. `NotifyGate` already makes this true: a message notifies only if it is under 5 minutes old *and* newer than anything seen in its chat, and backfilled history is older. A test locks it for this case (see Tests). Bot replies ("Successfully synced…") come in bridge-bot rooms, which never notify.
+- **A notification storm.** Chats arriving with 50 old messages each must not notify. `NotifyGate` already makes this true: a message notifies only if it is under 5 minutes old *and* newer than anything seen in its chat, and backfilled history is older. A test locks it for this case (see Tests). Bot replies ("Successfully synced…") come in bridge-bot rooms, which never notify. The badge is part of the storm too: bridgev2 marks backfilled messages read only when older than `backfill.unread_hours_threshold` (720 h by default), so chats from the last 30 days would arrive unread. Unichat marks every loaded room read itself.
 - **A bridge left broken.** A restart with a new limit that doesn't come back puts the old limit back and restarts once more, and says so. A limit key missing from the bridge's config refuses the step *before* stopping anything. Steps never overlap: one runs at a time, and a second click while one runs does nothing.
 - **Restarts that happen by themselves.** Only a click on "Load" in the sheet restarts a bridge for this feature. Discord's step waits 10 minutes after its last one: a reconnect resubscribes every server, which is what caused the 4008 loop the pace patch fixes.
 
@@ -72,7 +79,7 @@ Rejected: one generic "sync chats" call for every bridge (bridgev2 has none; eac
 
 Kept for all: `backfill.max_initial_messages` 50 (bridgev2) and Discord's `forward_limits.initial.dm` 50.
 
-Instagram's `batch_count` is written as 0 by default from now on, as it is on this Mac today. The template's -1 would walk the whole inbox at every new login, which is the anti-goal above. It goes to 3 only for a step the person ticked.
+Instagram's `batch_count` is written as 0 by default from now on, as it is on this Mac today (the person's choice): a new login brings only the first inbox page. The template's -1 would walk the whole inbox at every new login, which is the anti-goal above. It goes to 3 only for a step the person ticked in the warning sheet.
 
 "Nothing more" is kept per network (`olderChats.<net>.done`) and cleared when that network's login changes (a new account has its own older chats).
 
@@ -114,7 +121,7 @@ public interface OlderChats {
 `MatrixChatService` implements it with `OlderChatLoader`. The answers come back on the service's own executor; listeners are told on any thread, and the UI marshals them (`FxCoalescer`).
 
 ## UI
-- **The button**, "Load older chats" / "Cargar chats anteriores", sits right under the chat list in `ChatListPane`, above the footers (update bar, account alerts), full width in the list's style. It shows only in the inbox view (all chats or one network, with any quick filter), never while searching, in a folder, in a server's channels, in Favorites view or in Archivados; and only while `hasMore(networks in view)`. While a run is under way it is disabled and says "Loading older chats…". Its accessible text says which networks it will ask.
+- **The button**, "Load older chats" / "Cargar chats anteriores", is a plain row (the person's choice) right under the chat list in `ChatListPane`, above the footers (update bar, account alerts), full width in the list's style. It shows only in the inbox view (all chats or one network, with any quick filter), never while searching, in a folder, in a server's channels, in Favorites view or in Archivados; and only while `hasMore(networks in view)`. While a run is under way it is disabled and says "Loading older chats…". Its accessible text says which networks it will ask.
 - **The sheet**, `OlderChatsSheet` in `ui/chats`, opens in the window's overlay on every click:
   - the title, "Load older chats?";
   - one row per `Plan`: the network's icon and name, then what it does ("up to 100 more chats", "every group", "all of them", "50 more private chats"), and "its bridge restarts: <network> disconnects for a moment" where it does. Discord's row adds "it reconnects to every server". A Discord step still in its pause says "available in N min" and doesn't run;
@@ -147,6 +154,7 @@ Everything headless, with fakes for the bridges: a fake bot chat that records co
 - **Restart:** only that bridge restarts; it waits for its answer; a missing key refuses before stopping; a bridge that doesn't answer is reported; a reconfigure isn't counted as flapping by the watchdog.
 - **Steps:** each network's plan and step as in the table; "nothing more" after a step that adds none, kept, and cleared by a new login; Discord's 10-minute pause; one network at a time in order; a failure doesn't stop the next; the rollback; a second click ignored; nothing runs without a call to `load` (start, login refresh and sync run no command and no restart).
 - **WhatsApp patch:** it applies to v0.2610.0 (`git apply --check`), builds, and the natives build lists it; without it, the step answers "not possible".
+- **Read:** a chat that arrives through a load is marked read, and the unread badge is unchanged; a loaded chat whose newest message is newer than the step's start is left unread.
 - **Notifications:** a room arriving with 50 backfilled messages from hours to years ago fires no `incomingMessage`; one message in it under 5 minutes old does (it's news).
 - **UI:** the sheet (Cancel focused and does nothing; Escape; each row's text; Discord's reconnect line; Instagram off by default, its warning visible, runs only when ticked; Load disabled when nothing would run; keyboard and accessible texts; 160 % and high contrast); the button (where it shows and hides, keyboard, disabled while running); the bar (stages, N of M, result, hiding, accessible text, a wide font).
 
@@ -154,5 +162,4 @@ Everything headless, with fakes for the bridges: a fake bot chat that records co
 - The exact signature of `createPortalsFromHistorySync` in mautrix-whatsapp v0.2610.0, how the patched command reports its count, and whether it must also set `history_sync_portals_need_creating`.
 - Whether mautrix-meta v0.2607.0 already marked Instagram's thread backfill done while `batch_count` was 0. If it did, the Instagram step can't work without a database write: it answers "not possible" and the sheet doesn't offer it.
 - How `RoomArrivals` hears new rooms (the sync's `chatsChanged` and `proc.rooms()`, or the invites joined).
-- Whether bridgev2's `backfill.unread_hours_threshold` (720 h by default) marks the loaded chats read; Discord's legacy bridge's equivalent. Chats loaded with unread messages from the last 30 days would raise the unread badge, though they don't notify.
-- The button's exact look under the list.
+- The button row's exact style, within the list's own look.

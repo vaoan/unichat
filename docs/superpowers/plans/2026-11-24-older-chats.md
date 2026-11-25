@@ -22,6 +22,8 @@
   - Facebook and X: nothing more.
   - `max_initial_messages` stays 50.
 - **Instagram is off unless ticked** in the sheet on that click. No other way runs it.
+- **Loaded chats arrive read** (the person, 2026-11-24). Each room a step counts is marked read, so the unread badge is unchanged; only a room whose newest message is newer than the step's start is left as the sync says.
+- **Instagram's page count is 0 by default** (the person): a new login brings only the first page.
 - **One bridge at a time.** At most one run of `load`, and inside it one network at a time. A restart touches only that network's bridge.
 - **A bridge is never left broken.** A missing key refuses before stopping. A bridge that doesn't come back gets its old setting back and one more restart.
 - **No bridge database is written.**
@@ -51,6 +53,7 @@
 6. **Discord restarts stay rare.** Task 5 `aSecondDiscordStepWithinTenMinutesDoesntRestart`.
 7. **One-shot limits go back.** Google Messages and Instagram: Task 2 `oneShotLimitsApplyOnlyWhileSet`; Task 5 `oneShotSettingsAreClearedWhenTheirStepEnds`.
 8. **Cancel does nothing.** Task 8 `cancelIsFocusedAndRunsNothing`.
+9. **Loaded chats arrive read, the badge unchanged.** Task 5 `aChatArrivingThroughALoadIsMarkedRead`; Task 6 `aLoadLeavesTheUnreadBadgeAsItWas`.
 
 ---
 
@@ -206,13 +209,16 @@ final class RoomArrivals {
 
 final class OlderChatLoader {
     interface Bot { String query(Network n, String command, Duration patience) throws Exception; }
+    /** markRead: ChatPreferences.markRead in production; newest: a room's newest message time (null when none). */
     OlderChatLoader(OlderChatSteps steps, Bot bot, BridgeProvisioner provisioner, RoomArrivals arrivals,
-                    SettingsWriter settings, Executor io);
+                    SettingsWriter settings, Consumer<String> markRead, Function<String, @Nullable Instant> newest,
+                    Executor io);
     CompletableFuture<Map<Network, OlderChats.Answer>> load(List<Network> networks, Set<Network> included);
     @Nullable OlderChats.Loading loading();
     void addListener(Runnable l); void removeListener(Runnable l);
 }
 ```
+Each room `RoomArrivals` counts is passed to `markRead` once, unless its newest message is newer than the step's start (news, left as the sync says). A room that gets its history after it was counted is marked again when its history arrives, so the badge never rises (`RoomArrivals` reports rooms whose newest message changed while the step runs).
 `included` carries the sheet's choice: Instagram runs only if it's in `included`. Quiet 45 s, max 15 min. Constants in `OlderChatLoader`.
 
 The fakes, in the test folder:
@@ -236,6 +242,8 @@ The tests:
 - `aSecondDiscordStepWithinTenMinutesDoesntRestart`: a second `load([DISCORD])` 5 minutes later → `NotPossible` (the wait), and no second `reconfigure`.
 - `instagramRunsOnlyWhenIncluded`: `load([INSTAGRAM, TELEGRAM], included={TELEGRAM})` → no Instagram reconfigure, and Instagram's answer is absent. With `included` holding Instagram, it runs.
 - `oneShotSettingsAreClearedWhenTheirStepEnds`: after Google Messages' and Instagram's steps (any answer, the error ones included), `olderChats.<net>.once` is removed, and `.done` is set on success.
+- `aChatArrivingThroughALoadIsMarkedRead`: 3 rooms arrive during Telegram's step, with messages from 2 days to 2 years old → `markRead` called for each of the 3 (and their history arriving later marks them again), never for a room that was already there nor another network's.
+- `aLoadedChatWithANewMessageIsLeftUnread`: a room whose newest message is after the step's start → no `markRead` for it.
 - `noNewRoomsMeansNothingMore`: 0 rooms, then quiet → `NothingMore`, `olderChats.telegram.done=true`, `hasMore({TELEGRAM})` false.
 - `networksRunOneAtATime`: with Telegram's `reconfigure` held on a latch, no Discord call is recorded. Released, Discord runs after Telegram's answer.
 - `aSecondClickWhileRunningIsIgnored`: a second `load` while one runs returns the same future and records nothing new.
@@ -267,12 +275,13 @@ The tests:
 - `NotifyGateTest.aChatLoadedWithItsHistoryDoesntNotify`: a chat never seen, and 50 messages timed from 6 minutes to 4 years ago → `isNew` is false for every one.
 - `NotifyGateTest.aRecentMessageInANewlyLoadedChatStillNotifies`: the same chat, plus one message 1 minute old → true once.
 - `OlderChatsNotifyTest.aRoomJoinedWithBackfillFiresNoIncomingMessage`: a live sync (`notify=true`) brings an invite. It's joined, and the next sync brings the room with 50 messages hours to years old → no `incomingMessage` reaches a listener. `chatsChanged` fires.
+- `OlderChatsNotifyTest.aLoadLeavesTheUnreadBadgeAsItWas`: over the fake homeserver, total unread across chats (what `ChatFilter.inboxUnread` sums) is N before a load. A room arrives with 50 messages from the last 30 days, unread by the server's count; the loader's `markRead` reaches the server (a read receipt for its last event), the next sync says 0 unread for it, and the total is N again.
 - `OlderChatsNotifyTest.theBridgeBotsReplyDoesntNotify`: "Successfully synced 100 chats" in the bot room → no `incomingMessage`.
 
 The steps:
 - [ ] Write the tests. They should pass at once, since the spec says the gate already covers this. If one fails, follow superpowers:systematic-debugging: fix it, add its regression test and a Lessons line.
-- [ ] Record the unread-badge question in `matrix/CLAUDE.md`: bridgev2's `backfill.unread_hours_threshold` is 720 h by default, so loaded chats with messages from the last 30 days may arrive unread. Read the local `config.yaml` of whatsapp and telegram, read-only, and write down the value found.
-- [ ] Commit: `test(matrix): chats loaded with their history don't notify`.
+- [ ] Add a line to `matrix/CLAUDE.md`: bridgev2 marks backfilled messages read only past `backfill.unread_hours_threshold` (720 h by default), so `OlderChatLoader` marks every loaded room read itself (the person, 2026-11-24).
+- [ ] Commit: `test(matrix): chats loaded with their history don't notify, and arrive read`.
 
 ### Task 7: WhatsApp's `sync-history-chats <n>` patch
 **Files:**
@@ -353,6 +362,7 @@ The tests:
   - `aClickEnterOrSpaceOpensTheSheet`: each one calls the sheet once with those networks.
   - `disabledAndSaysLoadingWhileARunIsUnderWay`: `loading()` is not null → disabled, with the `olderChats.button.loading` text. When it's done → enabled again, or hidden if nothing more.
   - `itsAccessibleTextNamesTheNetworks`.
+  - `aLoadLeavesTheInboxBadgeAsItWas`: over the demo with `-Dunichat.demoOlderChats` (its canned run adds chats already read), the rail's inbox badge reads the same before and after a load.
   - `notThereWithoutOlderChats`: a service that isn't `OlderChats` → no button.
 - `OlderChatsBarUiTest`:
   - `showsTheNetworkTheStageAndNOfM`: each `Stage` gives its text, with "2 of 3".
