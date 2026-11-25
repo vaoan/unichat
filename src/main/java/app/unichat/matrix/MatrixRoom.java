@@ -60,6 +60,10 @@ final class MatrixRoom {
     @Nullable Instant invitedAt;
     @Nullable String inviter;
     @Nullable String prevBatch;
+
+    /** History goes on while the server gave a point to read back from ({@code prev_batch}, then each page's {@code end}). */
+    boolean hasOlder() { return prevBatch != null; }
+
     /** Names in the last m.tag; null until one is heard. Only input for the preferences file (see {@link RoomPreferences}). */
     java.util.@Nullable Set<String> serverTags;
     /** Last reminder account data; {@link #reminderKnown} once heard, null when it's empty. */

@@ -87,6 +87,9 @@ public final class ThreadPane extends BorderPane {
     /** What waits for the older messages being loaded (going to a pinned message). */
     private final List<Runnable> afterOlder = new java.util.ArrayList<>();
     private final PinnedBar pinnedBar = new PinnedBar(this::reveal);
+    private final OlderBar olderBar = new OlderBar(this::loadOlder);
+    /** Snapshot diagnostics: the bar as if the chat had history, working when true (the demo's chats are whole). */
+    private @Nullable Boolean shownOlder;
     private int drawnWith;
     /** Newest message shown, to notice your own new message (always jumps to it). */
 
@@ -179,7 +182,7 @@ public final class ThreadPane extends BorderPane {
         typing.getStyleClass().add("typing-line");
         VBox bottom = new VBox(typing, composer);
 
-        content.setTop(new VBox(header, selection.ends(), pinnedBar.node()));
+        content.setTop(new VBox(header, selection.ends(), pinnedBar.node(), olderBar.node()));
         content.setCenter(timeline);
         content.setBottom(bottom);
 
@@ -499,6 +502,7 @@ public final class ThreadPane extends BorderPane {
         loadingOlder = false;
         afterOlder.clear(); // a pinned message another chat was looking for
         pinnedBar.show(c == null ? null : c.id());
+        showOlderBar();
         scroll.pin();
         setCenter(c == null ? emptyState : content);
         composer.setChat(c == null ? null : c.id());
@@ -561,7 +565,37 @@ public final class ThreadPane extends BorderPane {
         drawnWith = surroundings;
         if (selected != null && !forceBottom) select(selected);
         if (wasAtBottom && !(list.isFocused() && selected != null)) scroll.scrollToBottom();
+        showOlderBar(); // a sync can tell there's history before any load did
     }
+
+    /** "Cargar mensajes anteriores" while the chat has older history, working while it loads. */
+    private void showOlderBar() {
+        Chat c = chat;
+        boolean was = olderBar.shown();
+        Boolean shown = shownOlder;
+        if (shown != null) olderBar.show(true, shown);
+        else olderBar.show(c != null && !reachedStart && svc.hasOlder(c.id()), loadingOlder);
+        // Gone under the keyboard's focus (the chat's start): the focus goes on to the oldest message, not nowhere.
+        // The scene's focus owner, not isFocused(): that one needs the window to have the system's focus.
+        if (was && !olderBar.shown() && getScene() != null && getScene().getFocusOwner() == olderBar.button()) {
+            for (int i = 0; i < rows.size(); i++) {
+                if (rows.get(i) instanceof ThreadRows.MessageRow) {
+                    list.getSelectionModel().select(i);
+                    break;
+                }
+            }
+            list.requestFocus();
+        }
+    }
+
+    /** Snapshot diagnostics: the bar loading older messages shown, working when {@code loading}. */
+    public void showOlder(boolean loading) {
+        shownOlder = loading;
+        showOlderBar();
+    }
+
+    /** The bar loading older messages, for tests. */
+    OlderBar olderBar() { return olderBar; }
 
     /** The same messages after a change of appearance (text size, settings): they all look different. */
     public void redraw() {
@@ -579,17 +613,26 @@ public final class ThreadPane extends BorderPane {
         afterOlder.add(then);
         if (loadingOlder) return;
         loadingOlder = true;
+        showOlderBar();
         String id = chat.id();
         // Loaded because the chat is short (not because you scrolled to the top): keep showing the newest.
         boolean followBottom = scroll.pinned();
         var _ = svc.loadOlder(id).whenComplete((more, err) -> Platform.runLater(() -> {
             loadingOlder = false;
             if (chat == null || !chat.id().equals(id)) return;
-            if (err != null || Boolean.FALSE.equals(more)) reachedStart = true;
+            if (err != null) {
+                // Said, and the button is there to try again; what waited (a pinned message) gives up with it.
+                afterOlder.clear();
+                showOlderBar();
+                toast.accept(I18n.t("thread.olderFailed", app.unichat.support.Errors.message(err)));
+                return;
+            }
+            if (Boolean.FALSE.equals(more)) reachedStart = true;
             List<Message> all = svc.messages(id);
             messageRows.index(all);
             rows.setAll(ThreadRows.build(all, ZoneId.systemDefault()));
             scroll.afterOlder(followBottom);
+            showOlderBar();
             List<Runnable> waiting = List.copyOf(afterOlder);
             afterOlder.clear();
             waiting.forEach(Runnable::run);

@@ -1007,6 +1007,17 @@
 .pinned-count { -fx-text-fill: -text-2; -fx-font-size: 0.85em; }
 .pinned-preview { -fx-text-fill: -text; -fx-font-size: 0.95em; }
 
+/* "Cargar mensajes anteriores": a thin bar above the message list while the chat has older history (ui/timeline/OlderBar). */
+.older-bar { -fx-padding: 0.25em 1em; }
+.older-load { -fx-background-color: -surface-2; -fx-text-fill: -text; -fx-font-size: 0.9em; -fx-padding: 0.35em 1em;
+    -fx-background-radius: 999; -fx-graphic-text-gap: 0.5em; }
+.older-load:hover, .older-load:focused { -fx-background-color: -selected; }
+.older-load.loading { -fx-text-fill: -text-2; }
+.older-wheel { -fx-pref-width: 1em; -fx-pref-height: 1em; -fx-max-width: 1em; -fx-max-height: 1em; }
+.root.contrast .older-load { -fx-border-color: -border; -fx-border-width: 1.5; -fx-border-radius: 999; -fx-background-color: -bg; }
+.root.contrast .older-load:focused { -fx-border-color: -accent; -fx-border-width: 2.5; }
+.root.contrast .older-load.loading { -fx-text-fill: -text; }
+
 /* Stickers of the one emoji typed, above the message box: one row that scrolls sideways. */
 .sticker-suggestions { -fx-background-color: transparent; -fx-background: transparent; -fx-padding: 0.25em 0.5em; }
 

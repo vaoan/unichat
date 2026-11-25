@@ -160,10 +160,21 @@ public class ScriptedChatService extends MockChatService {
         Integer count = olderToLoad.remove(chatId);
         if (count == null) return CompletableFuture.completedFuture(false);
         asked.add(chatId);
-        return history.thenApply(x -> {
+        return history.handle((x, failed) -> {
+            if (failed != null) { // still there to load, as a server's history is after a failed request
+                olderToLoad.putIfAbsent(chatId, count);
+                throw new java.util.concurrent.CompletionException(failed);
+            }
             prepend(chatId, count);
             return true;
         });
+    }
+
+    /** What's held back or scripted to load is the history still to come. */
+    @Override
+    public boolean hasOlder(String chatId) {
+        List<Message> held = heldBack.get(chatId);
+        return (held != null && !held.isEmpty()) || olderToLoad.containsKey(chatId);
     }
 
     private void prepend(String chatId, int count) {

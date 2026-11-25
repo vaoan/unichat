@@ -301,6 +301,12 @@ public class MockChatService implements ChatService, FolderForwarding {
         return CompletableFuture.completedFuture(false);
     }
 
+    /** The demo's chats are whole from the start. */
+    @Override
+    public boolean hasOlder(String chatId) {
+        return false;
+    }
+
     // ---------------------------------------------------------------- sending
 
     @Override

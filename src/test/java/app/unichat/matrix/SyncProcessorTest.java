@@ -218,6 +218,18 @@ class SyncProcessorTest {
         assertEquals(1, messages(room).size());
     }
 
+    /** "Cargar mensajes anteriores" shows while this says there's more: until a page comes without an end. */
+    @Test
+    void aRoomHasOlderHistoryUntilAPageComesWithoutAnEnd() {
+        String room = "!h:example.org";
+        sync(room, "{'timeline':{'prev_batch':'t0','events':[%s]}}".formatted(text("$2", "@bob:example.org", 2, "new")), false);
+        assertTrue(Present.of(proc.room(room)).hasOlder(), "the sync gave a point to read back from");
+        proc.processHistory(room, json("{'chunk':[%s],'end':'t1'}".formatted(text("$1", "@bob:example.org", 1, "old"))));
+        assertTrue(Present.of(proc.room(room)).hasOlder(), "a page with an end: more before it");
+        proc.processHistory(room, json("{'chunk':[]}"));
+        assertFalse(Present.of(proc.room(room)).hasOlder(), "the chat's start");
+    }
+
     @Test
     void reactionBeforeTargetIsAppliedWhenHistoryLoads() {
         String room = "!h:example.org";
