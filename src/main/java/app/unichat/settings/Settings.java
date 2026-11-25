@@ -73,6 +73,8 @@ public final class Settings {
                 || key.startsWith("cloud.")
                 // Whether this computer's Telegram bridge already re-synced its chats: a marker, not a choice.
                 || key.equals("telegram.chatSyncLimit")
+                // How many chats this computer's bridges were asked for ("Load older chats"): about its bridges.
+                || key.startsWith("olderChats.")
                 // Whether the favourites were rebuilt from their sets once: a marker, not a choice.
                 || key.equals("library.favoritesRebuilt")
                 || (key.startsWith("gif.") && key.endsWith(".key"));

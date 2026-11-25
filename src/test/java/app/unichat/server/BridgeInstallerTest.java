@@ -11,6 +11,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -103,6 +104,17 @@ class BridgeInstallerTest {
     void aLegacyBridgeThatWritesNoConfigIsAnError() {
         IOException e = assertThrows(IOException.class, () -> installer("broken-bridge").prepare("discord", "t", "u", null, m -> { }));
         assertEquals("discord no generó su configuración", e.getMessage());
+    }
+
+    @Test
+    void theChatLimitsSavedReachTheConfig() throws Exception {
+        Map<String, String> saved = Map.of("olderChats.discord.extra", "50");
+        String jvm = ProcessHandle.current().info().command().orElse("java");
+        new BridgeInstaller(dir, store, MANIFEST,
+                b -> List.of(jvm, "-cp", System.getProperty("java.class.path"), FakeService.class.getName(), "bridge"), saved::get)
+                .prepare("discord", "dp-token", "http://127.0.0.1:9/status/discord", null, m -> { });
+        var config = BridgeConfig.read(Files.readString(dir.resolve("discord/config.yaml")));
+        assertEquals(100, config.at("/bridge/startup_private_channel_create_limit").asInt());
     }
 
     @Test

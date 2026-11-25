@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.bridge.BridgePorts;
+import app.unichat.bridge.ChatLimits;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -9,6 +10,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -176,6 +178,103 @@ class BridgeConfigTest {
         assertEquals(BridgePorts.TELEGRAM_CREATE_LIMIT, c.at("/network/sync/update_limit").asInt());
     }
 
+    private static BridgeConfig.Settings settings(String bridge, ChatLimits limits) {
+        return new BridgeConfig.Settings(bridge, 29318, "localhost", "@yo:localhost", "http://127.0.0.1:8008",
+                Path.of("/data/" + bridge), "dp-token", "123", "hash", null, limits);
+    }
+
+    private static ChatLimits telegramExtra(int extra) { return new ChatLimits(extra, 0, false, false, false); }
+
+    private static ChatLimits discordExtra(int extra) { return new ChatLimits(0, extra, false, false, false); }
+
+    private static final ChatLimits LINKEDIN_ALL = new ChatLimits(0, 0, true, false, false);
+    private static final ChatLimits GMESSAGES_ONCE = new ChatLimits(0, 0, false, true, false);
+    private static final ChatLimits INSTAGRAM_ONCE = new ChatLimits(0, 0, false, false, true);
+
+    private static final String DISCORD = LEGACY.replace("bridge:\n", "bridge:\n    startup_private_channel_create_limit: 5\n");
+
+    private static final String LINKEDIN = V2.replace("    some_network_key: 1\n", """
+                some_network_key: 1
+                sync:
+                    update_limit: 0
+                    create_limit: 10
+            """);
+
+    private static String gmessages(int count) {
+        return V2.replace("    some_network_key: 1\n", "    some_network_key: 1\n    initial_chat_sync_count: " + count + "\n");
+    }
+
+    private static String instagram(int batches) {
+        return V2.replace("    some_network_key: 1\n", """
+                some_network_key: 1
+                thread_backfill:
+                    enabled: true
+                    batch_count: \
+            """ + batches + "\n");
+    }
+
+    @Test
+    void telegramsExtraRaisesBothLimits() throws Exception {
+        ObjectNode c = BridgeConfig.apply(BridgeConfig.read(TELEGRAM), settings("telegram", telegramExtra(200)));
+        assertEquals(300, c.at("/network/sync/create_limit").asInt());
+        assertEquals(300, c.at("/network/sync/update_limit").asInt());
+        assertEquals(100, c.at("/network/sync/login_sync_limit").asInt(), "a new login still brings its first 100 at once");
+    }
+
+    @Test
+    void discordsPrivateChannelLimitIsFiftyPlusWhatWasAsked() throws Exception {
+        assertEquals(50, BridgeConfig.apply(BridgeConfig.read(DISCORD), settings("discord", discordExtra(0)))
+                .at("/bridge/startup_private_channel_create_limit").asInt());
+        assertEquals(150, BridgeConfig.apply(BridgeConfig.read(DISCORD), settings("discord", discordExtra(100)))
+                .at("/bridge/startup_private_channel_create_limit").asInt());
+    }
+
+    @Test
+    void linkedInCreatesEveryChatOnceAskedFor() throws Exception {
+        assertEquals(0, BridgeConfig.apply(BridgeConfig.read(LINKEDIN), settings("linkedin", LINKEDIN_ALL))
+                .at("/network/sync/create_limit").asInt(), "0 is no limit");
+        assertEquals(10, BridgeConfig.apply(BridgeConfig.read(LINKEDIN), settings("linkedin", ChatLimits.NONE))
+                .at("/network/sync/create_limit").asInt());
+    }
+
+    /**
+     * Google Messages asks the phone for its chats at every start, and Instagram walks Meta's inbox: each only for the step
+     * that set it. Once cleared, the next rewrite puts the bridge's own value back over the one the step wrote.
+     */
+    @Test
+    void oneShotLimitsApplyOnlyWhileSet() throws Exception {
+        assertEquals(ChatLimits.GMESSAGES_ALL, BridgeConfig.apply(BridgeConfig.read(gmessages(25)), settings("gmessages", GMESSAGES_ONCE))
+                .at("/network/initial_chat_sync_count").asInt());
+        assertEquals(25, BridgeConfig.apply(BridgeConfig.read(gmessages(25)), settings("gmessages", ChatLimits.NONE))
+                .at("/network/initial_chat_sync_count").asInt(), "the template's value untouched");
+        assertEquals(25, BridgeConfig.apply(BridgeConfig.read(gmessages(ChatLimits.GMESSAGES_ALL)), settings("gmessages", ChatLimits.NONE))
+                .at("/network/initial_chat_sync_count").asInt(), "the step's 500 doesn't stay for every start after it");
+        assertEquals(ChatLimits.INSTAGRAM_PAGES, BridgeConfig.apply(BridgeConfig.read(instagram(0)), settings("instagram", INSTAGRAM_ONCE))
+                .at("/network/thread_backfill/batch_count").asInt());
+        assertEquals(0, BridgeConfig.apply(BridgeConfig.read(instagram(ChatLimits.INSTAGRAM_PAGES)), settings("instagram", ChatLimits.NONE))
+                .at("/network/thread_backfill/batch_count").asInt());
+    }
+
+    /** The template's -1 walks the whole inbox at every new login: what Meta flags. A new login brings its first page only. */
+    @Test
+    void instagramWalksNoInboxPagesByDefault() throws Exception {
+        assertEquals(0, BridgeConfig.apply(BridgeConfig.read(instagram(-1)), settings("instagram"))
+                .at("/network/thread_backfill/batch_count").asInt());
+    }
+
+    @Test
+    void aMissingLimitKeyIsReported() throws Exception {
+        assertEquals(List.of("/bridge/startup_private_channel_create_limit"), BridgeConfig.missingLimitKeys(BridgeConfig.read(LEGACY), "discord"));
+        assertEquals(List.of(), BridgeConfig.missingLimitKeys(BridgeConfig.read(DISCORD), "discord"));
+        assertEquals(List.of("/network/sync/create_limit", "/network/sync/update_limit", "/network/sync/login_sync_limit"),
+                BridgeConfig.missingLimitKeys(BridgeConfig.read(V2), "telegram"));
+        assertEquals(List.of(), BridgeConfig.missingLimitKeys(BridgeConfig.read(TELEGRAM), "telegram"));
+        assertEquals(List.of(), BridgeConfig.missingLimitKeys(BridgeConfig.read(LINKEDIN), "linkedin"));
+        assertEquals(List.of("/network/initial_chat_sync_count"), BridgeConfig.missingLimitKeys(BridgeConfig.read(V2), "gmessages"));
+        assertEquals(List.of(), BridgeConfig.missingLimitKeys(BridgeConfig.read(instagram(0)), "instagram"));
+        assertEquals(List.of(), BridgeConfig.missingLimitKeys(BridgeConfig.read(V2), "twitter"), "a bridge with no limit needs none");
+    }
+
     @Test
     void discordCreatesMoreDms() throws Exception {
         String legacy = LEGACY.replace("bridge:\n", "bridge:\n    startup_private_channel_create_limit: 5\n");
@@ -223,12 +322,12 @@ class BridgeConfigTest {
     @SuppressFBWarnings(value = "DMI_HARDCODED_ABSOLUTE_FILENAME", justification = "a fixed path the test passes in as input; nothing is read or written there")
     void bridgesReportTheirStateToUnichat() throws Exception {
         BridgeConfig.Settings with = new BridgeConfig.Settings("whatsapp", 29318, "localhost", "@yo:localhost",
-                "http://127.0.0.1:8008", Path.of("/data/whatsapp"), "dp", null, null, "http://127.0.0.1:5000/status/whatsapp");
+                "http://127.0.0.1:8008", Path.of("/data/whatsapp"), "dp", null, null, "http://127.0.0.1:5000/status/whatsapp", ChatLimits.NONE);
         ObjectNode c = BridgeConfig.apply(BridgeConfig.read(V2), with);
         assertEquals("http://127.0.0.1:5000/status/whatsapp", c.at("/homeserver/status_endpoint").asText());
         ObjectNode legacy = BridgeConfig.apply(BridgeConfig.read(LEGACY), new BridgeConfig.Settings("discord", 29334,
                 "localhost", "@yo:localhost", "http://127.0.0.1:8008", Path.of("/data/discord"), "dp", null, null,
-                "http://127.0.0.1:5000/status/discord"));
+                "http://127.0.0.1:5000/status/discord", ChatLimits.NONE));
         assertEquals("http://127.0.0.1:5000/status/discord", legacy.at("/homeserver/status_endpoint").asText());
         assertTrue(BridgeConfig.apply(BridgeConfig.read(V2), settings("signal")).at("/homeserver/status_endpoint").isNull());
     }
