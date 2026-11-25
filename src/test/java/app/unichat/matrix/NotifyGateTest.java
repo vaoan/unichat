@@ -43,4 +43,25 @@ class NotifyGateTest {
         assertTrue(gate.isNew(msg("$f", "!r", now.minusSeconds(5)), now));
         assertFalse(gate.isNew(msg("$g", "!r", now.minusSeconds(60)), now));
     }
+
+    /** A chat the gate never saw, as a load brings it: 50 messages from 6 minutes to 4 years old. */
+    private void loadedWithItsHistory(String chat) {
+        for (int i = 0; i < 50; i++) {
+            Duration age = Duration.ofMinutes(6).plus(Duration.ofDays(4L * 365 * i / 49));
+            assertFalse(gate.isNew(msg("$h" + i, chat, now.minus(age)), now), "history " + age + " old");
+        }
+    }
+
+    @Test
+    void aChatLoadedWithItsHistoryDoesntNotify() {
+        loadedWithItsHistory("!loaded");
+    }
+
+    @Test
+    void aRecentMessageInANewlyLoadedChatStillNotifies() {
+        loadedWithItsHistory("!loaded");
+        Message news = msg("$news", "!loaded", now.minus(Duration.ofMinutes(1)));
+        assertTrue(gate.isNew(news, now), "a minute old: news");
+        assertFalse(gate.isNew(news, now), "once");
+    }
 }
