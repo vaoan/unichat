@@ -79,6 +79,27 @@ class OlderMessagesButtonUiTest {
         assertFalse(everShown[0], "the bar never showed, not even for a moment");
     }
 
+    /**
+     * A short chat with nothing before it: its scrollbar reaching the top asks for nothing. It did, now and then, in
+     * full runs (a layout moved the bar to its top), and the history was asked for a chat that has none.
+     */
+    @Test
+    void reachingTheTopOfAChatWithNothingBeforeItAsksNothing() throws Exception {
+        w = TimelineWindow.open(3, "mensaje %d");
+        FxWait.settled();
+        int before = w.svc.historyRequests(CHAT);
+        FxWait.onFx(() -> {
+            for (Node n : w.flow().lookupAll(".scroll-bar")) {
+                if (n instanceof javafx.scene.control.ScrollBar sb && sb.getOrientation() == javafx.geometry.Orientation.VERTICAL) {
+                    sb.setValue(sb.getMax());
+                    sb.setValue(sb.getMin());
+                }
+            }
+        });
+        FxWait.settled();
+        assertEquals(before, w.svc.historyRequests(CHAT), "nothing before it: nothing asked");
+    }
+
     /** A failed load is said once; nothing asks again until the person presses the button. */
     @Test
     void aFailedLoadIsNotTriedAgainUnasked() throws Exception {

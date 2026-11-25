@@ -603,7 +603,10 @@ public final class ThreadPane extends BorderPane {
         list.refresh();
     }
 
+    /** Reaching the top or the button: only while the chat has older history (a short one's scrollbar sits at the top). */
     private void loadOlder() {
+        Chat c = chat;
+        if (c == null || !svc.hasOlder(c.id())) return;
         loadOlder(() -> { });
     }
 
