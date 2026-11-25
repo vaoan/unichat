@@ -349,7 +349,7 @@ class BuildRulesTest {
             m.put("app.unichat.ui.settings", "0.00");
             m.put("app.unichat.ui.timeline", "0.10");
             m.put("app.unichat.update", "0.60");
-            m.put("app.unichat.video", "0.80");
+            m.put("app.unichat.video", "0.70");
             m.put("app.unichat.voice", "0.80");
         } else {
             m.put("app.unichat.assist", "0.90");
@@ -365,7 +365,7 @@ class BuildRulesTest {
             m.put("app.unichat.ui.settings", "0.75");
             m.put("app.unichat.ui.timeline", "0.85");
             m.put("app.unichat.update", "0.70");
-            m.put("app.unichat.video", "0.85");
+            m.put("app.unichat.video", "0.75");
         }
         return m;
     }

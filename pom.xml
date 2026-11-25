@@ -47,7 +47,8 @@
     <jacoco.floor.app.unichat.ui.settings>0.00</jacoco.floor.app.unichat.ui.settings>
     <jacoco.floor.app.unichat.ui.timeline>0.10</jacoco.floor.app.unichat.ui.timeline>
     <jacoco.floor.app.unichat.update>0.60</jacoco.floor.app.unichat.update>
-    <jacoco.floor.app.unichat.video>0.80</jacoco.floor.app.unichat.video>
+    <!-- video at 0.70, not its Mac 0.80: on Linux Ubuntu's ffmpeg lacks encoders some tests need and there's no lottieconverter, 0.74 there (CI). -->
+    <jacoco.floor.app.unichat.video>0.70</jacoco.floor.app.unichat.video>
     <jacoco.floor.app.unichat.voice>0.80</jacoco.floor.app.unichat.voice>
   </properties>
 
@@ -630,7 +631,8 @@
         <jacoco.floor.app.unichat.ui.settings>0.75</jacoco.floor.app.unichat.ui.settings>
         <jacoco.floor.app.unichat.ui.timeline>0.85</jacoco.floor.app.unichat.ui.timeline>
         <jacoco.floor.app.unichat.update>0.70</jacoco.floor.app.unichat.update>
-        <jacoco.floor.app.unichat.video>0.85</jacoco.floor.app.unichat.video>
+        <!-- video at 0.75, not its Mac 0.85: the same tests skip on Linux as in the plain build. -->
+        <jacoco.floor.app.unichat.video>0.75</jacoco.floor.app.unichat.video>
       </properties>
     </profile>
   </profiles>
