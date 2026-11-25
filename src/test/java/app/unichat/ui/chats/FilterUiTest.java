@@ -23,7 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Regression test for "Favoritos / Prioridad baja are lost when switching network": clicks the real chips and rail
+ * Regression test for "Favoritos / Prioridad baja are lost when switching network": clicks the real filter bar and rail
  * buttons. Needs a display: {@code ./mvnw test -Dtest=FilterUiTest -Dunichat.uiTests=true}. The window is invisible
  * and off-screen.
  */
@@ -76,9 +76,11 @@ class FilterUiTest {
         assertTrue(fx(() -> chip(scene, "Todos").isSelected()), "chip follows the filter");
     }
 
-    private static ToggleButton chip(Scene scene, String text) {
-        return (ToggleButton) scene.getRoot().lookupAll(".chip").stream()
-                .filter(n -> n instanceof ToggleButton t && t.getText().equals(text)).findFirst().orElseThrow();
+    /** A part of the quick filter bar by its name: "Todos" is its text, the icons say theirs to screen readers. */
+    private static ToggleButton chip(Scene scene, String name) {
+        return (ToggleButton) scene.getRoot().lookupAll(".filter-part").stream()
+                .filter(n -> n instanceof ToggleButton t && (name.equals(t.getText()) || name.equals(t.getAccessibleText())))
+                .findFirst().orElseThrow(() -> new AssertionError("no filter " + name));
     }
 
     /** Rail button whose screen-reader text starts with {@code name} ("WhatsApp (2 cuentas)", "Archivados"…). */

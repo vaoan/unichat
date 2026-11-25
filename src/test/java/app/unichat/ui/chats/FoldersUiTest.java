@@ -115,7 +115,7 @@ class FoldersUiTest {
         assertTrue(fx(pane::foldersOpen));
         assertEquals("Carpetas", fx(() -> title().getText()));
         assertFalse(fx(() -> showing(inboxList())), "the names cover the inbox");
-        assertFalse(fx(() -> showing(chipRow())), "no filter chips in folders");
+        assertFalse(fx(() -> showing(filterBar())), "no quick filters in folders");
         List<String> names = texts(".folder-list");
         assertTrue(names.stream().anyMatch(t -> t.startsWith("Trabajo")), names.toString());
         assertTrue(names.stream().anyMatch(t -> t.startsWith("Casa")), names.toString());
@@ -683,8 +683,8 @@ class FoldersUiTest {
         return (Label) scene.getRoot().lookup(".folder-title");
     }
 
-    private Node chipRow() {
-        return scene.getRoot().lookup(".chip-row");
+    private Node filterBar() {
+        return scene.getRoot().lookup(".filter-bar");
     }
 
     private ThreadPane thread() {
