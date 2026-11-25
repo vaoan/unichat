@@ -375,7 +375,8 @@ class CaptureUiTest {
 
     @Test
     void anEndStillGoingOutCantBePicked() throws Exception {
-        svc.sendText(CHAT, "va saliendo", null).get();
+        // A message of the chat marked as still going out, not one sent here: the demo moves a sent one on to SENT
+        // 300 ms later, and in a loaded run the press came after that (the range took 3).
         Message going = chat().getLast();
         going.setStatus(app.unichat.model.MessageStatus.SENDING);
         start(chat().get(chat().size() - 3));
