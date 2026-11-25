@@ -40,4 +40,12 @@ class ImageHeadersTest {
         assertTrue(ImageHeaders.isMp4(iso("isom")));
         assertFalse(ImageHeaders.isMp4(iso("heic")));
     }
+
+    /** A phone's 3GP and an MPEG-7 brand are MP4s too: taken for something else they'd be converted for nothing. */
+    @Test
+    void threeGpAndMp71BrandsAreMp4s() throws Exception {
+        for (String brand : java.util.List.of("3gp4", "3gp5", "mp71")) {
+            assertTrue(ImageHeaders.isMp4(iso(brand)), brand);
+        }
+    }
 }

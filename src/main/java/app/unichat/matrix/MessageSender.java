@@ -230,10 +230,11 @@ final class MessageSender {
         }
         Chat chat = core.chat(chatId);
         boolean gif = gifs && chat != null && !NetworkFormats.of(chat.network()).gifVideosAsIs() && app.unichat.video.GifVideos.fits(m);
-        // A GIF video that isn't an MP4 (a stranger's WebM so marked): refused where the bridge sends one on as it is.
+        // A GIF video where the bridge sends one on as it is must be an MP4, told by its bytes, not its label (a stranger's
+        // WebM may say video/mp4): one that isn't is made one, else it goes as it is.
         @Nullable Network mp4For = chat != null && NetworkFormats.of(chat.network()).gifVideosAsIs() && app.unichat.video.GifVideos.is(m)
-                && !MP4.equals(m.mimeType()) ? chat.network() : null;
-        boolean copy = m.isMedia() && (gif || mp4For != null || needsCopy(url));
+                ? chat.network() : null;
+        boolean copy = m.isMedia() && (gif || needsCopy(url));
         ObjectNode content = ForwardedContent.of(m, copy);
         keepVoice(content, m, chat);
         String txn = core.newTxnId();
@@ -241,16 +242,18 @@ final class MessageSender {
             proc.addLocalEcho(chatId, txn, echo -> app.unichat.service.Forwarding.copy(m, echo));
         }
         fireLocal(chatId);
-        if (!copy) return sendEvent(chatId, "m.room.message", txn, content);
-        String copied = Objects.requireNonNull(url, "only media is copied, and its address was checked above");
+        if (!copy && mp4For == null) return sendEvent(chatId, "m.room.message", txn, content);
+        String copied = Objects.requireNonNull(url, "only media is copied or read, and its address was checked above");
         return sendWhenPrepared(chatId, txn, "m.room.message", "Forward", media.media(copied, 0, 0).thenApplyAsync(src -> {
             try {
                 // An animated WebP, as small as it takes to fit (Discord: 10 MB without Nitro), else the video, which still plays.
                 Path file = gif ? app.unichat.video.GifVideos.webpUnder(src, app.unichat.video.GifVideos.maxBytes()) : src;
-                if (mp4For != null) {
-                    Path mp4 = gifAsMp4(src, mp4For);
+                Path mp4 = mp4For == null ? src : gifAsMp4(src, mp4For);
+                if (mp4 != src) {
                     ForwardedContent.becomeMp4(content, Files.size(mp4));
-                    content.put("url", client.upload(mp4, MP4, content.path("filename").asText("gif.mp4")));
+                    content.put("url", client.upload(mp4, MP4, content.path("filename").asText(GIF_MP4_NAME)));
+                } else if (!copy) {
+                    return content; // an MP4 already, at its own address
                 } else if (file != src) {
                     ForwardedContent.becomeWebp(content, Files.size(file));
                     content.put("url", client.upload(file, StickerConverter.WEBP, content.path("filename").asText("gif.webp")));
@@ -419,7 +422,7 @@ final class MessageSender {
         Network network = chat.network();
         if (NetworkFormats.of(network).gifVideosAsIs()) {
             return CompletableFuture.supplyAsync(() -> gifAsMp4(file, network), core.io)
-                    .thenCompose(p -> sendMedia(chatId, p, replyToId, MP4, width, height, true));
+                    .thenCompose(p -> sendMedia(chatId, p, replyToId, MP4, width, height, true, p == file ? null : GIF_MP4_NAME));
         }
         return CompletableFuture.supplyAsync(() -> app.unichat.video.GifVideos.webpUnder(file, app.unichat.video.GifVideos.maxBytes()), core.io)
                 .thenCompose(p -> p == file ? sendMedia(chatId, file, replyToId, mime, width, height, true)
@@ -427,6 +430,8 @@ final class MessageSender {
     }
 
     private static final String MP4 = "video/mp4";
+    /** The name a GIF made an MP4 goes under: its file's is the cache's ({@code converted-<hash>.gif.mp4}). */
+    private static final String GIF_MP4_NAME = "gif.mp4";
 
     /**
      * {@code file} as an MP4 for {@code network}'s bridge, which takes a video marked {@code fi.mau.gif} only as video/mp4
@@ -486,13 +491,27 @@ final class MessageSender {
 
     private CompletableFuture<Void> sendMedia(String chatId, Path file, @Nullable String replyToId, String mime, int width, int height,
                                               boolean gif) {
-        return sendMedia(chatId, file, replyToId, new Kind(mime, width, height, 0, false, p -> { }), content -> {
+        return sendMedia(chatId, file, replyToId, mime, width, height, gif, null);
+    }
+
+    /** {@code name}: what the other person sees it called, null for the file's own name. */
+    private CompletableFuture<Void> sendMedia(String chatId, Path file, @Nullable String replyToId, String mime, int width, int height,
+                                              boolean gif, @Nullable String name) {
+        return sendMedia(chatId, file, replyToId, new Kind(mime, width, height, 0, false, p -> { }, name), content -> {
             if (gif) content.withObjectProperty("info").put("fi.mau.gif", true);
         }).thenApply(id -> null);
     }
 
-    /** What a file is sent as: its MIME, size and length if known, whether as a plain document, and who hears the upload. */
-    private record Kind(String mime, int width, int height, long durationMs, boolean document, DoubleConsumer progress) {
+    /**
+     * What a file is sent as: its MIME, size and length if known, whether as a plain document, who hears the upload,
+     * and the name it goes under (null: the file's own; a converted copy's is the cache's, {@code converted-<hash>}).
+     */
+    private record Kind(String mime, int width, int height, long durationMs, boolean document, DoubleConsumer progress,
+                        @Nullable String name) {
+        Kind(String mime, int width, int height, long durationMs, boolean document, DoubleConsumer progress) {
+            this(mime, width, height, durationMs, document, progress, null);
+        }
+
         MessageType type() {
             return document ? MessageType.FILE : MessageType.ofMime(mime);
         }
@@ -507,7 +526,8 @@ final class MessageSender {
         String mime = kind.mime();
         long durationMs = kind.durationMs();
         String txn = core.newTxnId();
-        String name = PathParts.name(file);
+        String given = kind.name();
+        String name = given != null ? given : PathParts.name(file);
         MessageType type = kind.type();
         long size;
         try {

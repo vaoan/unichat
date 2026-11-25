@@ -84,14 +84,15 @@ public final class ForwardBar extends TaskBar {
         } else {
             what.setText(j.failed() > 0 ? I18n.n("forwardBar.failed", j.failed(), j.sent())
                     : I18n.t(j.cancelled() ? "forwardBar.stopped" : "forwardBar.done", j.sent(), where(j)));
-            detail.setText("");
+            String why = j.refused();
+            detail.setText(j.failed() > 0 && why != null ? why : ""); // a GIF no MP4 could be made of says so
             where.setText("");
             lead.getChildren().setAll(Icons.icon(j.failed() > 0 ? Icons.ERROR : Icons.CHECK, 22));
             if (j.failed() == 0) hideLater.playFromStart();
             else hideLater.stop();
         }
         tidy();
-        bar.setAccessibleText(what.getText() + ". " + big.getText());
+        bar.setAccessibleText(what.getText() + ". " + big.getText() + (detail.getText().isEmpty() ? "" : ". " + detail.getText()));
     }
 
     /** "Buga", or "Buga y 2 más". */

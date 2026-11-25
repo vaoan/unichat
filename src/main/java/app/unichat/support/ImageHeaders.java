@@ -25,7 +25,7 @@ public final class ImageHeaders {
 
     /** An MP4's brands; an iPhone's HEIC or an AVIF photo has the same {@code ftyp} box with another (heic, mif1, avif). */
     private static final java.util.Set<String> MP4_BRANDS = java.util.Set.of("isom", "iso2", "iso4", "iso5", "iso6", "mp41", "mp42",
-            "avc1", "M4V ", "dash");
+            "avc1", "M4V ", "dash", "3gp4", "3gp5", "mp71");
 
     /**
      * Whether {@code file} is a video ffmpeg turns into frames: a WebM (video stickers) or an MP4 (the ISO box {@code ftyp}

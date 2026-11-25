@@ -117,4 +117,34 @@ class ForwardingTest {
         assertEquals(1, job.sent());
         assertTrue(job.finished() && job.cancelled());
     }
+
+    /** A GIF no MP4 could be made of for Telegram: the job keeps why, for the forward bar; any other failure says nothing. */
+    @Test
+    void oneThatCantGoAsItIsSaysWhy() throws Exception {
+        String why = "This GIF can't go to Telegram";
+        Forwarding.Job job = Forwarding.send(failing(new CantSend(why)), first(2), List.of(TO), m -> null, true);
+        job.done().get();
+        assertEquals(List.of(0, 2), List.of(job.sent(), job.failed()));
+        assertEquals(why, job.refused());
+
+        Forwarding.Job other = Forwarding.send(failing(new java.io.IOException("connection reset")), first(1), List.of(TO), m -> null, true);
+        other.done().get();
+        assertEquals(1, other.failed());
+        assertNull(other.refused(), "nothing to say but that it failed");
+    }
+
+    /** A service whose every forward fails with {@code err}, as the matrix one does, wrapped. */
+    static MockChatService failing(Exception err) {
+        MockChatService svc = new MockChatService() {
+            @Override public CompletableFuture<Void> forward(String chatId, Message message, boolean gifs) {
+                return CompletableFuture.failedFuture(new java.util.concurrent.CompletionException(err));
+            }
+        };
+        svc.noAutoReplies();
+        return svc;
+    }
+
+    private static List<Message> first(int n) {
+        return svc().messages(FROM).stream().filter(m -> m.type() == MessageType.TEXT).limit(n).toList();
+    }
 }
