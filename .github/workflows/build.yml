@@ -21,8 +21,9 @@ jobs:
           distribution: temurin
           java-version: "25"
           cache: maven
-      # VoiceEnhancerTest and VoiceRecordingTest skip without ffmpeg, and voice's coverage floor counts on them.
-      - run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg
+      # VoiceEnhancerTest and VoiceRecordingTest skip without ffmpeg, the video tests without img2webp and anim_dump
+      # (webp), and the coverage floors of voice and video count on them.
+      - run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg webp
       - run: ./mvnw -B verify
 
   ui-headless:
@@ -37,7 +38,7 @@ jobs:
           java-version: "25"
           cache: maven
       # JavaFX plays video on Linux through the system's FFmpeg libraries (libavcodec/libavformat).
-      - run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg libasound2t64 pulseaudio libasound2-plugins
+      - run: sudo apt-get update -q && sudo apt-get install -y -q --no-install-recommends ffmpeg webp libasound2t64 pulseaudio libasound2-plugins
       # A runner has no sound card. ALSA's own null device drops the sound at once, so a voice note "ends" before a test
       # sees it playing: PulseAudio's null sink takes it in real time, and ALSA's default goes there.
       - run: |
