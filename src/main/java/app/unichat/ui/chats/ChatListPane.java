@@ -47,7 +47,7 @@ import java.time.ZoneId;
 import java.util.List;
 import java.util.function.Consumer;
 
-/** Left column: title, search, filter chips, favorites grid and the chat list. */
+/** Left column: title, search, quick filters ({@link FilterBar}), favorites grid and the chat list. */
 public final class ChatListPane extends VBox {
     private final ChatService svc;
     private final ObjectProperty<ChatFilter> filter = new SimpleObjectProperty<>(ChatFilter.DEFAULT);
@@ -59,9 +59,8 @@ public final class ChatListPane extends VBox {
     private final Label title = new Label();
     private final Label empty = new Label();
     private final TextField search = new TextField();
-    private final ToggleGroup chips = new ToggleGroup();
     private final Spaces spaces;
-    private final FlowPane chipRow;
+    private final FilterBar filterBar;
     private @Nullable Runnable onNewChat;
     private final Consumer<Chat> onOpen;
     private @Nullable String selectedId;
@@ -95,15 +94,7 @@ public final class ChatListPane extends VBox {
         Node header = buildHeader();
         Node searchBox = buildSearchBox();
 
-        chipRow = new FlowPane(6, 6,
-                chip(I18n.t("chatList.chip.all"), f -> f.withUnreadOnly(false).withView(ChatFilter.View.INBOX)),
-                chip(I18n.t("chatList.chip.unread"), f -> f.withUnreadOnly(true).withView(ChatFilter.View.INBOX)),
-                chip(I18n.t("chatList.chip.favorites"), f -> f.withUnreadOnly(false).withView(ChatFilter.View.FAVORITES)),
-                chip(I18n.t("chatList.chip.lowPriority"), f -> f.withUnreadOnly(false).withView(ChatFilter.View.LOW_PRIORITY)));
-        chipRow.getStyleClass().add("chip-row");
-        chips.getToggles().get(0).setSelected(true);
-        chips.selectedToggleProperty().addListener((o, a, b) -> { if (b == null) a.setSelected(true); });
-
+        filterBar = new FilterBar(filter);
 
         configureList();
 
@@ -117,11 +108,8 @@ public final class ChatListPane extends VBox {
         });
         ChatMenus.onMenuKey(folderView.chatList(), this::rowMenu);
         setVgrow(folderView, Priority.ALWAYS);
-        getChildren().addAll(header, searchBox, chipRow, accountRow, favorites, list, channels, folderView);
-        filter.addListener((o, a, b) -> {
-            syncChips(b);
-            refresh();
-        });
+        getChildren().addAll(header, searchBox, filterBar, accountRow, favorites, list, channels, folderView);
+        filter.addListener((o, a, b) -> refresh());
         refresh();
     }
 
@@ -197,26 +185,6 @@ public final class ChatListPane extends VBox {
         setVgrow(list, Priority.ALWAYS);
     }
 
-    private ToggleButton chip(String text, java.util.function.UnaryOperator<ChatFilter> change) {
-        ToggleButton b = new ToggleButton(text);
-        b.getStyleClass().add("chip");
-        b.setMinWidth(USE_PREF_SIZE);
-        b.setToggleGroup(chips);
-        b.setOnAction(e -> filter.set(change.apply(filter.get())));
-        return b;
-    }
-
-    /** The chips follow the filter however it changed (rail, shortcuts, leaving the archive). */
-    private void syncChips(ChatFilter f) {
-        int i = switch (f.view()) {
-            case INBOX -> f.unreadOnly() ? 1 : 0;
-            case FAVORITES -> 2;
-            case LOW_PRIORITY -> 3;
-            case ARCHIVE -> -1;
-        };
-        if (i >= 0 && chips.getToggles().get(i) != chips.getSelectedToggle()) chips.getToggles().get(i).setSelected(true);
-    }
-
     public ObjectProperty<ChatFilter> filterProperty() { return filter; }
 
     /**
@@ -286,7 +254,7 @@ public final class ChatListPane extends VBox {
         refreshFavorites(f, all);
     }
 
-    /** The title, the account row, the view's chips and what an empty list says, for {@code f}. */
+    /** The title, the account row, and what an empty list says, for {@code f}. */
     private void refreshTitles(ChatFilter f) {
         String base = switch (f.view()) {
             case INBOX -> f.unreadOnly() ? I18n.t("chatList.title.unread") : I18n.t("chatList.title.inbox");
@@ -414,7 +382,7 @@ public final class ChatListPane extends VBox {
     private void refreshView() {
         boolean space = channels.isOpen();
         boolean folders = !space && foldersOpen();
-        for (Node x : List.of(chipRow, list)) {
+        for (Node x : List.of(filterBar, list)) {
             Nodes.show(x, !space && !folders);
         }
         Nodes.show(folderView, folders);

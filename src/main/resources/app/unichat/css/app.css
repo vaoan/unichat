@@ -214,6 +214,27 @@
 .search-box { -fx-padding: 0 4; }
 .search-field { -fx-padding: 8 12 8 2.5em; /* room for the lupa, which grows with the text */ -fx-background-color: -surface-2; }
 .chip-row { -fx-padding: 0 4; }
+/* The quick filters (chats/FilterBar): one segmented bar, the chips' colours; the parts share its width. */
+.filter-bar {
+    -fx-background-color: -surface-2;
+    -fx-background-insets: 0 4;
+    -fx-background-radius: 999;
+    -fx-padding: 3 7;
+    -fx-spacing: 2;
+    -fx-alignment: center;
+}
+.filter-part {
+    -fx-background-color: transparent;
+    -fx-background-radius: 999;
+    -fx-text-fill: -text-2;
+    -fx-font-size: 0.92em;
+    -fx-padding: 0.3em 0.7em;
+    -fx-alignment: center;
+}
+.filter-part .icon { -fx-background-color: -text-2; }
+.filter-part:hover { -fx-background-color: -hover; }
+.filter-part:selected { -fx-background-color: -text; -fx-text-fill: -bg; }
+.filter-part:selected .icon { -fx-background-color: -bg; }
 .favorites { -fx-padding: 4 4 6 4; }
 /* One width for every tile, in em so it grows with the text; the name fills it, centered, cut with "…". */
 .favorite-tile { -fx-padding: 0.45em 0.3em; -fx-background-radius: 12; -fx-min-width: 48px; -fx-pref-width: 4.4em; -fx-max-width: 4.4em; -fx-cursor: hand; }
@@ -741,6 +762,7 @@
     -fx-border-width: 2;
     -fx-border-radius: 999;
 }
+.filter-part:focus-visible { -fx-border-radius: 999; }
 .list-view:focus-visible .list-cell:selected { -fx-border-color: -accent; -fx-border-width: 2; -fx-border-radius: 12; }
 .text-field:focused, .password-field:focused, .composer-row:focus-within { -fx-border-color: -accent; }
 .composer-row { -fx-border-color: transparent; -fx-border-radius: 16; -fx-border-width: 1.5; }
@@ -812,9 +834,18 @@
 .root.contrast .composer-banner, .root.contrast .hover-actions, .root.contrast .file-icon { -fx-border-radius: 12; }
 .root.contrast .composer-row { -fx-border-radius: 16; }
 .root.contrast .chip:selected { -fx-background-color: -text; -fx-text-fill: -bg; }
+.root.contrast .filter-bar { -fx-border-color: -border; -fx-border-width: 1.5; -fx-border-insets: 0 4; -fx-border-radius: 999; }
+/* The chosen part is a ring as well as a fill: its shape tells it apart, not only its colour. */
+.root.contrast .filter-part:selected {
+    -fx-background-color: -text, -bg, -text;
+    -fx-background-insets: 0, 2, 3.5;
+    -fx-text-fill: -bg;
+    -fx-font-weight: bold;
+}
 .root.contrast .bubble.out .bubble-meta .label, .root.contrast .bubble.out .reply-text { -fx-text-fill: white; }
 .root.contrast .bubble.out .bubble-meta .icon { -fx-background-color: white; }
 .root.contrast .icon { -fx-background-color: -text; }
+.root.contrast .filter-part:selected .icon { -fx-background-color: -bg; }
 .root.contrast .chat-preview, .root.contrast .chat-stamp, .root.contrast .thread-subtitle { -fx-text-fill: -text-2; }
 .root.contrast .split-pane > .split-pane-divider { -fx-background-color: -border; -fx-padding: 0 1 0 1; }
 .root.contrast .thread-header { -fx-border-color: transparent transparent -border transparent; -fx-border-width: 0 0 1.5 0; }
