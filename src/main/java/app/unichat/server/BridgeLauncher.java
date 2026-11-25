@@ -1,8 +1,10 @@
 package app.unichat.server;
 
+import app.unichat.bridge.BridgeDidntAnswer;
 import app.unichat.support.I18n;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
@@ -29,6 +31,9 @@ final class BridgeLauncher {
         void restarting(String bridge);
 
         Path log(String bridge);
+
+        /** Its config.yaml. */
+        Path config(String bridge);
     }
 
     /** The bridges in use that can run now (Telegram only with its keys). */
@@ -101,6 +106,27 @@ final class BridgeLauncher {
             processes.restarting(bridge);
         }
         processes.start(bridge);
+    }
+
+    /**
+     * New chat limits for {@code bridge} ("Load older chats"): its config is rewritten and it alone restarts
+     * ({@link #applySettings}), and this returns once it answers again. Refused before anything stops when it isn't
+     * meant to run (no account) or its config lacks a limit key (a bridge version that renamed one); a bridge that
+     * stops running or says nothing within the wait is {@link BridgeDidntAnswer}.
+     */
+    void reconfigure(String bridge, String network, Consumer<String> progress) throws IOException, InterruptedException {
+        if (!usable.get().contains(bridge) || demand.withAccounts(List.of(bridge)).isEmpty()) {
+            throw new IOException(I18n.t("server.bridgeNotInUse", network));
+        }
+        List<String> missing = BridgeConfig.missingLimitKeys(BridgeConfig.read(Files.readString(processes.config(bridge))), bridge);
+        if (!missing.isEmpty()) {
+            System.err.println("Not reconfiguring " + bridge + ", its config lacks " + missing);
+            throw new IOException(I18n.t("server.bridgeLimitKeyMissing", network));
+        }
+        applySettings(bridge, progress);
+        if (!demand.answers(bridge, processes::isRunning)) {
+            throw new BridgeDidntAnswer(I18n.t("server.bridgeDidntAnswer", network, processes.log(bridge)));
+        }
     }
 
     /** Opening {@code bridge}'s sign-in: starts it and returns once it answers, for the sign-in's first call. */

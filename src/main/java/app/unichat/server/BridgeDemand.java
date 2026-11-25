@@ -67,6 +67,11 @@ final class BridgeDemand {
     boolean open(String bridge, Predicate<String> running, Start start) throws IOException, InterruptedException {
         if (!running.test(bridge)) start.run(bridge);
         meant.add(bridge);
+        return answers(bridge, running);
+    }
+
+    /** Waits for {@code bridge} to answer: false as soon as it isn't {@code running}, or after the limit. */
+    boolean answers(String bridge, Predicate<String> running) throws InterruptedException {
         long end = System.nanoTime() + limit.toNanos();
         while (true) {
             if (probe.answers(bridge)) return true;

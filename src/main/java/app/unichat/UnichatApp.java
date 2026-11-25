@@ -229,6 +229,10 @@ public final class UnichatApp extends Application {
             @Override public void loggedOut(Network n) {
                 local.loggedOut(n.protocolId());
             }
+
+            @Override public void reconfigure(Network n, java.util.function.Consumer<String> progress) throws Exception {
+                local.reconfigureBridge(n.protocolId(), n.displayName(), progress);
+            }
         };
     }
 

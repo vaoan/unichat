@@ -1,6 +1,8 @@
 package app.unichat.server;
 
 import app.unichat.bridge.BridgeStates;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.Test;
 
@@ -61,6 +63,7 @@ class WatchdogTest {
                 @Override public void stop(String bridge) { /* the fake ignores it */ }
                 @Override public void restarting(String bridge) { /* the fake ignores it */ }
                 @Override public java.nio.file.Path log(String bridge) { return java.nio.file.Path.of(bridge); }
+                @Override public java.nio.file.Path config(String bridge) { return java.nio.file.Path.of(bridge); }
             }, new BridgeDemand(Set.of("whatsapp")::contains, b -> true, Duration.ZERO, Duration.ZERO),
                     () -> Set.of("whatsapp", "gmessages"));
             launcher.launch();
@@ -75,6 +78,41 @@ class WatchdogTest {
         } finally {
             whatsapp.stop(0);
         }
+    }
+
+    /**
+     * "Load older chats" restarts a bridge on purpose (BridgeLauncher.reconfigure): the drop its stop reports, on top of
+     * the ones before, must not make the watchdog take it for flapping and restart it once more.
+     */
+    @Test
+    void aReconfiguredBridgeIsntCountedAsFlapping() throws Exception {
+        HttpServer discord = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
+        discord.createContext("/", ex -> {
+            ex.sendResponseHeaders(200, -1);
+            ex.close();
+        });
+        discord.start();
+        try {
+            BridgeStates states = new BridgeStates();
+            long now = BridgeStates.now();
+            for (int i = 0; i < Watchdog.FLAPS; i++) { // the last one is the reconfigure's own stop
+                states.record("discord", state("TRANSIENT_DISCONNECT"), now);
+                states.record("discord", state("CONNECTED"), now);
+            }
+            states.restarting("discord", now);
+            states.record("discord", state("CONNECTED"), now);
+            List<String> restarted = new ArrayList<>();
+            Watchdog dog = new Watchdog(Map.of("discord", discord.getAddress().getPort()), () -> List.of("discord"), states,
+                    (name, why) -> restarted.add(name + ": " + why), () -> true);
+            dog.check();
+            assertEquals(List.of(), restarted);
+        } finally {
+            discord.stop(0);
+        }
+    }
+
+    private static JsonNode state(String event) {
+        return new ObjectMapper().createObjectNode().put("state_event", event).put("remote_id", "me").put("remote_name", "Me");
     }
 
     private static final int PROBE_ROUNDS = Watchdog.PROBE_FAILURES + 1;

@@ -1,15 +1,23 @@
 package app.unichat.server;
 
 import app.unichat.Present;
+import app.unichat.bridge.BridgeDidntAnswer;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
+import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -25,7 +33,8 @@ class BridgeLauncherTest {
     /** Long enough never to be reached: these waits end by what the fake bridge does. */
     private static final Duration NO_LIMIT = Duration.ofDays(1);
 
-    private final List<String> calls = new ArrayList<>();
+    /** Written by the thread a reconfigure runs on too. */
+    private final List<String> calls = Collections.synchronizedList(new ArrayList<>());
     private final Set<String> running = new LinkedHashSet<>();
     private final Set<String> usable = new LinkedHashSet<>(List.of("whatsapp", "gmessages"));
     private Set<String> withAccount = Set.of("whatsapp");
@@ -36,6 +45,12 @@ class BridgeLauncherTest {
     /** Bridges whose download or config fails, and bridges that can't be launched. */
     private final Set<String> failsToPrepare = new LinkedHashSet<>();
     private final Set<String> failsToStart = new LinkedHashSet<>();
+    /** When both are set, a probe says it's probing and waits for the test before it answers. */
+    private @Nullable CompletableFuture<Void> probing;
+    private @Nullable CountDownLatch answer;
+
+    @TempDir
+    Path configs;
 
     private final BridgeLauncher.Processes processes = new BridgeLauncher.Processes() {
         @Override public boolean isRunning(String b) { return running.contains(b); }
@@ -54,11 +69,18 @@ class BridgeLauncherTest {
         }
         @Override public void restarting(String b) { calls.add("restarting " + b); }
         @Override public Path log(String b) { return Path.of("server", b, "bridge.log"); }
+        @Override public Path config(String b) { return configs.resolve(b + ".yaml"); }
     };
 
     private BridgeLauncher launcher(Duration limit) {
         BridgeDemand demand = new BridgeDemand(b -> withAccount.contains(b), b -> { // NOPMD: LambdaCanBeMethodReference, withAccount changes below; the lambda reads it then
             calls.add("probe " + b);
+            CompletableFuture<Void> p = probing;
+            CountDownLatch a = answer;
+            if (p != null && a != null) {
+                p.complete(null);
+                a.await();
+            }
             return unanswered-- <= 0;
         }, Duration.ZERO, limit);
         return new BridgeLauncher(processes, demand, () -> Set.copyOf(usable));
@@ -130,6 +152,7 @@ class BridgeLauncherTest {
             @Override public void stop(String b) { /* the fake ignores it */ }
             @Override public void restarting(String b) { /* the fake ignores it */ }
             @Override public Path log(String b) { return Path.of(b); }
+            @Override public Path config(String b) { return Path.of(b); }
         };
         BridgeLauncher l = new BridgeLauncher(failing, new BridgeDemand(b -> false, b -> true, Duration.ZERO, NO_LIMIT),
                 () -> Set.copyOf(usable));
@@ -201,5 +224,80 @@ class BridgeLauncherTest {
         BridgeLauncher l = launcher(NO_LIMIT);
         l.launch();
         assertEquals(Set.of("start whatsapp", "start gmessages"), Set.copyOf(calls));
+    }
+
+    private static final String DISCORD_CONFIG = """
+            bridge:
+                startup_private_channel_create_limit: 50
+            """;
+
+    /** Discord with an account, running, and its config on disk. */
+    private BridgeLauncher discordRunning() throws IOException {
+        usable.add("discord");
+        withAccount = Set.of("whatsapp", "discord");
+        BridgeLauncher l = launcher(NO_LIMIT);
+        l.launch();
+        Files.writeString(configs.resolve("discord.yaml"), DISCORD_CONFIG);
+        calls.clear();
+        return l;
+    }
+
+    @Test
+    void reconfiguringRestartsOnlyThatBridgeAndWaitsForItsAnswer() throws Exception {
+        BridgeLauncher l = discordRunning();
+        CompletableFuture<Void> p = new CompletableFuture<>();
+        CountDownLatch a = new CountDownLatch(1);
+        probing = p;
+        answer = a;
+        CompletableFuture<Void> done = CompletableFuture.runAsync(() -> {
+            try {
+                l.reconfigure("discord", "Discord", msg -> { });
+            } catch (IOException | InterruptedException e) {
+                throw new CompletionException(e);
+            }
+        });
+        try {
+            CompletableFuture.anyOf(p, done).get(); // probing, or returned without waiting (the failure)
+            assertFalse(done.isDone(), "it returns only once the bridge answers");
+        } finally {
+            a.countDown();
+        }
+        done.get();
+        assertEquals(List.of("prepare discord", "stop discord", "restarting discord", "start discord", "probe discord"), calls,
+                "only discord, restarted with its new config, then waited for");
+    }
+
+    /** A bridge version that renamed the key would run with the limit it had: said before anything stops. */
+    @Test
+    void aLimitKeyMissingRefusesBeforeStopping() throws Exception {
+        BridgeLauncher l = discordRunning();
+        Files.writeString(configs.resolve("discord.yaml"), "bridge:\n    other: 1\n");
+        IOException e = assertThrows(IOException.class, () -> l.reconfigure("discord", "Discord", msg -> { }));
+        assertFalse(e instanceof BridgeDidntAnswer, e.toString());
+        assertTrue(Present.of(e.getMessage()).contains("Discord"), e.getMessage());
+        assertEquals(List.of(), calls, "nothing stopped, nothing rewritten");
+    }
+
+    @Test
+    void aBridgeThatDoesntAnswerAfterReconfiguringIsReported() throws Exception {
+        BridgeLauncher l = discordRunning();
+        diesAtStart = true;
+        unanswered = 5; // a wait that went on would get an answer
+        BridgeDidntAnswer e = assertThrows(BridgeDidntAnswer.class, () -> l.reconfigure("discord", "Discord", msg -> { }));
+        assertTrue(Present.of(e.getMessage()).contains("Discord"), e.getMessage());
+        assertEquals(List.of("prepare discord", "stop discord", "restarting discord", "start discord", "probe discord"), calls,
+                "no waiting on a bridge that stopped running");
+    }
+
+    @Test
+    void aBridgeNotMeantToRunIsntStartedByReconfigure() throws Exception {
+        BridgeLauncher l = launcher(NO_LIMIT);
+        l.launch();
+        Files.writeString(configs.resolve("gmessages.yaml"), "network:\n    initial_chat_sync_count: 25\n");
+        calls.clear();
+        IOException e = assertThrows(IOException.class, () -> l.reconfigure("gmessages", "Google Messages", msg -> { }));
+        assertTrue(Present.of(e.getMessage()).contains("Google Messages"), e.getMessage());
+        assertEquals(List.of(), calls, "a bridge without accounts isn't started for this");
+        assertFalse(l.watched().contains("gmessages"));
     }
 }

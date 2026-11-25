@@ -197,6 +197,16 @@ public final class LocalServer {
         bridges.open(bridge, network, progress);
     }
 
+    /**
+     * New chat limits for {@code bridge}: rewrites its config, restarts it alone and returns once it answers
+     * ({@link BridgeLauncher#reconfigure}). Blocking, at most the minute a sign-in waits.
+     */
+    public synchronized void reconfigureBridge(String bridge, String network, Consumer<String> progress)
+            throws IOException, InterruptedException {
+        if (!running) throw new IOException(I18n.t("server.bridgeNotInUse", network));
+        bridges.reconfigure(bridge, network, progress);
+    }
+
     /** The person logged out of {@code bridge}'s last account (the bridge confirmed it): it stops. */
     public synchronized void loggedOut(String bridge) {
         bridges.loggedOut(bridge);
@@ -217,6 +227,8 @@ public final class LocalServer {
         @Override public void restarting(String b) { states.restarting(b, BridgeStates.now()); }
 
         @Override public Path log(String b) { return dir.resolve(b).resolve("bridge.log"); }
+
+        @Override public Path config(String b) { return dir.resolve(b).resolve("config.yaml"); }
     }
 
     public synchronized void stop() {
