@@ -32,7 +32,11 @@ public final class ImageHeaders {
      * at byte 4 with a video's brand: the GIFs Telegram and WhatsApp send as video).
      */
     public static boolean isVideo(Path file) throws java.io.IOException {
-        if (isWebm(file)) return true;
+        return isWebm(file) || isMp4(file);
+    }
+
+    /** Whether {@code file} is an MP4 (the ISO box {@code ftyp} at byte 4 with a video's brand), whatever its label says. */
+    public static boolean isMp4(Path file) throws java.io.IOException {
         try (java.io.InputStream in = java.nio.file.Files.newInputStream(file)) {
             byte[] head = in.readNBytes(12);
             return head.length == 12 && head[4] == 'f' && head[5] == 't' && head[6] == 'y' && head[7] == 'p'

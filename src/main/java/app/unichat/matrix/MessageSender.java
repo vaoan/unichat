@@ -230,7 +230,10 @@ final class MessageSender {
         }
         Chat chat = core.chat(chatId);
         boolean gif = gifs && chat != null && !NetworkFormats.of(chat.network()).gifVideosAsIs() && app.unichat.video.GifVideos.fits(m);
-        boolean copy = m.isMedia() && (gif || needsCopy(url));
+        // A GIF video that isn't an MP4 (a stranger's WebM so marked): refused where the bridge sends one on as it is.
+        @Nullable Network mp4For = chat != null && NetworkFormats.of(chat.network()).gifVideosAsIs() && app.unichat.video.GifVideos.is(m)
+                && !MP4.equals(m.mimeType()) ? chat.network() : null;
+        boolean copy = m.isMedia() && (gif || mp4For != null || needsCopy(url));
         ObjectNode content = ForwardedContent.of(m, copy);
         keepVoice(content, m, chat);
         String txn = core.newTxnId();
@@ -244,7 +247,11 @@ final class MessageSender {
             try {
                 // An animated WebP, as small as it takes to fit (Discord: 10 MB without Nitro), else the video, which still plays.
                 Path file = gif ? app.unichat.video.GifVideos.webpUnder(src, app.unichat.video.GifVideos.maxBytes()) : src;
-                if (file != src) {
+                if (mp4For != null) {
+                    Path mp4 = gifAsMp4(src, mp4For);
+                    ForwardedContent.becomeMp4(content, Files.size(mp4));
+                    content.put("url", client.upload(mp4, MP4, content.path("filename").asText("gif.mp4")));
+                } else if (file != src) {
                     ForwardedContent.becomeWebp(content, Files.size(file));
                     content.put("url", client.upload(file, StickerConverter.WEBP, content.path("filename").asText("gif.webp")));
                 } else {
@@ -402,17 +409,42 @@ final class MessageSender {
     /**
      * A GIF from the GIF tab: m.video (mp4) or m.image (gif) flagged {@code fi.mau.gif}, so bridges send a GIF. One that's
      * an MP4 (a provider's, a favourite from Telegram or WhatsApp) goes where the bridge would show a video (Discord) as
-     * the animated WebP a forward makes ({@code video/GifVideos}), else as it is.
+     * the animated WebP a forward makes ({@code video/GifVideos}), else as it is. Where the bridge sends a GIF video on
+     * (Telegram, WhatsApp) it must be an MP4: one that isn't (a WebM from Discord or a provider) is made one first.
      */
     CompletableFuture<Void> sendGif(String chatId, Path file, String mime, int width, int height, @Nullable String replyToId) {
         Chat chat = core.chat(chatId);
         boolean video = mime != null && mime.startsWith("video/");
-        if (!video || chat == null || NetworkFormats.of(chat.network()).gifVideosAsIs()) {
-            return sendMedia(chatId, file, replyToId, mime, width, height, true);
+        if (!video || chat == null) return sendMedia(chatId, file, replyToId, mime, width, height, true);
+        Network network = chat.network();
+        if (NetworkFormats.of(network).gifVideosAsIs()) {
+            return CompletableFuture.supplyAsync(() -> gifAsMp4(file, network), core.io)
+                    .thenCompose(p -> sendMedia(chatId, p, replyToId, MP4, width, height, true));
         }
         return CompletableFuture.supplyAsync(() -> app.unichat.video.GifVideos.webpUnder(file, app.unichat.video.GifVideos.maxBytes()), core.io)
                 .thenCompose(p -> p == file ? sendMedia(chatId, file, replyToId, mime, width, height, true)
                         : sendMedia(chatId, p, replyToId, StickerConverter.WEBP, width, height, true));
+    }
+
+    private static final String MP4 = "video/mp4";
+
+    /**
+     * {@code file} as an MP4 for {@code network}'s bridge, which takes a video marked {@code fi.mau.gif} only as video/mp4
+     * ("unsupported media type (video/webm in fi.mau.gif)"): itself when its bytes are one, else the silent H.264 MP4
+     * ffmpeg makes of it. Without ffmpeg, or when it fails, nothing the bridge would refuse goes: a {@code CantSend}
+     * saying why (an animated WebP is no GIF there: WhatsApp makes it a still JPEG). Blocking.
+     */
+    private static Path gifAsMp4(Path file, Network network) {
+        try {
+            if (ImageHeaders.isMp4(file)) return file;
+            return app.unichat.video.VideoTranscoder.toGifMp4(file, p -> { });
+        } catch (IOException e) {
+            System.err.println("GIF to MP4 for " + network.displayName() + " failed (" + e.getClass().getSimpleName() + ": " + e.getMessage() + ")");
+            throw new CompletionException(new app.unichat.service.CantSend(I18n.t("gif.cantMakeMp4", network.displayName()), e));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CompletionException(e);
+        }
     }
 
     /**

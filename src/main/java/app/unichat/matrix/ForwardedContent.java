@@ -55,12 +55,24 @@ final class ForwardedContent {
 
     /** {@code content} (a video's) made the animated WebP of {@code size} bytes it's sent as instead ({@code video/GifVideos}). */
     static void becomeWebp(ObjectNode content, long size) {
-        String name = app.unichat.video.GifVideos.webpName(content.path("filename").asText(content.path("body").asText("gif")));
-        if (content.path("body").asText().equals(content.path("filename").asText())) content.put("body", name);
-        content.put("msgtype", "m.image").put("filename", name);
-        ObjectNode info = content.withObjectProperty("info");
-        info.put("mimetype", StickerConverter.WEBP).put("size", size);
+        ObjectNode info = become(content, "m.image", "webp", StickerConverter.WEBP, size);
         info.remove(List.of("duration", "thumbnail_url", "thumbnail_info"));
+    }
+
+    /** {@code content} (a GIF video's that isn't an MP4) made the MP4 of {@code size} bytes it's sent as instead. */
+    static void becomeMp4(ObjectNode content, long size) {
+        ObjectNode info = become(content, "m.video", "mp4", "video/mp4", size);
+        info.remove(List.of("thumbnail_url", "thumbnail_info"));
+    }
+
+    /** Its file renamed to {@code extension} (the body too when it was the name), its type and size; gives its info. */
+    private static ObjectNode become(ObjectNode content, String msgtype, String extension, String mime, long size) {
+        String name = app.unichat.video.GifVideos.renamed(content.path("filename").asText(content.path("body").asText("gif")), extension);
+        if (content.path("body").asText().equals(content.path("filename").asText())) content.put("body", name);
+        content.put("msgtype", msgtype).put("filename", name);
+        ObjectNode info = content.withObjectProperty("info");
+        info.put("mimetype", mime).put("size", size);
+        return info;
     }
 
     /** A file's name, its invisible marks taken out, or "file". */

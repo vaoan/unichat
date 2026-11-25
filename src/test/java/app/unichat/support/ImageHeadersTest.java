@@ -30,4 +30,14 @@ class ImageHeadersTest {
         assertFalse(ImageHeaders.isVideo(iso("mif1")));
         assertFalse(ImageHeaders.isVideo(iso("avif")));
     }
+
+    /** Telegram's and WhatsApp's bridges take a GIF video only as an MP4: a WebM is a video, not an MP4. */
+    @Test
+    void aWebmIsAVideoButNoMp4() throws Exception {
+        Path webm = Files.write(dir.resolve("gif.mp4"), new byte[]{0x1A, 0x45, (byte) 0xDF, (byte) 0xA3, 0, 0, 0, 0, 0, 0, 0, 0});
+        assertTrue(ImageHeaders.isVideo(webm));
+        assertFalse(ImageHeaders.isMp4(webm), "whatever its name says");
+        assertTrue(ImageHeaders.isMp4(iso("isom")));
+        assertFalse(ImageHeaders.isMp4(iso("heic")));
+    }
 }

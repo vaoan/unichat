@@ -111,8 +111,13 @@ public final class GifVideos {
 
     /** {@code name} with ".webp" in place of its extension. */
     public static String webpName(String name) {
+        return renamed(name, "webp");
+    }
+
+    /** {@code name} with {@code extension} in place of its own. */
+    public static String renamed(String name, String extension) {
         int dot = name.lastIndexOf('.');
-        return (dot > 0 ? name.substring(0, dot) : name) + ".webp";
+        return (dot > 0 ? name.substring(0, dot) : name) + "." + extension;
     }
 
     /** Lossy WebP's quality: the frames as they come, every colour, a fraction of a GIF's weight. */

@@ -20,4 +20,12 @@ public final class CantSend extends IOException {
     public CantSend(@Nullable String why, Throwable cause) {
         super(why, cause);
     }
+
+    /** The {@link CantSend} behind a failure (it comes wrapped by the futures it went through), or null. */
+    public static @Nullable CantSend behind(@Nullable Throwable err) {
+        for (Throwable t = err; t != null; t = t.getCause()) {
+            if (t instanceof CantSend c) return c;
+        }
+        return null;
+    }
 }

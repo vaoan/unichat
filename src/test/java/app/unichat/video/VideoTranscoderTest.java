@@ -60,6 +60,41 @@ class VideoTranscoderTest {
         assertEquals(result, VideoTranscoder.makePlayable(ffmpeg, result), "H.264 already: left as it is");
     }
 
+    /** A GIF's MP4 is silent (Telegram takes only a silent video as a GIF); a playable copy keeps the sound. */
+    @Test
+    void aGifsMp4HasNoSoundAndPlaysEverywhere() throws Exception {
+        Path in = Files.write(dir.resolve("gif.webm"), new byte[]{0x1A, 0x45, (byte) 0xDF, (byte) 0xA3});
+        List<String> gif = VideoTranscoder.command(Path.of("ffmpeg"), in, dir.resolve("out.mp4"), "libx264", false);
+        assertTrue(gif.contains("-an"), gif.toString());
+        assertFalse(gif.contains("0:a:0?") || gif.contains("aac"), gif.toString());
+        for (String part : List.of("yuv420p", "scale=trunc(iw/2)*2:trunc(ih/2)*2", "+faststart", "-format_whitelist")) {
+            assertTrue(gif.contains(part), part + " in " + gif);
+        }
+        List<String> playable = VideoTranscoder.command(Path.of("ffmpeg"), in, dir.resolve("out.mp4"), "libx264", true);
+        assertTrue(playable.contains("0:a:0?") && playable.contains("aac"), playable.toString());
+        assertFalse(playable.contains("-an"));
+    }
+
+    @Test
+    @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "a test runs its own tool (ffmpeg) with its own fixed arguments; nothing from outside")
+    void aWebmBecomesASilentH264Mp4BesideIt() throws Exception {
+        Path ffmpeg = Present.orSkip(Ffmpeg.find(), "needs an ffmpeg");
+        Path webm = dir.resolve("gif.webm");
+        Processes.Result made = Processes.capture(new ProcessBuilder(ffmpeg.toString(), "-nostdin", "-y", "-loglevel", "error",
+                "-f", "lavfi", "-i", "testsrc=size=63x47:rate=10:duration=1", "-f", "lavfi", "-i", "sine=d=1",
+                "-c:v", "libvpx-vp9", "-c:a", "libopus", "-shortest", webm.toString()).redirectErrorStream(true), NO_LIMIT);
+        Assumptions.assumeTrue(made.ok(), "needs an ffmpeg with VP9 and Opus encoders to make the sample: " + made.out());
+
+        Path mp4 = VideoTranscoder.toGifMp4(webm, p -> { });
+        assertTrue(app.unichat.support.ImageHeaders.isMp4(mp4));
+        String info = Processes.capture(new ProcessBuilder(ffmpeg.toString(), "-hide_banner", "-nostdin", "-i", mp4.toString())
+                .redirectErrorStream(true), NO_LIMIT).out();
+        assertTrue(VideoTranscoder.playsEverywhere(info), info);
+        assertFalse(info.contains("Audio:"), info);
+        assertTrue(info.contains("62x46"), "even sides: " + info);
+        assertEquals(mp4, VideoTranscoder.toGifMp4(webm, p -> { }), "made once");
+    }
+
     @Test
     void picturesAreToldFromVideos() {
         assertTrue(VideoTranscoder.picture("Input #0, gif, from 'a.gif':\n  Stream #0:0: Video: gif, bgra, 32x32"));

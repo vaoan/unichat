@@ -32,7 +32,7 @@ final class NetworkFormats {
     /**
      * {@code asIs}: the sticker formats its bridge sends on (the chat's room_features may still refuse one); {@code animated}
      * and {@code still}: what one in another format becomes; {@code gifVideosAsIs}: its bridge sends a GIF that came as an
-     * MP4 (marked {@code fi.mau.gif}) on as a GIF; {@code ifUnmade}: what it still shows as it is when the conversion
+     * MP4 (marked {@code fi.mau.gif}) on as a GIF, and takes one only as an MP4 ({@code MessageSender.gifAsMp4}); {@code ifUnmade}: what it still shows as it is when the conversion
      * can't be made.
      */
     record Rule(Set<String> asIs, String animated, String still, boolean gifVideosAsIs, Set<String> ifUnmade) {
