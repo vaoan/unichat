@@ -1,5 +1,6 @@
 package app.unichat.server;
 
+import app.unichat.bridge.BridgePorts;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
@@ -160,7 +161,19 @@ class BridgeConfigTest {
         ObjectNode c = BridgeConfig.apply(BridgeConfig.read(TELEGRAM), settings("telegram"));
         assertEquals(100, c.at("/network/sync/create_limit").asInt());
         assertEquals(100, c.at("/network/sync/login_sync_limit").asInt());
-        assertEquals(100, c.at("/network/sync/update_limit").asInt(), "other keys untouched");
+        assertEquals(100, c.at("/network/sync/update_limit").asInt());
+    }
+
+    /**
+     * The bridge walks at most {@code update_limit} dialogs (its default 100) and creates rooms for {@code create_limit} of
+     * them: with only {@code create_limit} raised, a limit above 100 did nothing.
+     */
+    @Test
+    void telegramsUpdateLimitFollowsItsCreateLimit() throws Exception {
+        String template = TELEGRAM.replace("update_limit: 100", "update_limit: 50");
+        ObjectNode c = BridgeConfig.apply(BridgeConfig.read(template), settings("telegram"));
+        assertEquals(BridgePorts.TELEGRAM_CREATE_LIMIT, c.at("/network/sync/create_limit").asInt());
+        assertEquals(BridgePorts.TELEGRAM_CREATE_LIMIT, c.at("/network/sync/update_limit").asInt());
     }
 
     @Test

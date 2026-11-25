@@ -135,6 +135,8 @@ public final class BridgeConfig {
                     obj(c, "/network/animated_sticker").put("target", "disable").put("convert_from_webm", false);
                     // 15 by default: most chats never showed up. The bridge paces itself on Telegram's flood waits.
                     setExisting(c, "/network/sync/create_limit", BridgePorts.TELEGRAM_CREATE_LIMIT);
+                    // The walk stops after update_limit dialogs (100 by default), so a create_limit above it did nothing.
+                    setExisting(c, "/network/sync/update_limit", BridgePorts.TELEGRAM_CREATE_LIMIT);
                     setExisting(c, "/network/sync/login_sync_limit", BridgePorts.TELEGRAM_CREATE_LIMIT);
                 }
                 default -> { }
