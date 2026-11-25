@@ -213,6 +213,42 @@ final class BridgeAccounts {
 
     static volatile @Nullable BridgeProvisioner provisioner; // NOPMD: MutableStaticState, a seam tests swap
 
+    /** The provisioner set when it's asked, not when this is made (the local server sets it after the session starts). */
+    static BridgeProvisioner live() {
+        return new BridgeProvisioner() {
+            @Override
+            public void ensure(Network network) throws Exception {
+                BridgeProvisioner p = provisioner;
+                if (p != null) p.ensure(network);
+            }
+
+            @Override
+            public void reconfigure(Network network, java.util.function.Consumer<String> progress) throws Exception {
+                BridgeProvisioner p = provisioner;
+                if (p == null) throw new IOException(I18n.t("server.bridgeNotInUse", network.displayName()));
+                p.reconfigure(network, progress);
+            }
+        };
+    }
+
+    /** The networks with an account signed in (or signing in), for "Load older chats". */
+    Set<Network> withLogins() {
+        Set<Network> out = java.util.EnumSet.noneOf(Network.class);
+        for (Account a : accounts()) {
+            if (a.status() != AccountStatus.NEEDS_LOGIN && a.status() != AccountStatus.NOT_AVAILABLE) out.add(a.network());
+        }
+        return out;
+    }
+
+    /** A "Load older chats" command to {@code n}'s bot: its reply, or a TimeoutException when none came in time. */
+    String olderChatsCommand(Network n, String command, java.time.Duration patience) throws IOException, InterruptedException,
+            java.util.concurrent.TimeoutException {
+        if (bots.find(n) == null) throw new IOException(I18n.t("server.bridgeNotInUse", n.displayName()));
+        String reply = bots.ask(n, command, patience);
+        if (reply == null) throw new java.util.concurrent.TimeoutException(n.protocolId() + " " + command + ": no reply");
+        return reply;
+    }
+
     CompletableFuture<String> connectNetwork(Network network) {
         if (!network.isBridged()) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.networkUnsupported")));
         return CompletableFuture.supplyAsync(() -> {

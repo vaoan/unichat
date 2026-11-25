@@ -64,6 +64,11 @@ final class OlderChatSteps {
         this.now = now;
     }
 
+    /** The steps' clock: a step's start, against which a loaded room's newest message is news or history. */
+    Instant now() {
+        return now.get();
+    }
+
     /** The key that says {@code n} has nothing more to load. */
     static String doneKey(Network n) {
         return "olderChats." + n.protocolId() + ".done";
