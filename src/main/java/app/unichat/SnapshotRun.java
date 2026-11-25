@@ -18,7 +18,7 @@ import java.io.File;
  * and exits; {@code -Dunichat.openChat=<id>} opens a chat first, {@code -Dunichat.info=true} the info panel,
  * {@code -Dunichat.openSpace=<id>} a server's channels,
  * {@code -Dunichat.openFolders=true} the list of folders, {@code -Dunichat.openFolder=<name>} inside one,
- * {@code -Dunichat.overlay=command|newchat|add|picker|folder|folderDelete|cloak|chatOptions|forward|select|delete|savedText[:none]|fixing|queue|capture[:sheet]|login:<net>|settings[:Page]} the command bar, connect-network sheet or settings,
+ * {@code -Dunichat.overlay=command|newchat|add|picker|folder|folderDelete|cloak|chatOptions|forward|select|delete|savedText[:none]|fixing|queue|older[:loading]|capture[:sheet]|login:<net>|settings[:Page]} the command bar, connect-network sheet or settings,
  * {@code -Dunichat.network=<protocol id>} filters the inbox to one network, {@code -Dunichat.search=<text>} searches it.
  */
 final class SnapshotRun {
@@ -86,6 +86,7 @@ final class SnapshotRun {
         else if (overlay.startsWith("savedText")) view.showSavedText(overlay.equals("savedText:none"));
         else if (overlay.equals("fixing")) view.showFixing();
         else if (overlay.equals("queue")) view.showQueue();
+        else if (overlay.startsWith("older")) view.showOlder(overlay.equals("older:loading"));
         else if (overlay.startsWith("capture")) view.showCapture(overlay.equals("capture:sheet"));
         else if (overlay.startsWith("login:")) addAccount(view, overlay.substring(6));
         else if (overlay.startsWith("settings")) {

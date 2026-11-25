@@ -562,6 +562,14 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     public CompletableFuture<@Nullable Message> message(String chatId, String messageId) { return fetched.message(chatId, messageId); }
 
     @Override
+    public boolean hasOlder(String chatId) {
+        synchronized (proc) {
+            MatrixRoom r = proc.room(chatId);
+            return r != null && r.hasOlder();
+        }
+    }
+
+    @Override
     public CompletableFuture<Boolean> loadOlder(String chatId) {
         CompletableFuture<Boolean> f = new CompletableFuture<>();
         CompletableFuture<Boolean> prev = historyInFlight.putIfAbsent(chatId, f);

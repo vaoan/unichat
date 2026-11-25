@@ -603,6 +603,11 @@ public final class MainView extends StackPane {
         if (thread.chat() != null) thread.showQueue();
     }
 
+    /** "Cargar mensajes anteriores" over the open chat, ({@code loading}) working (snapshot diagnostics). */
+    public void showOlder(boolean loading) {
+        if (thread.chat() != null) thread.showOlder(loading);
+    }
+
     /** My newest message in the open chat being corrected with AI (snapshot diagnostics). */
     public void showFixing() {
         if (thread.chat() != null) thread.showFixing();

@@ -218,6 +218,31 @@ class SyncProcessorTest {
         assertEquals(1, messages(room).size());
     }
 
+    /** "Cargar mensajes anteriores" shows while this says there's more: until a page comes without an end. */
+    @Test
+    void aRoomHasOlderHistoryUntilAPageComesWithoutAnEnd() {
+        String room = "!h:example.org";
+        sync(room, "{'timeline':{'prev_batch':'t0','events':[%s]}}".formatted(text("$2", "@bob:example.org", 2, "new")), false);
+        assertTrue(Present.of(proc.room(room)).hasOlder(), "the sync gave a point to read back from");
+        proc.processHistory(room, json("{'chunk':[%s],'end':'t1'}".formatted(text("$1", "@bob:example.org", 1, "old"))));
+        assertTrue(Present.of(proc.room(room)).hasOlder(), "a page with an end: more before it");
+        proc.processHistory(room, json("{'chunk':[]}"));
+        assertFalse(Present.of(proc.room(room)).hasOlder(), "the chat's start");
+    }
+
+    /** A message after the start was loaded brings a {@code prev_batch} into what's already here: no older history. */
+    @Test
+    void theStartStaysReachedWhenANewMessageComesWithAPrevBatch() {
+        String room = "!s:example.org";
+        sync(room, "{'timeline':{'prev_batch':'t0','events':[%s]}}".formatted(text("$1", "@bob:example.org", 1, "first")), false);
+        proc.processHistory(room, json("{'chunk':[]}"));
+        sync(room, "{'timeline':{'prev_batch':'t9','events':[%s]}}".formatted(text("$2", "@bob:example.org", 2, "new")), true);
+        assertFalse(Present.of(proc.room(room)).hasOlder(), "still at the start: the bar doesn't come back");
+        // A gap (limited) drops what was loaded: its history can be read again.
+        sync(room, "{'timeline':{'limited':true,'prev_batch':'t10','events':[%s]}}".formatted(text("$3", "@bob:example.org", 3, "after a gap")), true);
+        assertTrue(Present.of(proc.room(room)).hasOlder(), "after a gap there's history again");
+    }
+
     @Test
     void reactionBeforeTargetIsAppliedWhenHistoryLoads() {
         String room = "!h:example.org";

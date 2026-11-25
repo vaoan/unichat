@@ -16,6 +16,10 @@ public interface ChatReader {
     List<Message> messages(String chatId);
     /** Loads earlier history; completes with false when the start of the chat was reached. */
     CompletableFuture<Boolean> loadOlder(String chatId);
+    /** Whether {@link #loadOlder} may still bring something: false once the chat's start is known to be loaded. */
+    default boolean hasOlder(String chatId) {
+        return true;
+    }
     /**
      * One message by its id, when it isn't among those loaded (the original of a reply, far back in a big chat); not
      * added to the chat. Completes with null when it can't be had.
