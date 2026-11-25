@@ -5,6 +5,7 @@ import app.unichat.support.I18n;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Set;
@@ -34,6 +35,9 @@ final class BridgeLauncher {
 
         /** Its config.yaml. */
         Path config(String bridge);
+
+        /** Takes the one-shot chat limits out of the settings ({@code ChatLimits.clearOneShots}). */
+        void clearOneShotLimits();
     }
 
     /** The bridges in use that can run now (Telegram only with its keys). */
@@ -55,9 +59,11 @@ final class BridgeLauncher {
     /**
      * At launch, before the server starts: writes the config of each usable bridge with an account and installs its new
      * build. One that fails is said and left as it is (it starts with the build it has): one failed download stopped
-     * the whole server. The others are prepared when their sign-in opens.
+     * the whole server. The others are prepared when their sign-in opens. First the one-shot chat limits a quit left set
+     * are cleared, so no launch config asks for them again.
      */
     void prepareAtLaunch(Consumer<String> progress) throws IOException, InterruptedException {
+        processes.clearOneShotLimits();
         for (String b : demand.withAccounts(usable.get())) {
             try {
                 processes.prepare(b, progress);
@@ -112,13 +118,19 @@ final class BridgeLauncher {
      * New chat limits for {@code bridge} ("Load older chats"): its config is rewritten and it alone restarts
      * ({@link #applySettings}), and this returns once it answers again. Refused before anything stops when it isn't
      * meant to run (no account) or its config lacks a limit key (a bridge version that renamed one); a bridge that
-     * stops running or says nothing within the wait is {@link BridgeDidntAnswer}.
+     * stops running or says nothing within the wait is {@link BridgeDidntAnswer}. Like {@link #applySettings}, asking
+     * whether it has an account marks one that has as meant to run.
      */
     void reconfigure(String bridge, String network, Consumer<String> progress) throws IOException, InterruptedException {
         if (!usable.get().contains(bridge) || demand.withAccounts(List.of(bridge)).isEmpty()) {
             throw new IOException(I18n.t("server.bridgeNotInUse", network));
         }
-        List<String> missing = BridgeConfig.missingLimitKeys(BridgeConfig.read(Files.readString(processes.config(bridge))), bridge);
+        List<String> missing;
+        try {
+            missing = BridgeConfig.missingLimitKeys(BridgeConfig.read(Files.readString(processes.config(bridge))), bridge);
+        } catch (NoSuchFileException e) {
+            missing = List.of("config.yaml"); // never set up here: nothing to raise
+        }
         if (!missing.isEmpty()) {
             System.err.println("Not reconfiguring " + bridge + ", its config lacks " + missing);
             throw new IOException(I18n.t("server.bridgeLimitKeyMissing", network));

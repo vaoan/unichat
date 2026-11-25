@@ -2,6 +2,7 @@ package app.unichat.bridge;
 
 import org.jspecify.annotations.Nullable;
 
+import java.util.function.Consumer;
 import java.util.function.Function;
 
 /**
@@ -33,6 +34,15 @@ public record ChatLimits(int telegramExtra, int discordExtra, boolean linkedinAl
     public static ChatLimits parse(Function<String, @Nullable String> get) {
         return new ChatLimits(count(get.apply(TELEGRAM_EXTRA)), count(get.apply(DISCORD_EXTRA)), flag(get.apply(LINKEDIN_ALL)),
                 flag(get.apply(GMESSAGES_ONCE)), flag(get.apply(INSTAGRAM_ONCE)));
+    }
+
+    /**
+     * Takes the one-shot limits out of the settings through {@code remove}: each is meant for one step's restart, so one
+     * a quit left set (Unichat closed mid-step) must not reach the next launch's config.
+     */
+    public static void clearOneShots(Consumer<String> remove) {
+        remove.accept(GMESSAGES_ONCE);
+        remove.accept(INSTAGRAM_ONCE);
     }
 
     /** Telegram's {@code create_limit} and {@code update_limit}. */

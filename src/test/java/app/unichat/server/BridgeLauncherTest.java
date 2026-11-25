@@ -2,6 +2,7 @@ package app.unichat.server;
 
 import app.unichat.Present;
 import app.unichat.bridge.BridgeDidntAnswer;
+import app.unichat.support.I18n;
 import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -22,6 +23,7 @@ import java.util.function.Consumer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -70,6 +72,7 @@ class BridgeLauncherTest {
         @Override public void restarting(String b) { calls.add("restarting " + b); }
         @Override public Path log(String b) { return Path.of("server", b, "bridge.log"); }
         @Override public Path config(String b) { return configs.resolve(b + ".yaml"); }
+        @Override public void clearOneShotLimits() { calls.add("clear one-shot limits"); }
     };
 
     private BridgeLauncher launcher(Duration limit) {
@@ -153,6 +156,7 @@ class BridgeLauncherTest {
             @Override public void restarting(String b) { /* the fake ignores it */ }
             @Override public Path log(String b) { return Path.of(b); }
             @Override public Path config(String b) { return Path.of(b); }
+            @Override public void clearOneShotLimits() { /* the fake ignores it */ }
         };
         BridgeLauncher l = new BridgeLauncher(failing, new BridgeDemand(b -> false, b -> true, Duration.ZERO, NO_LIMIT),
                 () -> Set.copyOf(usable));
@@ -204,7 +208,7 @@ class BridgeLauncherTest {
     void onlyBridgesWithAnAccountArePreparedAtLaunch() throws Exception {
         BridgeLauncher l = launcher(NO_LIMIT);
         l.prepareAtLaunch(msg -> { });
-        assertEquals(List.of("prepare whatsapp"), calls, "gmessages is prepared when its sign-in opens");
+        assertEquals(List.of("clear one-shot limits", "prepare whatsapp"), calls, "gmessages is prepared when its sign-in opens");
     }
 
     @Test
@@ -214,7 +218,8 @@ class BridgeLauncherTest {
         BridgeLauncher l = launcher(NO_LIMIT);
         l.prepareAtLaunch(msg -> { });
         l.launch();
-        assertEquals(Set.of("prepare whatsapp", "prepare gmessages", "start whatsapp", "start gmessages"), Set.copyOf(calls));
+        assertEquals(Set.of("clear one-shot limits", "prepare whatsapp", "prepare gmessages", "start whatsapp", "start gmessages"),
+                Set.copyOf(calls));
     }
 
     @Test
@@ -299,5 +304,56 @@ class BridgeLauncherTest {
         assertTrue(Present.of(e.getMessage()).contains("Google Messages"), e.getMessage());
         assertEquals(List.of(), calls, "a bridge without accounts isn't started for this");
         assertFalse(l.watched().contains("gmessages"));
+    }
+
+    /**
+     * A one-shot limit (Google Messages' 500 chats, Instagram's 3 pages) is set for one step's restart only: Unichat quitting
+     * mid-step left it set, and the next launch would have asked for it again.
+     */
+    @Test
+    void oneShotLimitsAreClearedAtLaunchBeforeAnyBridgeIsPrepared() throws Exception {
+        BridgeLauncher l = discordRunning();
+        l.prepareAtLaunch(msg -> { });
+        assertEquals("clear one-shot limits", calls.get(0), "before any bridge's config is written");
+        assertEquals(Set.of("prepare whatsapp", "prepare discord"), Set.copyOf(calls.subList(1, calls.size())));
+    }
+
+    @Test
+    void aReconfigureKeepsTheOneShotLimitItWasAskedFor() throws Exception {
+        BridgeLauncher l = discordRunning();
+        l.reconfigure("discord", "Discord", msg -> { });
+        l.applySettings("discord", msg -> { });
+        assertFalse(calls.contains("clear one-shot limits"), calls.toString());
+    }
+
+    @Test
+    void aMissingConfigRefusesInThePersonsWords() throws Exception {
+        BridgeLauncher l = discordRunning();
+        Files.delete(configs.resolve("discord.yaml"));
+        IOException e = assertThrows(IOException.class, () -> l.reconfigure("discord", "Discord", msg -> { }));
+        assertEquals(I18n.t("server.bridgeLimitKeyMissing", "Discord"), e.getMessage());
+        assertEquals(List.of(), calls, "nothing stopped");
+    }
+
+    /** Quitting interrupts a reconfigure's wait (LocalServer.stop), which must end it at once rather than wait out the minute. */
+    @Test
+    void anInterruptedWaitEndsTheReconfigure() throws Exception {
+        BridgeLauncher l = discordRunning();
+        CompletableFuture<Void> p = new CompletableFuture<>();
+        probing = p;
+        answer = new CountDownLatch(1); // never released: only the interrupt ends the wait
+        CompletableFuture<@Nullable Throwable> ended = new CompletableFuture<>();
+        Thread t = new Thread(() -> {
+            try {
+                l.reconfigure("discord", "Discord", msg -> { });
+                ended.complete(null);
+            } catch (IOException | InterruptedException | RuntimeException e) {
+                ended.complete(e);
+            }
+        }, "reconfigure");
+        t.start();
+        CompletableFuture.anyOf(p, ended).get();
+        t.interrupt();
+        assertInstanceOf(InterruptedException.class, ended.get());
     }
 }

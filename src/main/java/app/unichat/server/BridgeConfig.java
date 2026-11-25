@@ -45,9 +45,12 @@ public final class BridgeConfig {
     /** mautrix-gmessages' own {@code initial_chat_sync_count}, put back once its one-shot step is over. */
     static final int GMESSAGES_DEFAULT = 25;
 
-    /** The keys each bridge's chat limits are written to: the same paths {@link #apply} sets. */
+    /**
+     * The keys a "Load older chats" step raises, per bridge: the same paths {@link #apply} writes from the limits. Telegram's
+     * {@code login_sync_limit} isn't one (no step changes it), so a version without it can still be asked for more.
+     */
     private static final Map<String, List<String>> LIMIT_KEYS = Map.of(
-            "telegram", List.of(TELEGRAM_CREATE, TELEGRAM_UPDATE, TELEGRAM_LOGIN),
+            "telegram", List.of(TELEGRAM_CREATE, TELEGRAM_UPDATE),
             "discord", List.of(DISCORD_DMS),
             "linkedin", List.of(LINKEDIN_CREATE),
             "gmessages", List.of(GMESSAGES_COUNT),

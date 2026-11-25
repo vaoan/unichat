@@ -266,7 +266,7 @@ class BridgeConfigTest {
     void aMissingLimitKeyIsReported() throws Exception {
         assertEquals(List.of("/bridge/startup_private_channel_create_limit"), BridgeConfig.missingLimitKeys(BridgeConfig.read(LEGACY), "discord"));
         assertEquals(List.of(), BridgeConfig.missingLimitKeys(BridgeConfig.read(DISCORD), "discord"));
-        assertEquals(List.of("/network/sync/create_limit", "/network/sync/update_limit", "/network/sync/login_sync_limit"),
+        assertEquals(List.of("/network/sync/create_limit", "/network/sync/update_limit"),
                 BridgeConfig.missingLimitKeys(BridgeConfig.read(V2), "telegram"));
         assertEquals(List.of(), BridgeConfig.missingLimitKeys(BridgeConfig.read(TELEGRAM), "telegram"));
         assertEquals(List.of(), BridgeConfig.missingLimitKeys(BridgeConfig.read(LINKEDIN), "linkedin"));

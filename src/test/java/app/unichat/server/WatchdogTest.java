@@ -64,6 +64,7 @@ class WatchdogTest {
                 @Override public void restarting(String bridge) { /* the fake ignores it */ }
                 @Override public java.nio.file.Path log(String bridge) { return java.nio.file.Path.of(bridge); }
                 @Override public java.nio.file.Path config(String bridge) { return java.nio.file.Path.of(bridge); }
+                @Override public void clearOneShotLimits() { /* the fake ignores it */ }
             }, new BridgeDemand(Set.of("whatsapp")::contains, b -> true, Duration.ZERO, Duration.ZERO),
                     () -> Set.of("whatsapp", "gmessages"));
             launcher.launch();
