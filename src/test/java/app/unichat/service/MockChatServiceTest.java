@@ -16,6 +16,18 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class MockChatServiceTest {
+    /** The demo's chats are whole from their start: no "Cargar mensajes anteriores", and a load brings nothing. */
+    @Test
+    void theDemosChatsHaveNoOlderHistory() throws Exception {
+        MockChatService demo = new MockChatService();
+        try {
+            for (var c : demo.chats()) assertFalse(demo.hasOlder(c.id()), c.id());
+            assertFalse(demo.loadOlder("!family:demo").get(), "loading says the start is there");
+        } finally {
+            demo.stop();
+        }
+    }
+
     /** Every name and text the demo shows, and the voice note's file, all in the UI language through demo.* keys. */
     @Test
     void theDemoSpeaksTheUiLanguage() throws Exception {

@@ -146,6 +146,8 @@ public class ScriptedChatService extends MockChatService {
 
     @Override
     public CompletableFuture<Boolean> loadOlder(String chatId) {
+        requests.merge(chatId, 1, Integer::sum);
+        if (failNext.remove(chatId)) return CompletableFuture.failedFuture(new java.io.IOException("history failed (test)"));
         List<Message> held = heldBack.get(chatId);
         if (held != null && !held.isEmpty()) {
             List<Message> list = Present.of(messages.get(chatId));
@@ -168,6 +170,19 @@ public class ScriptedChatService extends MockChatService {
             prepend(chatId, count);
             return true;
         });
+    }
+
+    private final Map<String, Integer> requests = new ConcurrentHashMap<>();
+    private final java.util.Set<String> failNext = ConcurrentHashMap.newKeySet();
+
+    /** How many times the window asked {@code chatId}'s history, whatever came of it. */
+    public int historyRequests(String chatId) {
+        return requests.getOrDefault(chatId, 0);
+    }
+
+    /** The next history load of {@code chatId} fails at once; what's held back stays held for the one after. */
+    public void failNextHistory(String chatId) {
+        failNext.add(chatId);
     }
 
     /** What's held back or scripted to load is the history still to come. */

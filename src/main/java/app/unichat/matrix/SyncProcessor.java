@@ -158,7 +158,8 @@ final class SyncProcessor {
             r.messagesChanged.add(roomId);
         }
         String prev = text(tl, "prev_batch");
-        if (isNew || limited || room.prevBatch == null) room.prevBatch = prev;
+        if (isNew || limited) room.atStart = false; // what was loaded is gone: its history can be read again
+        if (isNew || limited || (room.prevBatch == null && !room.atStart)) room.prevBatch = prev;
         for (JsonNode ev : tl.path("events")) processEvent(room, ev, null, live, r);
 
         for (JsonNode ev : j.path("ephemeral").path("events")) applyEphemeral(room, ev, r);
@@ -214,8 +215,10 @@ final class SyncProcessor {
         List<Message> older = new ArrayList<>();
         for (int i = chunk.size() - 1; i >= 0; i--) processEvent(room, chunk.get(i), older, false, r);
         room.timeline.addAll(0, older);
-        room.prevBatch = text(resp, "end");
-        r.hasMore = room.prevBatch != null && !chunk.isEmpty();
+        String end = text(resp, "end");
+        room.atStart = end == null || chunk.isEmpty();
+        room.prevBatch = room.atStart ? null : end;
+        r.hasMore = !room.atStart;
         r.messagesChanged.add(roomId);
         if (!older.isEmpty()) {
             fields.refresh(room);

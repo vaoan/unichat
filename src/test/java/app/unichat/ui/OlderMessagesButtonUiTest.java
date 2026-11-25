@@ -62,7 +62,92 @@ class OlderMessagesButtonUiTest {
         w.close();
 
         w = TimelineWindow.open(30, "mensaje %d");
-        assertFalse(FxWait.fx(this::shown), "the demo's chat is whole from its start: no button");
+        assertFalse(FxWait.fx(this::shown), "a chat whose start is loaded (nothing held back or to load): no button");
+    }
+
+    /** A short chat with nothing before it: no request, and not a frame of "Cargando…" on opening it. */
+    @Test
+    void aShortChatWithNothingBeforeItNeverFlashesTheBar() throws Exception {
+        w = TimelineWindow.open(3, "mensaje %d"); // fewer than 20: opening it used to ask for its history at once
+        boolean[] everShown = {false};
+        FxWait.onFx(() -> bar().visibleProperty().addListener((o, a, v) -> everShown[0] |= v));
+        int before = w.svc.historyRequests(CHAT);
+        FxWait.onFx(() -> w.view.openChatId("!family:demo"));
+        w.openChat();
+        FxWait.settled();
+        assertEquals(before, w.svc.historyRequests(CHAT), "nothing to ask: nothing asked");
+        assertFalse(everShown[0], "the bar never showed, not even for a moment");
+    }
+
+    /** A failed load is said once; nothing asks again until the person presses the button. */
+    @Test
+    void aFailedLoadIsNotTriedAgainUnasked() throws Exception {
+        w = TimelineWindow.open(40, LONG, svc -> svc.holdBack(CHAT, 10));
+        w.svc.failNextHistory(CHAT);
+        int before = w.svc.historyRequests(CHAT);
+        press();
+        FxWait.until("the failure is said", () -> w.scene.getRoot().lookup(".toast") instanceof Label t && t.isVisible()
+                && t.getText().startsWith("No se pudieron cargar los mensajes anteriores"));
+        FxWait.settled();
+        assertEquals(before + 1, w.svc.historyRequests(CHAT), "one request, and no other on its own");
+        assertTrue(FxWait.fx(() -> shown() && LOAD.equals(button().getText())), "the button waits for the person");
+    }
+
+    /** What waited for a failed load (going to a pinned message) gives up with it: a later load doesn't jump there. */
+    @Test
+    void aPinnedMessageWaitingForAFailedLoadDoesntJumpLater() throws Exception {
+        app.unichat.model.Message[] held = new app.unichat.model.Message[1];
+        w = TimelineWindow.open(40, LONG, svc -> {
+            held[0] = svc.messages(CHAT).getFirst(); // the oldest, in the page held back
+            svc.holdBack(CHAT, 10);
+        });
+        app.unichat.model.Message pinned = held[0];
+        String pinnedId = pinned.id();
+        try {
+            FxWait.onFx(() -> app.unichat.service.PinnedMessages.get().pin(CHAT, pinned));
+            w.svc.failNextHistory(CHAT);
+            int asked = w.svc.historyRequests(CHAT);
+            FxWait.onFx(() -> ((Button) w.scene.getRoot().lookup(".pinned-go")).fire());
+            FxWait.until("the load failed: the button is back", () -> shown() && LOAD.equals(button().getText())
+                    && w.svc.historyRequests(CHAT) == asked + 1);
+            FxWait.settled();
+            int before = count();
+            press(); // the person's own load
+            FxWait.until("the page came", () -> w.svc.messages(CHAT).size() > before);
+            FxWait.settled();
+            assertTrue(FxWait.fx(() -> w.svc.messages(CHAT).stream().anyMatch(m -> m.id().equals(pinnedId))),
+                    "precondition: the pinned one is loaded now");
+            assertFalse(FxWait.fx(() -> w.list().getSelectionModel().getSelectedItem() instanceof app.unichat.ui.timeline.ThreadRows.MessageRow mr
+                    && mr.message().id().equals(pinnedId)), "the failed reveal didn't come back to jump to the pinned one");
+            assertEquals(asked + 2, w.svc.historyRequests(CHAT), "and no load went on looking for it");
+        } finally {
+            FxWait.onFx(() -> app.unichat.service.PinnedMessages.get().unpin(CHAT, pinnedId));
+        }
+    }
+
+    /** One chat's load answering after another chat was opened leaves that chat's own load working. */
+    @Test
+    void aLateAnswerForAnotherChatLeavesThisChatsLoadWorking() throws Exception {
+        String other = "!family:demo";
+        ScriptedChatService.Gate[] first = new ScriptedChatService.Gate[1];
+        w = TimelineWindow.open(30, LONG, svc -> first[0] = svc.olderToLoad(CHAT, 5));
+        press(); // CHAT's load, held
+        FxWait.until("loading", () -> LOADING.equals(button().getText()));
+        ScriptedChatService.Gate second = w.svc.olderToLoad(other, 5);
+        FxWait.onFx(() -> w.view.openChatId(other));
+        FxWait.settled();
+        if (!LOADING.equals(FxWait.fx(() -> button().getText()))) press(); // its own load, held (if opening didn't start it)
+        FxWait.until("the other chat loads", () -> LOADING.equals(button().getText()));
+        first[0].release(); // CHAT's answer, late
+        FxWait.settled();
+        assertEquals(LOADING, FxWait.fx(() -> button().getText()), "this chat's load still going: still working");
+        assertTrue(FxWait.fx(this::wheelShown));
+        int asked = w.svc.historyRequests(other);
+        press(); // still loading: the press asks nothing more
+        FxWait.settled();
+        assertEquals(asked, w.svc.historyRequests(other), "the late answer didn't end this chat's load: no second request");
+        second.release();
+        FxWait.until("this chat's own answer ends it", () -> !LOADING.equals(button().getText()));
     }
 
     @Test

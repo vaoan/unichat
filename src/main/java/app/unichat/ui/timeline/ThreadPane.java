@@ -511,7 +511,7 @@ public final class ThreadPane extends BorderPane {
         refreshHeader();
         rebuild(true);
         composer.focus();
-        if (svc.messages(c.id()).size() < 20) loadOlder();
+        if (svc.messages(c.id()).size() < 20 && svc.hasOlder(c.id())) loadOlder(); // nothing to ask: no "Cargando…" flash
     }
 
     /** Called with a server's id when its name in the header is clicked. */
@@ -618,8 +618,8 @@ public final class ThreadPane extends BorderPane {
         // Loaded because the chat is short (not because you scrolled to the top): keep showing the newest.
         boolean followBottom = scroll.pinned();
         var _ = svc.loadOlder(id).whenComplete((more, err) -> Platform.runLater(() -> {
+            if (chat == null || !chat.id().equals(id)) return; // another chat's load, if any, is its own
             loadingOlder = false;
-            if (chat == null || !chat.id().equals(id)) return;
             if (err != null) {
                 // Said, and the button is there to try again; what waited (a pinned message) gives up with it.
                 afterOlder.clear();
