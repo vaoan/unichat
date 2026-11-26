@@ -12,7 +12,9 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -35,7 +37,7 @@ class SyncBodyNotKeptTest {
         CountDownLatch longPollArrived = new CountDownLatch(1);
         CountDownLatch release = new CountDownLatch(1);
         byte[] big = new byte[4 * 1024 * 1024];
-        java.util.Arrays.fill(big, (byte) 'x');
+        Arrays.fill(big, (byte) 'x');
         server.createContext("/big", ex -> {
             clientPorts.add(ex.getRemoteAddress().getPort());
             ex.getRequestBody().readAllBytes();
@@ -53,7 +55,7 @@ class SyncBodyNotKeptTest {
                 Thread.currentThread().interrupt();
             }
             ex.sendResponseHeaders(200, 2);
-            ex.getResponseBody().write("{}".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            ex.getResponseBody().write("{}".getBytes(StandardCharsets.UTF_8));
             ex.close();
         });
         server.start();
@@ -63,14 +65,16 @@ class SyncBodyNotKeptTest {
             CompletableFuture<HttpResponse<String>> poll = http.sendAsync(
                     HttpRequest.newBuilder(base.resolve("/poll")).timeout(Duration.ofMinutes(1)).GET().build(),
                     HttpResponse.BodyHandlers.ofString());
-            longPollArrived.await();
-
             boolean cleared = false;
-            for (int round = 0; round < 50 && !cleared; round++) {
-                System.gc(); // NOPMD: DoNotCallGarbageCollectionExplicitly, it measures what is kept after a collection
-                cleared = body.get() == null;
+            try {
+                longPollArrived.await();
+                for (int round = 0; round < 50 && !cleared; round++) {
+                    System.gc(); // NOPMD: DoNotCallGarbageCollectionExplicitly, it measures what is kept after a collection
+                    cleared = body.get() == null;
+                }
+            } finally {
+                release.countDown(); // before the client closes: close() waits for the held poll
             }
-            release.countDown();
             poll.get();
             assertEquals(1, clientPorts.size(), "the long poll must go over the connection the first body came on");
             assertTrue(cleared, "the first response's body is still held by the pooled connection");
