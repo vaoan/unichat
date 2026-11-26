@@ -31,4 +31,12 @@ public interface BridgeProvisioner {
     default void reconfigure(Network network, Consumer<String> progress) throws Exception { // NOPMD: SignatureDeclareThrowsException, a callback: the local server restarts a bridge, failing as it does
         throw new UnsupportedOperationException("reconfigure");
     }
+
+    /**
+     * Writes {@code network}'s config from the settings again without restarting its bridge (a one-shot limit cleared
+     * after its step), so a restart by the watchdog doesn't ask for it again. Nothing where no bridge runs here.
+     */
+    default void rewrite(Network network) throws Exception { // NOPMD: SignatureDeclareThrowsException, a callback: the local server writes a config, failing as it does
+        /* nothing by default */
+    }
 }

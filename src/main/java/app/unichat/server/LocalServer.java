@@ -206,13 +206,18 @@ public final class LocalServer {
      */
     public synchronized void reconfigureBridge(String bridge, String network, Consumer<String> progress)
             throws IOException, InterruptedException {
-        if (!running) throw new IOException(I18n.t("server.bridgeNotInUse", network));
+        if (!running) throw new app.unichat.bridge.BridgeRefused(I18n.t("server.bridgeNotInUse", network));
         reconfiguring = Thread.currentThread(); // NOPMD: UnusedAssignment, stop() reads it on the thread that quits
         try {
             bridges.reconfigure(bridge, network, progress);
         } finally {
             reconfiguring = null;
         }
+    }
+
+    /** Writes {@code bridge}'s config from the settings again, without restarting it ({@link BridgeLauncher#rewrite}). */
+    public synchronized void rewriteBridgeConfig(String bridge) throws IOException, InterruptedException {
+        bridges.rewrite(bridge, msg -> { });
     }
 
     /** The person logged out of {@code bridge}'s last account (the bridge confirmed it): it stops. */

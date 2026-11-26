@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.bridge.BridgeDidntAnswer;
+import app.unichat.bridge.BridgeRefused;
 import app.unichat.support.I18n;
 
 import java.io.IOException;
@@ -123,7 +124,7 @@ final class BridgeLauncher {
      */
     void reconfigure(String bridge, String network, Consumer<String> progress) throws IOException, InterruptedException {
         if (!usable.get().contains(bridge) || demand.withAccounts(List.of(bridge)).isEmpty()) {
-            throw new IOException(I18n.t("server.bridgeNotInUse", network));
+            throw new BridgeRefused(I18n.t("server.bridgeNotInUse", network));
         }
         List<String> missing;
         try {
@@ -133,12 +134,21 @@ final class BridgeLauncher {
         }
         if (!missing.isEmpty()) {
             System.err.println("Not reconfiguring " + bridge + ", its config lacks " + missing);
-            throw new IOException(I18n.t("server.bridgeLimitKeyMissing", network));
+            throw new BridgeRefused(I18n.t("server.bridgeLimitKeyMissing", network));
         }
         applySettings(bridge, progress);
         if (!demand.answers(bridge, processes::isRunning)) {
             throw new BridgeDidntAnswer(I18n.t("server.bridgeDidntAnswer", network, processes.log(bridge)));
         }
+    }
+
+    /**
+     * Its config written again from the settings, without a restart (a one-shot chat limit cleared after its step): the
+     * watchdog restarts a bridge with the config on disk. One never set up here, or that can't run, is left alone.
+     */
+    void rewrite(String bridge, Consumer<String> progress) throws IOException, InterruptedException {
+        if (!usable.get().contains(bridge) || !Files.exists(processes.config(bridge))) return;
+        processes.prepare(bridge, progress);
     }
 
     /** Opening {@code bridge}'s sign-in: starts it and returns once it answers, for the sign-in's first call. */

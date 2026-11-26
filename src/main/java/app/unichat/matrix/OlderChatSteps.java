@@ -47,6 +47,8 @@ final class OlderChatSteps {
     /** Unichat's WhatsApp patch (native/patches/whatsapp), which answers "Created <k> chats from history sync". */
     static final String WHATSAPP_HISTORY_COMMAND = "sync-history-chats";
 
+    /** mautrix-whatsapp's own command, which answers "Queued syncs for <n> groups". */
+    static final String WHATSAPP_GROUPS_COMMAND = "sync groups";
     static final String WHATSAPP_GROUPS = "olderChats.whatsapp.groups";
     static final String DISCORD_AT = "olderChats.discord.at";
 
@@ -133,7 +135,7 @@ final class OlderChatSteps {
             case WHATSAPP -> "done".equals(settings.apply(WHATSAPP_GROUPS))
                     ? new Step(n, Kind.COMMAND, Map.of(), WHATSAPP_HISTORY_COMMAND + " " + WHATSAPP_HISTORY_CHATS, COMMAND_PATIENCE,
                             new Plan(n, WHATSAPP_HISTORY_CHATS, false, false, false, null))
-                    : new Step(n, Kind.COMMAND, Map.of(WHATSAPP_GROUPS, "done"), "sync groups", COMMAND_PATIENCE,
+                    : new Step(n, Kind.COMMAND, Map.of(WHATSAPP_GROUPS, "done"), WHATSAPP_GROUPS_COMMAND, COMMAND_PATIENCE,
                             new Plan(n, -1, false, false, false, null));
             case DISCORD -> new Step(n, Kind.RAISE_RESTART,
                     Map.of(ChatLimits.DISCORD_EXTRA, Integer.toString(asked.discordExtra() + ChatLimits.DISCORD_STEP),

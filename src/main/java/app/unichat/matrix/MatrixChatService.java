@@ -126,7 +126,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         this.profiles = new Profiles(core);
         this.invites = new Invites(core);
         this.fetched = new FetchedMessages(core);
-        this.olderChats = OlderChatLoader.of(bridges, this::roomIdsOf, chatActions::markRead, this::newestOf, io);
+        this.olderChats = OlderChatLoader.of(bridges, this::roomIdsOf, chatActions::markReadHere, this::newestOf, io);
     }
 
     // ---------------------------------------------------------------- folders
@@ -663,6 +663,9 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     @Override public CompletableFuture<Void> toggleReaction(String chatId, String messageId, String emoji) { return sender.toggleReaction(chatId, messageId, emoji); }
     @Override public void sendTyping(String chatId, boolean typing) { sender.sendTyping(chatId, typing); }
     @Override public void markRead(String chatId) { chatActions.markRead(chatId); }
+
+    /** A chat "Load older chats" brought, marked read here only: never a public receipt (the bridge would pass it on). */
+    void markLoadedRead(String chatId) { chatActions.markReadHere(chatId); }
     @Override public CompletableFuture<Void> setMarkedUnread(String chatId, boolean unread) { return chatActions.setMarkedUnread(chatId, unread); }
     @Override public CompletableFuture<Void> setFavorite(String chatId, boolean favorite) { return chatActions.setFavorite(chatId, favorite); }
     @Override public CompletableFuture<Void> setLowPriority(String chatId, boolean lowPriority) { return chatActions.setLowPriority(chatId, lowPriority); }

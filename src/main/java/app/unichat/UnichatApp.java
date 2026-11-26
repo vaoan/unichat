@@ -233,6 +233,10 @@ public final class UnichatApp extends Application {
             @Override public void reconfigure(Network n, java.util.function.Consumer<String> progress) throws Exception {
                 local.reconfigureBridge(n.protocolId(), n.displayName(), progress);
             }
+
+            @Override public void rewrite(Network n) throws Exception {
+                local.rewriteBridgeConfig(n.protocolId());
+            }
         };
     }
 

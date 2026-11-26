@@ -1,6 +1,7 @@
 package app.unichat.matrix;
 
 import app.unichat.bridge.BridgeDidntAnswer;
+import app.unichat.bridge.BridgeRefused;
 import app.unichat.bridge.ChatLimits;
 import app.unichat.model.Network;
 import app.unichat.service.OlderChats.Answer;
@@ -9,6 +10,7 @@ import app.unichat.service.OlderChats.Plan;
 import app.unichat.service.OlderChats.Stage;
 import app.unichat.settings.Settings;
 import app.unichat.support.I18n;
+import app.unichat.support.Numbers;
 import org.jspecify.annotations.Nullable;
 
 import java.time.Duration;
@@ -18,7 +20,6 @@ import java.util.Collections;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -38,8 +39,12 @@ final class OlderChatLoader {
     static final Duration QUIET = Duration.ofSeconds(45);
     /** The longest a step counts arriving rooms; the rest still arrive later, uncounted. */
     static final Duration MAX = Duration.ofMinutes(15);
-    /** How the WhatsApp patch's reply begins when it ran. */
+    /** How the WhatsApp patch's reply begins when it ran: "Created <k> chats from history sync". */
     private static final String HISTORY_CHATS_CREATED = "Created ";
+    /** How mautrix-whatsapp's {@code sync groups} answers when it ran (fnSync, v0.2610.0): "Queued syncs for <n> groups". */
+    private static final String GROUPS_QUEUED = "Queued syncs for ";
+    /** A bridge without the command ("Unknown command, use the `help` command for help."), in any case. */
+    private static final java.util.regex.Pattern UNKNOWN_COMMAND = java.util.regex.Pattern.compile("(?i)unknown command");
 
     /** A command to a network's bridge bot, answered with its reply; a {@link TimeoutException} when none came. */
     @FunctionalInterface
@@ -79,7 +84,7 @@ final class OlderChatLoader {
     private volatile boolean cancelled;
     private volatile @Nullable Loading loading;
 
-    /** markRead: ChatPreferences.markRead in production; newest: a room's newest message time (null when none). */
+    /** markRead: ChatActions.markReadHere in production (no public receipt); newest: a room's newest message time (null when none). */
     OlderChatLoader(OlderChatSteps steps, Bot bot, BridgeProvisioner provisioner, RoomArrivals arrivals,
                     SettingsWriter settings, Consumer<String> markRead, Function<String, @Nullable Instant> newest,
                     Executor io) {
@@ -169,7 +174,7 @@ final class OlderChatLoader {
                 Thread.currentThread().interrupt();
                 break;
             } catch (RuntimeException e) {
-                a = new Answer.NotPossible(failed(e));
+                a = new Answer.NotPossible(failed(n, "step", e));
             }
             answers.put(n, a);
             System.err.println("Older chats: " + n.protocolId() + ": " + a.getClass().getSimpleName()
@@ -193,40 +198,76 @@ final class OlderChatLoader {
             p.newChats(counting.newRooms());
         });
         boolean answered = true;
+        boolean promisedMore = false;
         try {
             Answer refused = step.kind() == OlderChatSteps.Kind.COMMAND ? null : raiseAndRestart(step, p);
             if (refused != null) return refused;
             String command = step.command();
             if (command != null) {
                 p.stage(Stage.ASKING);
-                Answer failed = null;
+                Asked asked = null;
                 try {
-                    failed = ask(step, command);
+                    asked = ask(step, command);
                 } catch (TimeoutException noReply) {
                     answered = false; // the bridge may still be at it: what arrives is the answer
                 }
-                if (failed != null) return failed;
+                if (asked != null) {
+                    Answer failed = asked.refused();
+                    if (failed != null) return failed;
+                    promisedMore = asked.promisedMore();
+                }
                 if (answered && step.kind() == OlderChatSteps.Kind.COMMAND) step.settings().forEach(settings::set);
             }
             p.stage(Stage.ARRIVING);
             int count = waitQuiet(counting);
-            return counted(step, count, answered);
+            return counted(step, count, answered && !promisedMore);
         } finally {
             counting.stop();
+            boolean cleared = false;
             for (String k : List.of(ChatLimits.GMESSAGES_ONCE, ChatLimits.INSTAGRAM_ONCE)) {
-                if (step.settings().containsKey(k)) settings.set(k, null);
+                if (step.settings().containsKey(k)) {
+                    settings.set(k, null);
+                    cleared = true;
+                }
             }
+            if (cleared) writeOut(step.network());
         }
     }
 
     /**
-     * The answer for {@code count} new rooms, keeping "nothing more" when the network has none left to give. A command
-     * that got no answer proves nothing, so the next click asks again.
+     * Writes the network's config again now its one-shot is cleared: the watchdog restarts a bridge with the config on
+     * disk, and would ask for it again (Google Messages' 500 chats on every restart). A cancel's interrupt waits until
+     * it's written, then stays.
      */
-    private Answer counted(OlderChatSteps.Step step, int count, boolean answered) {
+    private void writeOut(Network n) {
+        boolean interrupted = Thread.interrupted();
+        try {
+            provisioner.rewrite(n);
+        } catch (InterruptedException e) {
+            interrupted = true;
+            System.err.println("Older chats: " + n.protocolId() + " config not written again: interrupted");
+        } catch (Exception e) {
+            System.err.println("Older chats: " + n.protocolId() + " config not written again: " + e);
+        } finally {
+            if (interrupted) Thread.currentThread().interrupt();
+        }
+    }
+
+    /** What the bot said: the answer when it refused, else whether it said more chats are coming than may have arrived. */
+    private record Asked(@Nullable Answer refused, boolean promisedMore) {
+        static final Asked TAKEN = new Asked(null, false);
+
+        static Asked refusedWith(String why) { return new Asked(new Answer.NotPossible(why), false); }
+    }
+
+    /**
+     * The answer for {@code count} new rooms, keeping "nothing more" when the network has none left to give. A command
+     * that got no answer, or one that said it made chats that didn't come in time, proves nothing, so the next click asks again.
+     */
+    private Answer counted(OlderChatSteps.Step step, int count, boolean proven) {
         boolean groupsFirst = step.settings().containsKey(OlderChatSteps.WHATSAPP_GROUPS);
         boolean nothingLeft = OlderChatSteps.onlyOnce(step) || (count == 0 && !groupsFirst);
-        if (answered && nothingLeft) settings.set(OlderChatSteps.doneKey(step.network()), "true");
+        if (proven && nothingLeft) settings.set(OlderChatSteps.doneKey(step.network()), "true");
         return count > 0 ? new Answer.Loaded(count) : new Answer.NothingMore();
     }
 
@@ -254,8 +295,7 @@ final class OlderChatLoader {
             return new Answer.NotPossible(I18n.t("olderChats.didntComeBack"));
         } catch (Exception e) {
             old.forEach(settings::set);
-            System.err.println("Older chats: " + step.network().protocolId() + " refused: " + e.getMessage());
-            return new Answer.NotPossible(failed(e));
+            return new Answer.NotPossible(failed(step.network(), "restart", e));
         }
     }
 
@@ -271,35 +311,42 @@ final class OlderChatLoader {
         }
     }
 
-    /** Sends the step's command; null when the bot took it, a {@link TimeoutException} when it didn't answer in time. */
-    private @Nullable Answer ask(OlderChatSteps.Step step, String command) throws InterruptedException, TimeoutException {
+    /** Sends the step's command and reads the reply; a {@link TimeoutException} when it didn't answer in time. */
+    private Asked ask(OlderChatSteps.Step step, String command) throws InterruptedException, TimeoutException {
         String reply;
         try {
             reply = bot.query(step.network(), command, step.commandPatience());
         } catch (InterruptedException | TimeoutException e) {
             throw e;
         } catch (Exception e) {
-            System.err.println("Older chats: " + step.network().protocolId() + " " + command + " failed: " + e.getMessage());
-            return new Answer.NotPossible(failed(e));
+            return Asked.refusedWith(failed(step.network(), command, e));
         }
-        if (reply.toLowerCase(Locale.ROOT).contains("unknown command")) {
-            return new Answer.NotPossible(command.startsWith(OlderChatSteps.WHATSAPP_HISTORY_COMMAND) ? I18n.t("olderChats.needsUpdate")
+        if (UNKNOWN_COMMAND.matcher(reply).find()) {
+            return Asked.refusedWith(command.startsWith(OlderChatSteps.WHATSAPP_HISTORY_COMMAND) ? I18n.t("olderChats.needsUpdate")
                     : I18n.t("olderChats.failed", reply));
         }
-        // WhatsApp's patch says "Created <k> chats…" when it ran; anything else ("Not logged in" while it reconnects) is
-        // no "nothing more", so nothing is marked done and the next click asks again.
-        if (command.startsWith(OlderChatSteps.WHATSAPP_HISTORY_COMMAND) && !reply.startsWith(HISTORY_CHATS_CREATED)) {
-            return new Answer.NotPossible(I18n.t("olderChats.failed", reply));
-        }
+        // WhatsApp's commands say how they went ("Created <k> chats…", "Queued syncs for <n> groups"); anything else
+        // ("Not logged in" while it reconnects) is no "nothing more", so nothing is marked done and the next click asks again.
+        String success = command.startsWith(OlderChatSteps.WHATSAPP_HISTORY_COMMAND) ? HISTORY_CHATS_CREATED
+                : command.equals(OlderChatSteps.WHATSAPP_GROUPS_COMMAND) ? GROUPS_QUEUED : null;
+        if (success != null && !reply.startsWith(success)) return Asked.refusedWith(I18n.t("olderChats.failed", reply));
         // Telegram's sync-chats says "Successfully…" when it walked the list; anything else is the bridge saying why not.
         if (step.kind() == OlderChatSteps.Kind.RAISE_RESTART_COMMAND) {
             try {
                 BridgeProtocol.requireSuccess(reply);
             } catch (MatrixException e) {
-                return new Answer.NotPossible(I18n.t("olderChats.failed", reply));
+                return Asked.refusedWith(I18n.t("olderChats.failed", reply));
             }
         }
-        return null;
+        return HISTORY_CHATS_CREATED.equals(success) ? new Asked(null, !createdNone(reply)) : Asked.TAKEN;
+    }
+
+    /** Whether the patch's "Created <k> chats…" says k is 0; a k that doesn't read says nothing, so not. */
+    private static boolean createdNone(String reply) {
+        String rest = reply.substring(HISTORY_CHATS_CREATED.length());
+        int end = rest.indexOf(' ');
+        Integer k = Numbers.intOf(end < 0 ? rest : rest.substring(0, end));
+        return k != null && k == 0;
     }
 
     private static int waitQuiet(RoomArrivals.Counting counting) throws InterruptedException {
@@ -330,9 +377,15 @@ final class OlderChatLoader {
     /** A line of a bridge's restart: the bar says "restarting its bridge", not each line. */
     static void notShown(String line) { /* not shown */ }
 
-    private static String failed(Exception e) {
+    /**
+     * Why it failed, for the person: a refusal in their words ({@link BridgeRefused}) as it is, anything else a text of
+     * ours, with the detail (technical, English) in the log.
+     */
+    private static String failed(Network n, String what, Exception e) {
         String m = e.getMessage();
-        return m == null || m.isBlank() ? I18n.t("olderChats.failed", e.getClass().getSimpleName()) : m;
+        if (e instanceof BridgeRefused && m != null && !m.isBlank()) return m;
+        System.err.println("Older chats: " + n.protocolId() + " " + what + " failed: " + e);
+        return I18n.t("olderChats.error");
     }
 
     private static Map<Network, Answer> copy(Map<Network, Answer> answers) {

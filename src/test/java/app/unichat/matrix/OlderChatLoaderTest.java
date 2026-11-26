@@ -131,6 +131,16 @@ class OlderChatLoaderTest {
             if (!left.isEmpty()) throw left.removeFirst();
             cameBack.run();
         }
+
+        @Override
+        public void rewrite(Network network) {
+            List<String> olderChats = new ArrayList<>();
+            settings.forEach((k, v) -> { if (k.startsWith("olderChats.") && !k.endsWith(".at")) olderChats.add(k + "=" + v); });
+            olderChats.sort(null);
+            events.add(("rewrite " + network + " " + String.join(" ", olderChats)).strip()
+                    + (Thread.currentThread().isInterrupted() ? " (interrupted)" : ""));
+            time.changes.changed();
+        }
     }
 
     /** Runs the clock past every quiet wait until the load answers. */
@@ -175,10 +185,28 @@ class OlderChatLoaderTest {
     void whatsappSendsSyncGroupsWithoutARestart() throws Exception {
         replies.put("sync groups", () -> {
             arrive(Network.WHATSAPP, "!group", START.minus(Duration.ofDays(3)));
-            return "Synced 1 group";
+            return "Queued syncs for 1 groups";
         });
         assertEquals(Map.of(Network.WHATSAPP, new Answer.Loaded(1)), load(Network.WHATSAPP));
         assertEquals(List.of("command WHATSAPP sync groups PT2M", "set olderChats.whatsapp.groups=done"), events);
+    }
+
+    @Test
+    void whatsappSyncGroupsRefusedIsNotPossibleAndAskedAgainLater() throws Exception {
+        // fnSync answers "Queued syncs for <n> groups" when it ran; "Login not found" or "Failed to get joined groups" is no.
+        replies.put("sync groups", () -> "Failed to get joined groups: websocket not connected");
+        Answer a = load(Network.WHATSAPP).get(Network.WHATSAPP);
+        assertEquals(new Answer.NotPossible("no funcionó: Failed to get joined groups: websocket not connected"), a);
+        assertEquals(List.of(), eventsStarting("set"), "groups not marked done: the next click asks again");
+    }
+
+    @Test
+    void whatsappHistoryChatsThatCreatedSomeButBroughtNoneInTimeIsNotDone() throws Exception {
+        // The bridge made the chats, but their rooms came after the quiet wait: no proof there's nothing more.
+        settings.put("olderChats.whatsapp.groups", "done");
+        replies.put("sync-history-chats 100", () -> "Created 7 chats from history sync");
+        assertEquals(Map.of(Network.WHATSAPP, new Answer.NothingMore()), load(Network.WHATSAPP));
+        assertEquals(List.of(), eventsStarting("set"), "not done: the next click asks again");
     }
 
     @Test
@@ -216,6 +244,39 @@ class OlderChatLoaderTest {
     }
 
     @Test
+    void aOneShotLimitClearedIsWrittenOutOfTheBridgesConfigToo() throws Exception {
+        // The watchdog restarts a bridge with the config on disk: left there, the one-shot would be asked again.
+        var _ = load(Network.GOOGLE_MESSAGES);
+        int cleared = events.indexOf("remove olderChats.gmessages.once");
+        int rewritten = events.indexOf("rewrite GOOGLE_MESSAGES olderChats.gmessages.done=true");
+        assertTrue(cleared >= 0 && rewritten > cleared, events.toString());
+        assertEquals(1, eventsStarting("reconfigure").size(), "rewritten, not restarted");
+    }
+
+    @Test
+    void aOneShotLimitIsWrittenOutEvenWhenTheRunWasCancelled() throws Exception {
+        reconfigureHeld = new CountDownLatch(1);
+        CompletableFuture<Map<Network, Answer>> run = loader.load(List.of(Network.INSTAGRAM));
+        time.changes.until("Instagram's restart", () -> !eventsStarting("reconfigure").isEmpty());
+        loader.cancel();
+        var _ = run.get();
+        assertEquals(List.of("rewrite INSTAGRAM"), eventsStarting("rewrite"), "written out, and not refused by the cancel's interrupt");
+    }
+
+    @Test
+    void aStepWithoutAOneShotRewritesNothing() throws Exception {
+        var _ = load(Network.DISCORD);
+        assertEquals(List.of(), eventsStarting("rewrite"));
+    }
+
+    @Test
+    void aFailureSaysSoInThePersonsWordsAndLogsTheDetail() throws Exception {
+        replies.put("sync-chats", () -> { throw new IOException("HTTP 502 Bad Gateway from 127.0.0.1:6167"); });
+        Answer a = load(Network.TELEGRAM).get(Network.TELEGRAM);
+        assertEquals(new Answer.NotPossible("algo falló; el registro dice qué"), a);
+    }
+
+    @Test
     void discordRaisesFiftyAndRestartsOnce() throws Exception {
         var _ = load(Network.DISCORD);
         assertEquals(List.of("reconfigure DISCORD olderChats.discord.extra=50"), eventsStarting("reconfigure"));
@@ -247,7 +308,7 @@ class OlderChatLoaderTest {
     @Test
     void oneShotSettingsAreClearedWhenTheirStepEnds() throws Exception {
         arrive(Network.GOOGLE_MESSAGES, "!sms-before", null);
-        refuse(Network.INSTAGRAM, new IOException("Esta versión del puente de Instagram no lo permite"));
+        refuse(Network.INSTAGRAM, new app.unichat.bridge.BridgeRefused("Esta versión del puente de Instagram no lo permite"));
         Map<Network, Answer> a = answers(loader.load(List.of(Network.GOOGLE_MESSAGES, Network.INSTAGRAM)));
         assertEquals(new Answer.NotPossible("Esta versión del puente de Instagram no lo permite"), a.get(Network.INSTAGRAM));
         assertEquals(new Answer.NothingMore(), a.get(Network.GOOGLE_MESSAGES));
@@ -335,7 +396,7 @@ class OlderChatLoaderTest {
 
     @Test
     void aMissingKeyIsNotPossibleAndChangesNothing() throws Exception {
-        refuse(Network.DISCORD, new IOException("Esta versión del puente de Discord no lo permite"));
+        refuse(Network.DISCORD, new app.unichat.bridge.BridgeRefused("Esta versión del puente de Discord no lo permite"));
         Answer a = load(Network.DISCORD).get(Network.DISCORD);
         assertEquals(new Answer.NotPossible("Esta versión del puente de Discord no lo permite"), a);
         assertEquals(1, eventsStarting("reconfigure").size(), "no second restart");

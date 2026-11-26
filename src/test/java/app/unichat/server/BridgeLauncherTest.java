@@ -278,7 +278,7 @@ class BridgeLauncherTest {
         BridgeLauncher l = discordRunning();
         Files.writeString(configs.resolve("discord.yaml"), "bridge:\n    other: 1\n");
         IOException e = assertThrows(IOException.class, () -> l.reconfigure("discord", "Discord", msg -> { }));
-        assertFalse(e instanceof BridgeDidntAnswer, e.toString());
+        assertInstanceOf(app.unichat.bridge.BridgeRefused.class, e, "said in the person's words, shown as it is");
         assertTrue(Present.of(e.getMessage()).contains("Discord"), e.getMessage());
         assertEquals(List.of(), calls, "nothing stopped, nothing rewritten");
     }
@@ -301,6 +301,7 @@ class BridgeLauncherTest {
         Files.writeString(configs.resolve("gmessages.yaml"), "network:\n    initial_chat_sync_count: 25\n");
         calls.clear();
         IOException e = assertThrows(IOException.class, () -> l.reconfigure("gmessages", "Google Messages", msg -> { }));
+        assertInstanceOf(app.unichat.bridge.BridgeRefused.class, e, "said in the person's words, shown as it is");
         assertTrue(Present.of(e.getMessage()).contains("Google Messages"), e.getMessage());
         assertEquals(List.of(), calls, "a bridge without accounts isn't started for this");
         assertFalse(l.watched().contains("gmessages"));
@@ -355,5 +356,22 @@ class BridgeLauncherTest {
         CompletableFuture.anyOf(p, ended).get();
         t.interrupt();
         assertInstanceOf(InterruptedException.class, ended.get());
+    }
+
+    /** A one-shot limit cleared after its step leaves the config too: the watchdog restarts a bridge with what's on disk. */
+    @Test
+    void aRewriteWritesTheConfigWithoutRestarting() throws Exception {
+        BridgeLauncher l = discordRunning();
+        l.rewrite("discord", msg -> { });
+        assertEquals(List.of("prepare discord"), calls, "written, not stopped nor started");
+    }
+
+    @Test
+    void aRewriteOfABridgeNeverSetUpHereDoesNothing() throws Exception {
+        BridgeLauncher l = discordRunning();
+        Files.delete(configs.resolve("discord.yaml"));
+        l.rewrite("discord", msg -> { });
+        l.rewrite("signal", msg -> { }); // not usable here
+        assertEquals(List.of(), calls, "nothing installed for it");
     }
 }

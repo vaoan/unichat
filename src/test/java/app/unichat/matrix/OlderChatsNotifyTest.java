@@ -52,7 +52,7 @@ class OlderChatsNotifyTest {
     private final BlockingQueue<String> live = new LinkedBlockingQueue<>();
     private final AtomicInteger liveAsked = new AtomicInteger();
     private final AtomicInteger liveAnswered = new AtomicInteger();
-    /** "join !room", "read !room $event", in order. */
+    /** "join !room", "read !room $event <receipt type>", in order. */
     private final List<String> requests = new CopyOnWriteArrayList<>();
     private volatile String initialSync = "{\"next_batch\":\"b0\"}";
     private final List<Message> incoming = new CopyOnWriteArrayList<>();
@@ -97,7 +97,10 @@ class OlderChatsNotifyTest {
                 answer = "{\"room_id\":\"x\"}";
             } else if (path.endsWith("/read_markers")) {
                 String room = java.net.URLDecoder.decode(path.replaceAll(".*/rooms/([^/]+)/read_markers", "$1"), StandardCharsets.UTF_8);
-                requests.add("read " + room + " " + MatrixClient.JSON.readTree(body).path("m.fully_read").asText());
+                com.fasterxml.jackson.databind.JsonNode read = MatrixClient.JSON.readTree(body);
+                String kind = read.has("m.read") ? "m.read" : read.has("m.read.private") ? "m.read.private" : "no receipt";
+                requests.add("read " + room + " " + read.path("m.fully_read").asText() + " " + kind
+                        + (read.has("m.read") && read.has("m.read.private") ? " and m.read.private" : ""));
             } else if (path.endsWith("/filter")) {
                 answer = "{\"filter_id\":\"f1\"}";
             }
@@ -190,6 +193,16 @@ class OlderChatsNotifyTest {
 
     @Test
     void aLoadLeavesTheUnreadBadgeAsItWas() throws Exception {
+        @Nullable String receipts = app.unichat.settings.Settings.get().getString("privacy.readReceiptsWhen");
+        app.unichat.settings.Settings.get().setReadReceipts(app.unichat.settings.Settings.ReadReceipts.ALWAYS);
+        try {
+            loadLeavesTheBadge();
+        } finally {
+            app.unichat.settings.Settings.get().set("privacy.readReceiptsWhen", receipts);
+        }
+    }
+
+    private void loadLeavesTheBadge() throws InterruptedException, java.util.concurrent.ExecutionException {
         initialSync = joined(telegramRoom("!known:example.org", RestServer.message("$k", FRIEND, "hi", Instant.now().minusSeconds(3600).toEpochMilli()), 2));
         start("older-notify-badge");
         serverChanges.until("the first live sync asked", () -> liveAsked.get() >= 1);
@@ -215,7 +228,7 @@ class OlderChatsNotifyTest {
                 if (value == null) written.remove(key);
                 else written.put(key, value);
             }
-        }, svc::markRead, id -> {
+        }, svc::markLoadedRead, id -> {
             Chat c = svc.chat(id);
             return c == null ? null : c.lastActivity();
         }, io);
@@ -226,12 +239,19 @@ class OlderChatsNotifyTest {
         time.advance(OlderChatLoader.QUIET);
         assertEquals(Map.of(Network.TELEGRAM, new OlderChats.Answer.Loaded(1)), run.get());
         assertEquals(before, inboxUnread(), "marked read as it came");
-        // Only now that it was marked: the receipt for its last event reaches the server.
-        serverChanges.until("the loaded chat's read receipt", () -> requests.contains("read !loaded:example.org $h49"));
+        // Only now that it was marked: its read marker reaches the server, with a private receipt whatever the setting
+        // (ALWAYS here): a public m.read would go through the bridge and tell the sender and the phone it was read.
+        serverChanges.until("the loaded chat's read marker", () -> requests.stream().anyMatch(r -> r.startsWith("read !loaded:example.org")));
+        assertEquals(List.of("read !loaded:example.org $h49 m.read.private"),
+                requests.stream().filter(r -> r.startsWith("read !loaded")).toList());
 
         liveSync(joined(telegramRoom("!loaded:example.org", "", 0)));
         assertEquals(before, inboxUnread(), "the badge is as it was");
         assertEquals(Set.of(), Set.copyOf(incoming), "and nothing notified");
+
+        // The person opening it later reads it: then the public receipt goes, as the setting says.
+        svc.markRead("!loaded:example.org");
+        serverChanges.until("the receipt of opening it", () -> requests.contains("read !loaded:example.org $h49 m.read"));
     }
 
     @Test
