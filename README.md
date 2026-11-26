@@ -63,7 +63,7 @@ memory, with simulated incoming messages, "typing…" and read receipts.
   only the networks you have connected).
 - **Threads** with grouped bubbles, day separators, replies, reactions, editing, deleting,
   large emojis, links, **bold**/*italic*/`code`, images, files, video and audio.
-- **Load older chats**: a button at the end of the inbox asks each network's bridge for chats it hasn't brought yet,
+- **Load older chats**: an item in a network's menu (right-click its icon in the rail) and in the command bar (⌘K) asks each network's bridge for chats it hasn't brought yet,
   one network at a time, after a warning that says what it does and what risks it has (Instagram only if you tick it).
   Nothing loads by itself, and what arrives comes read.
 - **Account status, clear and live**: if a network stops working, a strip above the list says so.

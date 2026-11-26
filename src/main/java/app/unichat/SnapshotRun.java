@@ -1,6 +1,7 @@
 package app.unichat;
 
 import app.unichat.model.Network;
+import app.unichat.support.I18n;
 import app.unichat.ui.MainView;
 import app.unichat.ui.settings.SettingsWindow;
 import app.unichat.ui.chats.SidePanel;
@@ -96,9 +97,13 @@ final class SnapshotRun {
         }
     }
 
-    /** -Dunichat.overlay=olderChats: the warning sheet; olderChats:run, its Load pressed (the bar on top, with -Dunichat.demoOlderChats=hold mid-run). */
+    /** -Dunichat.overlay=olderChats: the warning sheet, through ⌘K's command as the person would; olderChats:run, its Load pressed (the bar on top, with -Dunichat.demoOlderChats=hold mid-run). */
     private static void loadOlderChats(MainView view, boolean run) {
-        view.list().loadOlderChats();
+        view.showCommandBar();
+        if (!(view.lookup(".command-field") instanceof javafx.scene.control.TextField field)) return;
+        field.setText(I18n.t("olderChats.menu").replace("…", ""));
+        field.fireEvent(new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED, "", "", javafx.scene.input.KeyCode.ENTER,
+                false, false, false, false));
         if (!run) return;
         PauseTransition laidOut = new PauseTransition(Duration.millis(500)); // the sheet's card is in the scene after a pulse
         laidOut.setOnFinished(e -> {

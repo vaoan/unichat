@@ -218,8 +218,8 @@ known, the chats show up together under the network and the per-account filter i
 ## Older chats
 
 Each bridge brings only its newest chats when it connects (WhatsApp 200, Telegram 100, Discord 50 private channels,
-Instagram its first inbox page). The rest has no Matrix room yet: the **Load older chats** button at the end of the
-inbox asks for them, one network at a time, after a warning sheet. Nothing does it by itself. Unichat keeps what it
+Instagram its first inbox page). The rest has no Matrix room yet: the **Load older chats** item in a network's menu (right-click
+its icon in the rail) and in the command bar (⌘K / Ctrl+K) asks for them, one network at a time, after a warning sheet. Nothing does it by itself. Unichat keeps what it
 asked for in this computer's settings (`olderChats.*`) and writes the limits into each bridge's config.
 
 | Network | One click | Bridge restarts |
