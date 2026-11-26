@@ -208,6 +208,28 @@ class OlderChatsMenuUiTest {
         assertEquals(I18n.t("olderChats.menu"), FxWait.fx(again::getText));
     }
 
+    @Test
+    void duringARunANetworkWithoutAStepHasNoItem() throws Exception {
+        Win w = shown(svc);
+        svc.tell(new OlderChats.Loading(Network.TELEGRAM, OlderChats.Stage.ASKING, 0, 0, 2, java.util.Map.of()));
+        assertNull(older(railMenu(w, Network.SIGNAL)), "nothing to load there, running or not");
+    }
+
+    @Test
+    void commandKOutsideTheInboxStillAsksEveryNetworkWithAStep() throws Exception {
+        DemoOlderChats demo = new DemoOlderChats();
+        demo.skipDemoPauses();
+        Win w = shown(demo);
+        FxWait.onFx(() -> w.view.lookupAll(".rail-button").stream().map(Button.class::cast)
+                .filter(b -> I18n.t("rail.archived").equals(b.getTooltip().getText())).findFirst().orElseThrow().fire());
+        FxWait.settled();
+        assertEquals(List.of(I18n.t("olderChats.menu")), commands(w), "deliberate: the sheet warns first");
+        key(Present.of(w.view.lookup(".command-field")), KeyCode.ENTER);
+        pressLoad(w.view);
+        assertEquals(List.of(List.of(Network.TELEGRAM, Network.WHATSAPP, Network.DISCORD, Network.GOOGLE_MESSAGES)), demo.asked());
+        FxWait.until("the run ends", () -> ended(demo));
+    }
+
     /** The command bar's entries for "older". */
     private static List<String> commands(Win w) throws InterruptedException {
         FxWait.onFx(w.view::showCommandBar);

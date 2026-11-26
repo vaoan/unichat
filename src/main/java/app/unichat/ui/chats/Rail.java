@@ -231,14 +231,13 @@ public final class Rail extends VBox {
     private java.util.Optional<javafx.scene.control.MenuItem> olderChatsItem(Network n) {
         OlderChatsLauncher launcher = olderChats;
         if (launcher == null) return java.util.Optional.empty();
+        if (!launcher.hasStep(List.of(n))) return java.util.Optional.empty();
         if (launcher.running()) {
             javafx.scene.control.MenuItem loading = ChatMenus.item(I18n.t("olderChats.menu.loading"), () -> { });
             loading.setDisable(true);
             return java.util.Optional.of(loading);
         }
-        return launcher.hasStep(List.of(n))
-                ? java.util.Optional.of(ChatMenus.item(I18n.t("olderChats.menu"), () -> launcher.open(List.of(n))))
-                : java.util.Optional.empty();
+        return java.util.Optional.of(ChatMenus.item(I18n.t("olderChats.menu"), () -> launcher.open(List.of(n))));
     }
 
     private static void setActive(Button b, boolean on) {

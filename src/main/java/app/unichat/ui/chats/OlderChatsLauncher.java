@@ -31,12 +31,12 @@ public final class OlderChatsLauncher {
     }
 
     /** Some of {@code nets} has a step to run. */
-    public boolean hasStep(Collection<Network> nets) {
+    boolean hasStep(Collection<Network> nets) {
         return !nets.isEmpty() && !older.plans(nets).isEmpty();
     }
 
     /** A run is under way. */
-    public boolean running() {
+    boolean running() {
         OlderChats.Loading l = older.loading();
         return l != null && l.stage() != OlderChats.Stage.DONE;
     }
@@ -52,7 +52,7 @@ public final class OlderChatsLauncher {
     }
 
     /** The warning sheet for {@code nets}; Load runs it. */
-    public void open(Collection<Network> nets) {
+    void open(Collection<Network> nets) {
         sheet.open(older.plans(nets), run -> { var _ = older.load(run); });
     }
 }
