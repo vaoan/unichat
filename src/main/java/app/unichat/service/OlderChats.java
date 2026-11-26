@@ -39,6 +39,11 @@ public interface OlderChats {
     default CompletableFuture<Map<Network, Answer>> load(List<Network> networks) { return CompletableFuture.completedFuture(Map.of()); }
 
     default @Nullable Loading loading() { return null; }
+
+    /** The whole minutes left of {@code wait}, at least one: "available in 7 minutes". */
+    static long minutesLeft(Duration wait) {
+        return Math.max(1, (wait.toSeconds() + 59) / 60);
+    }
     default void addLoadingListener(Runnable l) { /* nothing by default */ }
     default void removeLoadingListener(Runnable l) { /* nothing by default */ }
 }

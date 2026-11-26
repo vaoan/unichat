@@ -167,7 +167,6 @@ final class OlderChatSteps {
     }
 
     private static String waitText(Duration wait) {
-        long minutes = Math.max(1, (wait.toSeconds() + 59) / 60);
-        return I18n.n("olderChats.wait", minutes);
+        return I18n.n("olderChats.wait", app.unichat.service.OlderChats.minutesLeft(wait));
     }
 }
