@@ -38,6 +38,8 @@ final class OlderChatLoader {
     static final Duration QUIET = Duration.ofSeconds(45);
     /** The longest a step counts arriving rooms; the rest still arrive later, uncounted. */
     static final Duration MAX = Duration.ofMinutes(15);
+    /** How the WhatsApp patch's reply begins when it ran. */
+    private static final String HISTORY_CHATS_CREATED = "Created ";
 
     /** A command to a network's bridge bot, answered with its reply; a {@link TimeoutException} when none came. */
     @FunctionalInterface
@@ -281,8 +283,13 @@ final class OlderChatLoader {
             return new Answer.NotPossible(failed(e));
         }
         if (reply.toLowerCase(Locale.ROOT).contains("unknown command")) {
-            return new Answer.NotPossible(command.startsWith("sync-history-chats") ? I18n.t("olderChats.needsUpdate")
+            return new Answer.NotPossible(command.startsWith(OlderChatSteps.WHATSAPP_HISTORY_COMMAND) ? I18n.t("olderChats.needsUpdate")
                     : I18n.t("olderChats.failed", reply));
+        }
+        // WhatsApp's patch says "Created <k> chats…" when it ran; anything else ("Not logged in" while it reconnects) is
+        // no "nothing more", so nothing is marked done and the next click asks again.
+        if (command.startsWith(OlderChatSteps.WHATSAPP_HISTORY_COMMAND) && !reply.startsWith(HISTORY_CHATS_CREATED)) {
+            return new Answer.NotPossible(I18n.t("olderChats.failed", reply));
         }
         // Telegram's sync-chats says "Successfully…" when it walked the list; anything else is the bridge saying why not.
         if (step.kind() == OlderChatSteps.Kind.RAISE_RESTART_COMMAND) {

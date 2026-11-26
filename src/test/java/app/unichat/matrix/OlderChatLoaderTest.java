@@ -198,6 +198,24 @@ class OlderChatLoaderTest {
     }
 
     @Test
+    void whatsappHistoryChatsRefusedIsNotPossibleAndAskedAgainLater() throws Exception {
+        // The patch says "Not logged in" while WhatsApp reconnects: that is no "nothing more", thousands may be left.
+        settings.put("olderChats.whatsapp.groups", "done");
+        replies.put("sync-history-chats 100", () -> "Not logged in");
+        Answer a = load(Network.WHATSAPP).get(Network.WHATSAPP);
+        assertEquals(new Answer.NotPossible("no funcionó: Not logged in"), a);
+        assertEquals(List.of(), eventsStarting("set"), "nothing marked done: the next click asks again");
+    }
+
+    @Test
+    void whatsappHistoryChatsThatCreatedNoneIsNothingMore() throws Exception {
+        settings.put("olderChats.whatsapp.groups", "done");
+        replies.put("sync-history-chats 100", () -> "Created 0 chats from history sync");
+        assertEquals(Map.of(Network.WHATSAPP, new Answer.NothingMore()), load(Network.WHATSAPP));
+        assertEquals(List.of("set olderChats.whatsapp.done=true"), eventsStarting("set"));
+    }
+
+    @Test
     void discordRaisesFiftyAndRestartsOnce() throws Exception {
         var _ = load(Network.DISCORD);
         assertEquals(List.of("reconfigure DISCORD olderChats.discord.extra=50"), eventsStarting("reconfigure"));

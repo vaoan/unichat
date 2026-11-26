@@ -15,6 +15,8 @@ Native builds and the no-Docker stack, and the macOS menu-bar helper (the Java s
   history-sync chats not bridged yet, "Created <k> chats from history sync") for "Load older chats"
   (`matrix/OlderChatSteps`). Until natives-3 is published, pinned and installed, the bridge answers "Unknown command"
   and the person sees "not possible: needs the next Unichat update" (`whatsappWithoutThePatchIsNotPossible`).
+  Chats the bridge skips (status broadcast, PSA, a chat-info error) are never marked synced and keep their place among
+  the newest, so in rare cases a "Created 0" can end WhatsApp's older chats early (Unichat stores "nothing more").
   Bridges run with `direct_media` (`mxc://media-<bridge>.localhost/…`, nothing copied to the server); Unichat
   downloads those from the bridge's port (`LocalServer.directMediaBase`).
   `server/MediaPrune` deletes Discord attachments older than `discord.mediaDays` (default 30, 0 = never; Ajustes →

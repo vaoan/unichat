@@ -44,6 +44,8 @@ final class OlderChatSteps {
     static final Duration TELEGRAM_PATIENCE = Duration.ofMinutes(10);
     static final Duration COMMAND_PATIENCE = Duration.ofMinutes(2);
     static final int WHATSAPP_HISTORY_CHATS = 100;
+    /** Unichat's WhatsApp patch (native/patches/whatsapp), which answers "Created <k> chats from history sync". */
+    static final String WHATSAPP_HISTORY_COMMAND = "sync-history-chats";
 
     static final String WHATSAPP_GROUPS = "olderChats.whatsapp.groups";
     static final String DISCORD_AT = "olderChats.discord.at";
@@ -129,7 +131,7 @@ final class OlderChatSteps {
                     Map.of(ChatLimits.TELEGRAM_EXTRA, Integer.toString(asked.telegramExtra() + ChatLimits.TELEGRAM_STEP)),
                     "sync-chats", TELEGRAM_PATIENCE, new Plan(n, ChatLimits.TELEGRAM_STEP, true, false, false, null));
             case WHATSAPP -> "done".equals(settings.apply(WHATSAPP_GROUPS))
-                    ? new Step(n, Kind.COMMAND, Map.of(), "sync-history-chats " + WHATSAPP_HISTORY_CHATS, COMMAND_PATIENCE,
+                    ? new Step(n, Kind.COMMAND, Map.of(), WHATSAPP_HISTORY_COMMAND + " " + WHATSAPP_HISTORY_CHATS, COMMAND_PATIENCE,
                             new Plan(n, WHATSAPP_HISTORY_CHATS, false, false, false, null))
                     : new Step(n, Kind.COMMAND, Map.of(WHATSAPP_GROUPS, "done"), "sync groups", COMMAND_PATIENCE,
                             new Plan(n, -1, false, false, false, null));
