@@ -117,6 +117,17 @@ class ManifestTest {
     }
 
     @Test
+    void whatsappComesFromUnichatsOwnReleaseForItsPatch() {
+        // native/patches/whatsapp/sync-history-chats.patch ("Load older chats"): mautrix's own Mac build lacks it.
+        Manifest m = Manifest.bundled();
+        Manifest.Component wa = Present.of(m.bridge("whatsapp"));
+        for (Platform p : Platform.values()) {
+            assertEquals(m.nativesUrl(), m.releaseUrl(wa, p), "whatsapp on " + p);
+        }
+        assertNotEquals(wa.tag(), m.version(wa, Platform.MAC_ARM64), "recorded as Unichat's build, not mautrix's");
+    }
+
+    @Test
     void theHomeserverAlwaysComesFromUnichatsOwnRelease() {
         Manifest m = Manifest.bundled();
         assertEquals(m.nativesUrl(), m.releaseUrl(m.tuwunel(), Platform.MAC_ARM64));
