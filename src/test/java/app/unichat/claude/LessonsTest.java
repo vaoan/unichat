@@ -24,6 +24,7 @@ class LessonsTest {
 
     /** A line each lesson must catch, and the file it would be in. A new lesson comes with one. */
     private static final Map<String, String[]> CAUGHT = Map.ofEntries(
+            Map.entry("connect-timeout-keeps-body", new String[] {"src/main/java/app/unichat/matrix/X.java", "        HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(15)).build();"}), // lesson-ok: connect-timeout-keeps-body
             Map.entry("test-sleep", new String[] {"src/test/java/X.java", "        Thread.sleep(200);"}), // lesson-ok: test-sleep
             Map.entry("test-timed-wait", new String[] {"src/test/java/X.java", "        assertTrue(done.await(5, TimeUnit.SECONDS));"}), // lesson-ok: test-timed-wait
             Map.entry("static-text", new String[] {"src/main/java/X.java", "    private static final String TITLE = I18n.t(\"x\");"}),

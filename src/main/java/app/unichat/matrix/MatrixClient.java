@@ -40,8 +40,10 @@ final class MatrixClient {
     }
 
     static HttpClient newHttpClient() {
+        // No connectTimeout: the JDK's pooled connection keeps its connect timer, and the timer the exchange that opened it,
+        // with its whole response (the first full /sync's 78 MB, for as long as the connection lived). Each request has its
+        // own timeout, started before it connects, which covers connecting.
         return HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(15))
                 .followRedirects(HttpClient.Redirect.NORMAL)
                 .build();
     }
