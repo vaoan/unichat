@@ -318,7 +318,7 @@ public final class MainView extends StackPane {
         avatarsPreloaded = true;
         for (Chat c : recent) {
             String url = c.avatarUrl();
-            if (url != null) { var _ = ImageCache.load(url, svc); }
+            if (url != null) { var _ = ImageCache.load(url, svc, ImageCache.Tier.SMALL); }
         }
     }
 
