@@ -106,7 +106,7 @@ public final class OlderChatsSheet {
         for (String line : lines(p)) texts.getChildren().add(wrapping(line));
         HBox.setHgrow(texts, Priority.ALWAYS);
         texts.setMinWidth(0);
-        Node icon = NetworkIcons.glyph(n, 20);
+        Node icon = NetworkIcons.tile(n, 28, "older-chats-icon"); // white on the network's colour, as on the rail
         HBox row = new HBox(10, icon, texts);
         row.setAlignment(Pos.TOP_LEFT);
         row.getStyleClass().add("older-chats-row");

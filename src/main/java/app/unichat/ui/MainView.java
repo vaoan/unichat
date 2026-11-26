@@ -92,6 +92,7 @@ public final class MainView extends StackPane {
     private final app.unichat.ui.timeline.ForwardBar forwards;
     private final ExploreBar exploring;
     private final app.unichat.ui.chats.RestBar resting;
+    private final app.unichat.ui.chats.OlderChatsBar olderChats;
     private @Nullable String pendingOpenId;
     private long pendingOpenUntil;
     private boolean infoVisible;
@@ -204,8 +205,9 @@ public final class MainView extends StackPane {
         uploads = new UploadBar(app.unichat.service.UploadQueue.of(svc, pendingUploads), svc, this::openChatId);
         exploring = new ExploreBar(app.unichat.autosave.AutoSave.of(svc), svc, this::openChatId);
         resting = app.unichat.ui.chats.RestBar.of(svc, listPane);
+        olderChats = app.unichat.ui.chats.OlderChatsBar.of(svc, listPane, this::showOverlay, this::hideOverlay);
         main.setTop(new javafx.scene.layout.VBox(connection, new AudioBar(audio, c -> openChat(c, true)), uploads, forwards, exploring,
-                resting, new CloakBar(app.unichat.cloak.CloakJob.get())));
+                resting, new CloakBar(app.unichat.cloak.CloakJob.get()), olderChats));
 
         overlay.getStyleClass().add("overlay");
         overlay.setVisible(false);
@@ -265,6 +267,8 @@ public final class MainView extends StackPane {
         uploads.dispose();
         exploring.dispose();
         resting.dispose();
+        olderChats.dispose();
+        listPane.dispose();
         updateBar.dispose();
         svc.removeListener(listener);
         app.unichat.support.Storage.SHARED.removeListener(onStorage);

@@ -177,7 +177,7 @@ public final class UnichatApp extends Application {
 
     /** The demo keeps its choices and folders in the same files as the real service. */
     private static MockChatService demoService() {
-        return new MockChatService(new PreferencesFile(
+        return app.unichat.service.DemoOlderChats.of(new PreferencesFile(
                 Settings.dataDir().resolve("preferences.json"), Settings.dataDir().resolve("server-seen.json")));
     }
 

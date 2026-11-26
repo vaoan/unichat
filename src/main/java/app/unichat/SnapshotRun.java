@@ -18,7 +18,7 @@ import java.io.File;
  * and exits; {@code -Dunichat.openChat=<id>} opens a chat first, {@code -Dunichat.info=true} the info panel,
  * {@code -Dunichat.openSpace=<id>} a server's channels,
  * {@code -Dunichat.openFolders=true} the list of folders, {@code -Dunichat.openFolder=<name>} inside one,
- * {@code -Dunichat.overlay=command|newchat|add|picker|folder|folderDelete|cloak|chatOptions|forward|select|delete|savedText[:none]|fixing|queue|capture[:sheet]|login:<net>|settings[:Page]} the command bar, connect-network sheet or settings,
+ * {@code -Dunichat.overlay=command|newchat|add|picker|folder|folderDelete|cloak|chatOptions|forward|select|delete|savedText[:none]|fixing|queue|capture[:sheet]|olderChats[:run]|login:<net>|settings[:Page]} the command bar, connect-network sheet or settings,
  * {@code -Dunichat.network=<protocol id>} filters the inbox to one network, {@code -Dunichat.search=<text>} searches it.
  */
 final class SnapshotRun {
@@ -87,11 +87,23 @@ final class SnapshotRun {
         else if (overlay.equals("fixing")) view.showFixing();
         else if (overlay.equals("queue")) view.showQueue();
         else if (overlay.startsWith("capture")) view.showCapture(overlay.equals("capture:sheet"));
+        else if (overlay.startsWith("olderChats")) loadOlderChats(view, overlay.equals("olderChats:run"));
         else if (overlay.startsWith("login:")) addAccount(view, overlay.substring(6));
         else if (overlay.startsWith("settings")) {
             view.showSettings();
             if (overlay.contains(":")) SettingsWindow.select(overlay.substring(overlay.indexOf(':') + 1));
         }
+    }
+
+    /** -Dunichat.overlay=olderChats: the warning sheet; olderChats:run, its Load pressed (the bar on top, with -Dunichat.demoOlderChats=hold mid-run). */
+    private static void loadOlderChats(MainView view, boolean run) {
+        view.list().loadOlderChats();
+        if (!run) return;
+        PauseTransition laidOut = new PauseTransition(Duration.millis(500)); // the sheet's card is in the scene after a pulse
+        laidOut.setOnFinished(e -> {
+            if (view.lookup(".older-chats-sheet .primary-button") instanceof javafx.scene.control.Button load) load.fire();
+        });
+        laidOut.play();
     }
 
     /** -Dunichat.overlay=login:<net>: that network's login; an unknown id shows no login. */

@@ -597,7 +597,7 @@ public class MockChatService implements ChatService, FolderForwarding {
     public final void skipDemoPauses() { noPauses = true; }
 
     /** {@code r} after the demo's pause of {@code ms}, or right away (queued in order) with {@link #skipDemoPauses}. */
-    private void after(long ms, Runnable r) {
+    final void after(long ms, Runnable r) {
         var _ = scheduler().schedule(r, noPauses ? 0 : ms, TimeUnit.MILLISECONDS);
     }
 
