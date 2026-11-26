@@ -93,6 +93,8 @@ public final class MainView extends StackPane {
     private final ExploreBar exploring;
     private final app.unichat.ui.chats.RestBar resting;
     private final app.unichat.ui.chats.OlderChatsBar olderChats;
+    /** "Load older chats" from the rail's network menu and ⌘K; none when the service has no older chats. */
+    private final app.unichat.ui.chats.@Nullable OlderChatsLauncher olderLauncher;
     private @Nullable String pendingOpenId;
     private long pendingOpenUntil;
     private boolean infoVisible;
@@ -183,8 +185,8 @@ public final class MainView extends StackPane {
         forwards = new app.unichat.ui.timeline.ForwardBar(svc, this::openChatId);
         sheets(svc);
         offerChatOptions(svc);
-        rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::gearClicked);
-
+        olderLauncher = app.unichat.ui.chats.OlderChatsLauncher.of(svc, this::showOverlay, this::hideOverlay);
+        rail = new Rail(svc, listPane, this::showAccounts, this::addAccount, this::gearClicked, olderLauncher);
         threadArea.setCenter(thread);
         SplitPane split = new SplitPane(listPane, threadArea);
         split.setDividerPositions(0.3);
@@ -205,7 +207,7 @@ public final class MainView extends StackPane {
         uploads = new UploadBar(app.unichat.service.UploadQueue.of(svc, pendingUploads), svc, this::openChatId);
         exploring = new ExploreBar(app.unichat.autosave.AutoSave.of(svc), svc, this::openChatId);
         resting = app.unichat.ui.chats.RestBar.of(svc, listPane);
-        olderChats = app.unichat.ui.chats.OlderChatsBar.of(svc, listPane, this::showOverlay, this::hideOverlay);
+        olderChats = app.unichat.ui.chats.OlderChatsBar.of(svc);
         main.setTop(new javafx.scene.layout.VBox(connection, new AudioBar(audio, c -> openChat(c, true)), uploads, forwards, exploring,
                 resting, new CloakBar(app.unichat.cloak.CloakJob.get()), olderChats));
 
@@ -268,7 +270,6 @@ public final class MainView extends StackPane {
         exploring.dispose();
         resting.dispose();
         olderChats.dispose();
-        listPane.dispose();
         updateBar.dispose();
         svc.removeListener(listener);
         app.unichat.support.Storage.SHARED.removeListener(onStorage);
@@ -674,7 +675,7 @@ public final class MainView extends StackPane {
     }
 
     public void showCommandBar() {
-        CommandBar bar = new CommandBar(svc, svc, List.of(
+        List<CommandBar.Command> commands = new java.util.ArrayList<>(List.of(
                 new CommandBar.Command(I18n.t("main.cmd.inbox"), "", () -> setView(ChatFilter.View.INBOX, false)),
                 new CommandBar.Command(I18n.t("main.cmd.unread"), Shortcuts.key("2"), () -> setView(ChatFilter.View.INBOX, true)),
                 new CommandBar.Command(I18n.t("main.cmd.favorites"), Shortcuts.key("3"), () -> setView(ChatFilter.View.FAVORITES, false)),
@@ -686,7 +687,9 @@ public final class MainView extends StackPane {
                 new CommandBar.Command(I18n.t("main.cmd.addAccount"), "", () -> showAccounts().showPicker()),
                 new CommandBar.Command(I18n.t("main.cmd.settings"), Shortcuts.key(","), this::showSettings),
                 new CommandBar.Command(I18n.t("main.cmd.logout"), "", onLogout)
-        ), this::openChat, this::hideOverlay);
+        ));
+        if (olderLauncher != null) commands.addAll(olderLauncher.commands(listPane::olderChatsNetworks));
+        CommandBar bar = new CommandBar(svc, svc, commands, this::openChat, this::hideOverlay);
         showOverlay(bar);
         Platform.runLater(bar::focus);
     }

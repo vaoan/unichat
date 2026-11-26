@@ -21,6 +21,7 @@ import javafx.scene.layout.Priority;
 import javafx.scene.layout.Region;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
+import org.jspecify.annotations.Nullable;
 
 import java.util.List;
 
@@ -42,10 +43,13 @@ public final class Rail extends VBox {
     private final Button folders;
 
     private final java.util.function.Consumer<Network> onAddAccount;
+    /** "Load older chats" in a network's menu; none when the service has no older chats. */
+    private final @Nullable OlderChatsLauncher olderChats;
 
     public Rail(ChatService svc, ChatListPane listPane, Runnable onConnect, java.util.function.Consumer<Network> onAddAccount,
-                Runnable onSettings) {
+                Runnable onSettings, @Nullable OlderChatsLauncher olderChats) {
         this.onAddAccount = onAddAccount;
+        this.olderChats = olderChats;
         this.svc = svc;
         this.listPane = listPane;
         getStyleClass().add("rail");
@@ -206,7 +210,7 @@ public final class Rail extends VBox {
         if (!networks.getChildren().equals(shownButtons)) networks.getChildren().setAll(shownButtons);
     }
 
-    /** Right-click on a network: pick one of its accounts or add another. */
+    /** Right-click on a network: pick one of its accounts, load its older chats or add another account. */
     private javafx.scene.control.ContextMenu networkMenu(Network n, List<Account> accounts) {
         javafx.scene.control.ContextMenu menu = new javafx.scene.control.ContextMenu();
         menu.getItems().add(ChatMenus.item(I18n.t("rail.allAccounts", n.displayName()), () ->
@@ -217,9 +221,23 @@ public final class Rail extends VBox {
                         listPane.goTo(listPane.filterProperty().get().switchTo(n, a.id()))));
             }
         }
+        olderChatsItem(n).ifPresent(menu.getItems()::add);
         menu.getItems().add(new javafx.scene.control.SeparatorMenuItem());
         menu.getItems().add(ChatMenus.item(I18n.t("rail.addAnother", n.displayName()), () -> onAddAccount.accept(n)));
         return menu;
+    }
+
+    /** Read as the menu opens: there for a network with a step to run, disabled and saying so while a run is under way. */
+    private java.util.Optional<javafx.scene.control.MenuItem> olderChatsItem(Network n) {
+        OlderChatsLauncher launcher = olderChats;
+        if (launcher == null) return java.util.Optional.empty();
+        if (!launcher.hasStep(List.of(n))) return java.util.Optional.empty();
+        if (launcher.running()) {
+            javafx.scene.control.MenuItem loading = ChatMenus.item(I18n.t("olderChats.menu.loading"), () -> { });
+            loading.setDisable(true);
+            return java.util.Optional.of(loading);
+        }
+        return java.util.Optional.of(ChatMenus.item(I18n.t("olderChats.menu"), () -> launcher.open(List.of(n))));
     }
 
     private static void setActive(Button b, boolean on) {

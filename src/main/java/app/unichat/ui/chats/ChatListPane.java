@@ -82,8 +82,6 @@ public final class ChatListPane extends VBox {
     private final FolderView folderView;
     /** In folders (the names, one folder, or a server opened from one). */
     private final BooleanProperty inFolders = new SimpleBooleanProperty();
-    /** "Load older chats" at the end of the inbox, when the service can ({@link app.unichat.service.OlderChats}). */
-    private final @Nullable OlderChatsButton olderChats;
 
     public ChatListPane(ChatService svc, Consumer<Chat> onOpen, FolderDialogs folderDialogs) {
         this.svc = svc;
@@ -111,8 +109,6 @@ public final class ChatListPane extends VBox {
         ChatMenus.onMenuKey(folderView.chatList(), this::rowMenu);
         setVgrow(folderView, Priority.ALWAYS);
         getChildren().addAll(header, searchBox, filterBar, accountRow, favorites, list, channels, folderView);
-        olderChats = svc instanceof app.unichat.service.OlderChats older ? new OlderChatsButton(older) : null;
-        if (olderChats != null) getChildren().add(olderChats); // under the list, above the footers
         filter.addListener((o, a, b) -> refresh());
         refresh();
     }
@@ -204,21 +200,6 @@ public final class ChatListPane extends VBox {
 
     public void setOnNewChat(Runnable r) { this.onNewChat = r; }
 
-    /** "Load older chats" was asked for {@code open}'s networks (those in view): the window shows its warning. */
-    public void setOnLoadOlderChats(Consumer<java.util.Collection<Network>> open) {
-        if (olderChats != null) olderChats.setOnOpen(open);
-    }
-
-    /** "Load older chats" as its button does, when it shows (snapshot diagnostics). */
-    public void loadOlderChats() {
-        if (olderChats != null && olderChats.isVisible()) olderChats.fire();
-    }
-
-    /** The service outlives this pane (the window is rebuilt on a language change). */
-    public void dispose() {
-        if (olderChats != null) olderChats.dispose();
-    }
-
     public void setToast(Consumer<String> toast) { spaces.setToast(toast); }
 
     public void focusSearch() {
@@ -286,7 +267,6 @@ public final class ChatListPane extends VBox {
         title.setText(foldersOpen() ? I18n.t("chatList.title.folders") : n == null ? base : n.displayName());
         refreshAccountRow(f);
         refreshView();
-        refreshOlderChats(f);
         empty.setText(f.searching() ? I18n.t("chatList.empty.noResults", f.query())
                 : f.view() == ChatFilter.View.ARCHIVE ? I18n.t("chatList.empty.noArchived")
                 : f.unreadOnly() ? I18n.t("chatList.empty.allRead")
@@ -398,17 +378,10 @@ public final class ChatListPane extends VBox {
         return out;
     }
 
-    /**
-     * The networks "Load older chats" asks: the rail's, else every bridged one with an account; only in the inbox list
-     * (any quick filter but Favorites), never while searching, in a folder, a server's channels or the archive.
-     */
-    private void refreshOlderChats(ChatFilter f) {
-        if (olderChats == null) return;
-        Network n = f.network();
-        List<Network> nets = n != null ? List.of(n) : accounts.stream().map(Account::network).filter(Network::isBridged).distinct().toList();
-        boolean inbox = (f.view() == ChatFilter.View.INBOX || f.view() == ChatFilter.View.LOW_PRIORITY)
-                && !f.searching() && !channels.isOpen() && !foldersOpen();
-        olderChats.show(nets, inbox);
+    /** The networks "Load older chats" (⌘K) asks: the rail's, else every bridged one with an account. */
+    public List<Network> olderChatsNetworks() {
+        Network n = filter.get().network();
+        return n != null ? List.of(n) : accounts.stream().map(Account::network).filter(Network::isBridged).distinct().toList();
     }
 
     /** A server's channels cover the list while open. */

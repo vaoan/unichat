@@ -51,15 +51,9 @@ public final class OlderChatsBar extends TaskBar {
         this(svc::loading, svc::addLoadingListener, svc::removeLoadingListener, OlderChatsBar::afterAMoment);
     }
 
-    /**
-     * For the window: "Load older chats" at the end of {@code list} opens its warning ({@link OlderChatsSheet} in the
-     * overlay, {@code show} and {@code hide}) and Load runs it; the bar follows the run. A service without older chats
-     * gets a bar that never shows, and no button.
-     */
-    public static OlderChatsBar of(app.unichat.service.ChatService svc, ChatListPane list, Consumer<javafx.scene.Node> show, Runnable hide) {
+    /** For the window: the bar follows the service's run; a service without older chats gets a bar that never shows. */
+    public static OlderChatsBar of(app.unichat.service.ChatService svc) {
         if (!(svc instanceof OlderChats older)) return new OlderChatsBar(() -> null, l -> { }, l -> { }, OlderChatsBar::afterAMoment);
-        OlderChatsSheet sheet = new OlderChatsSheet(show, hide);
-        list.setOnLoadOlderChats(nets -> sheet.open(older.plans(nets), run -> { var _ = older.load(run); }));
         return new OlderChatsBar(older);
     }
 
