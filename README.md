@@ -63,6 +63,9 @@ memory, with simulated incoming messages, "typing…" and read receipts.
   only the networks you have connected).
 - **Threads** with grouped bubbles, day separators, replies, reactions, editing, deleting,
   large emojis, links, **bold**/*italic*/`code`, images, files, video and audio.
+- **Load older chats**: a button at the end of the inbox asks each network's bridge for chats it hasn't brought yet,
+  one network at a time, after a warning that says what it does and what risks it has (Instagram only if you tick it).
+  Nothing loads by itself, and what arrives comes read.
 - **Account status, clear and live**: if a network stops working, a strip above the list says so.
   Red with "Link" if the session was closed; amber while Unichat recovers it by itself. In the sidebar
   the network is marked. With the local server, Unichat restarts on its own a bridge that doesn't respond, that has been

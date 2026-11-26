@@ -63,6 +63,9 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
   solo las redes que tienes conectadas).
 - **Hilos** con burbujas agrupadas, separadores de día, respuestas, reacciones, edición, borrado,
   emojis grandes, enlaces, **negrita**/*cursiva*/`código`, imágenes, archivos, video y audio.
+- **Cargar chats anteriores**: un botón al final de la bandeja pide al puente de cada red los chats que aún no trajo,
+  de una red en una, tras un aviso que dice qué hace y qué riesgos tiene (Instagram solo si lo marcas).
+  Nada se carga solo, y lo que llega viene leído.
 - **Estado de las cuentas, claro y en vivo**: si una red deja de funcionar, una franja arriba de la lista lo dice.
   Roja con "Volver a vincular" si se cerró la sesión; ámbar mientras Unichat la recupera solo. En la barra lateral
   la red queda marcada. Con el servidor local, Unichat reinicia por su cuenta un puente que no responde, que lleva

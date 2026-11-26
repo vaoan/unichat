@@ -26,7 +26,7 @@ Each package may only depend on the ones below it. `ArchitectureTest` checks thi
 | `login` | Logging in to the bridges and browser cookies | `model`, `support` |
 | `update` | Asks GitHub whether there is a new version of Unichat (`UpdateChecker`; the rules without network in `UpdatePolicy`) | `settings`, `support` |
 | `settings` | Preferences | `support` |
-| `model`, `support`, `bridge` | Domain data; utilities (`Os`, `Hashes`, `Redactor`, `BundledTools`, `Urls`, `Errors`, `Folders`, `Processes`, `Threads`, `ConvertedFiles`, `AppVersion`, `ErrorReport`, `PathParts`, `BoundedMap`); what `matrix` and `server` share about the bridges (`BridgeStates`, `BridgePorts`, `LoginsCache`) | nothing in the project |
+| `model`, `support`, `bridge` | Domain data; utilities (`Os`, `Hashes`, `Redactor`, `BundledTools`, `Urls`, `Errors`, `Folders`, `Processes`, `Threads`, `ConvertedFiles`, `AppVersion`, `ErrorReport`, `PathParts`, `BoundedMap`); what `matrix` and `server` share about the bridges (`BridgeStates`, `BridgePorts`, `LoginsCache`, `ChatLimits`: how many chats each bridge was asked for) | nothing in the project |
 
 Accepted exceptions:
 
@@ -39,7 +39,7 @@ What exists only with bridges goes in `BridgeAccess`, which the demo doesn't imp
 ## `service`: small interfaces
 
 `ChatService` brings together interfaces by role: `ChatSession`, `ChatReader`, `MediaSource`, `ChatMessaging`, `ChatPreferences`,
-`NetworkAccounts`, `ContactDirectory`, `GroupDirectory`, `ChatFolders` (folders) and `ArchiveWaking` (what rests while the archive is closed; nothing in the demo). A new class asks only for the role it needs: `ImageCache`
+`NetworkAccounts`, `ContactDirectory`, `GroupDirectory`, `ChatFolders` (folders) `ArchiveWaking` (what rests while the archive is closed; nothing in the demo) and `OlderChats` ("Load older chats"; only with bridges, and in the demo only for snapshots). A new class asks only for the role it needs: `ImageCache`
 receives `MediaSource`, not the whole service.
 
 ## `matrix`
@@ -57,6 +57,7 @@ receives `MediaSource`, not the whole service.
 | `ChatActions` | What you change about a chat |
 | `BridgeAccounts` | Bridges and accounts |
 | `BotChat`, `BridgeProtocol` | The chat with each bridge's bot; commands and replies |
+| `OlderChatSteps`, `OlderChatLoader`, `RoomArrivals`, `LoadsOlderChats` | "Load older chats", only on demand: what each network's next step is (pure), running them one network at a time, counting the rooms that arrive, and the `service/OlderChats` role |
 | `ArchiveRest`, `ArchivedServers`, `SyncFilter` | Archived Discord servers and channels left out of the sync while the archive is closed, and woken (filter, catch-up) while it's open; what each server brings at the bridge (an archived one opened in the archive comes back until leaving); the sync's filter, posted once and named by id |
 | `DiscordServers`, `ContactActions`, `MediaDownloader` | Discord servers (a pause the bridge refused is retried with `Retry`, like mute rules), contacts, downloads |
 | `Profiles`, `Invites`, `FetchedMessages` | Names and pictures the sync left out (a few at a time); joining invites; messages fetched on their own (a reply's original) |
