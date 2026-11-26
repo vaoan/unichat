@@ -11,52 +11,93 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Avatar photos, decoded once per URL and shared by every size (list 44 px, header 34, messages 28, info 84).
- * Before, each size was its own download: opening a chat showed the initials in the header/info/messages and
- * then the photo — the "flash" on every click. Concurrent requests for one URL share a single load.
+ * Avatar photos, decoded once per URL and tier. Two tiers, as a 168 px image per URL for every size held 4x the
+ * pixels a 28 px view shows: SMALL for views up to 44 px (lists, header, messages, reactions), LARGE above (info
+ * panel, settings), each decoded at its largest size times the screen's scale. The server is still asked for one
+ * 168 px thumbnail per address, so both tiers come from one download. Concurrent requests share a single load.
  */
 public final class ImageCache {
     private ImageCache() {}
 
-    /** Decode size: enough for the largest avatar (84 px) on a 2x screen; smaller views scale it down. */
+    /** What the server is asked for: enough for the largest avatar (84 px) on a 2x screen; one file for both tiers. */
     static final int PX = 168;
-    private static final int MAX = 500;
+    private static final int SMALL_VIEW_MAX = 44;
+    private static final int LARGE_VIEW_MAX = 84;
 
-    private static final Map<String, Image> CACHE = Collections.synchronizedMap(BoundedMap.byUse(MAX));
+    /** Which decoded size a view takes. */
+    public enum Tier {
+        SMALL(SMALL_VIEW_MAX), LARGE(LARGE_VIEW_MAX);
+
+        private final int largestView;
+
+        Tier(int largestView) {
+            this.largestView = largestView;
+        }
+
+        /** The tier for a view {@code px} wide (up to 44 is SMALL). */
+        public static Tier forSize(double px) {
+            return px <= SMALL_VIEW_MAX ? SMALL : LARGE;
+        }
+    }
+
+    /** Decoded pixels for a tier on a screen of this scale: its largest view times the scale, rounded up. */
+    static int decodePx(Tier tier, double scale) {
+        return (int) Math.ceil(tier.largestView * Math.max(1, scale));
+    }
+
+    private static final Map<String, Image> SMALL_CACHE = Collections.synchronizedMap(BoundedMap.byUse(500));
+    private static final Map<String, Image> LARGE_CACHE = Collections.synchronizedMap(BoundedMap.byUse(60));
+
+    private static Map<String, Image> cache(Tier tier) {
+        return tier == Tier.SMALL ? SMALL_CACHE : LARGE_CACHE;
+    }
+
     private static final Map<String, CompletableFuture<Image>> LOADING = new ConcurrentHashMap<>();
     /** URLs that failed (e.g. bridge-bot avatars on remote servers a "localhost" Synapse can't fetch). */
     private static final Map<String, Long> FAILED = new ConcurrentHashMap<>();
     private static final long RETRY_AFTER_MS = 10 * 60 * 1000;
 
-    public static @Nullable Image get(String url) {
-        return CACHE.get(url);
+    /** That tier's image only, or null. */
+    public static @Nullable Image get(String url, Tier tier) {
+        return cache(tier).get(url);
+    }
+
+    /** Whatever is decoded for {@code url} (the large one if there, else the small): something to show at once. */
+    public static @Nullable Image any(String url) {
+        Image large = get(url, Tier.LARGE);
+        return large != null ? large : get(url, Tier.SMALL);
     }
 
     /**
      * The photo for {@code url}: cached, already loading, or a new (single) download + decode off the FX thread.
      * Completes with null when it can't be loaded (then the initials stay; retried after a while, not per click).
      */
-    public static CompletableFuture<Image> load(String url, MediaSource svc) {
-        return load(url, svc, AnimatedImage.DECODER);
+    public static CompletableFuture<Image> load(String url, MediaSource svc, Tier tier) {
+        return load(url, svc, tier, AnimatedImage.DECODER);
     }
 
     /** {@code decoder}: where the picture is decoded (a test decodes on its own thread). */
-    static CompletableFuture<Image> load(String url, MediaSource svc, java.util.concurrent.Executor decoder) {
-        Image cached = CACHE.get(url);
+    static CompletableFuture<Image> load(String url, MediaSource svc, Tier tier, java.util.concurrent.Executor decoder) {
+        Image cached = get(url, tier);
         if (cached != null) return CompletableFuture.completedFuture(cached);
         Long failedAt = FAILED.get(url);
         if (failedAt != null && System.currentTimeMillis() - failedAt < RETRY_AFTER_MS) return CompletableFuture.completedFuture(null);
         // Registered first and started after: a load finished at once used to remove itself inside computeIfAbsent,
         // which the map refuses ("Recursive update"), leaving a failed load there for good (ImageCacheUiTest).
+        String key = url + "|" + tier;
         CompletableFuture<Image> mine = new CompletableFuture<>();
-        CompletableFuture<Image> running = LOADING.putIfAbsent(url, mine);
+        CompletableFuture<Image> running = LOADING.putIfAbsent(key, mine);
         if (running != null) return running;
+        int px = decodePx(tier, ScreenScale.max());
         var _ = svc.media(url, PX, PX).thenApplyAsync(path -> {
             // Decoded completely here, so a view never shows a half-loaded (blank) image.
             // Animated avatars (Discord) stay still: JavaFX's own GIF animation never lets the image go.
             Image img;
             try {
-                img = AnimatedImage.still(path, PX, PX); // a video sticker's first frame too
+                // A cover box: the short side is px, as the square the avatar fills (a fit box left it under px); {0, 0} gives the square
+                int[] size = app.unichat.support.ImageHeaders.size(path);
+                int[] box = MediaSizes.coverBox(size[0], size[1], px);
+                img = AnimatedImage.still(path, box[0], box[1]); // a video sticker's first frame too
             } catch (java.io.IOException e) {
                 img = null;
             }
@@ -64,25 +105,26 @@ public final class ImageCache {
                 FAILED.put(url, System.currentTimeMillis());
                 return (Image) null;
             }
-            CACHE.put(url, img);
+            cache(tier).put(url, img);
             FAILED.remove(url);
             return img;
         }, decoder).exceptionally(err -> {
             FAILED.put(url, System.currentTimeMillis());
             return null;
         }).whenComplete((img, err) -> {
-            LOADING.remove(url, mine);
+            LOADING.remove(key, mine);
             mine.complete(img);
         });
         return mine;
     }
 
-        static int size() {
-        return CACHE.size();
+    static int size(Tier tier) {
+        return cache(tier).size();
     }
 
     static void clear() {
-        CACHE.clear();
+        SMALL_CACHE.clear();
+        LARGE_CACHE.clear();
         FAILED.clear();
     }
 }

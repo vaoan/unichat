@@ -75,16 +75,18 @@ public final class Avatar extends StackPane {
         }
         if (url.equals(loadedUrl)) return;
         loadedUrl = url;
-        Image cached = ImageCache.get(url);
+        ImageCache.Tier tier = ImageCache.Tier.forSize(size);
+        Image cached = ImageCache.get(url, tier);
+        if (cached == null) cached = ImageCache.any(url); // the other tier's picture meanwhile: never the initials
         if (cached != null) {
-            // Same photo in any size (list, header, messages, info): show it at once, no initials flash.
             image.setImage(cached);
             image.setVisible(true);
-            return;
+            if (ImageCache.get(url, tier) != null) return;
+        } else {
+            image.setVisible(false);
         }
-        image.setVisible(false);
-        var _ = ImageCache.load(url, service).thenAccept(img -> {
-            if (img == null) return; // no photo available: keep the initials
+        var _ = ImageCache.load(url, service, tier).thenAccept(img -> {
+            if (img == null) return; // no photo available: keep what shows (the initials, or the other tier's)
             Platform.runLater(() -> {
                 if (!url.equals(loadedUrl)) return;
                 image.setImage(img);
