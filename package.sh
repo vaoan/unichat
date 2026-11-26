@@ -50,8 +50,11 @@ if [ "$(uname -s)" = Darwin ]; then
     || echo "Warning: without whisper, voice notes can't be transcribed (except with your own command)." >&2
 fi
 
+# The JVM: a 1 GB ceiling, and G1 gives back what it no longer uses (a collection when idle for a minute, at most 35 %
+# of the heap free after one): with Java's defaults it kept the whole 1 GB for ~265 MB live (PackagingJvmTest, package.ps1).
 COMMON="--name Unichat --app-version $VERSION --vendor Unichat --input target/pkg --main-jar unichat.jar
-  --main-class app.unichat.Launcher --dest release --java-options -Xmx1g"
+  --main-class app.unichat.Launcher --dest release --java-options -Xmx1g --java-options -XX:G1PeriodicGCInterval=60000
+  --java-options -XX:MinHeapFreeRatio=15 --java-options -XX:MaxHeapFreeRatio=35"
 
 case "$(uname -s)" in
   Darwin)

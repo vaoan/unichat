@@ -99,7 +99,10 @@ try {
 $common = @("--name", "Unichat", "--app-version", $Version, "--vendor", "Unichat",
             "--description", "Unichat", "--copyright", "Copyright (c) 2026 vaoan",
             "--input", "target\pkg", "--main-jar", "unichat.jar", "--main-class", "app.unichat.Launcher",
-            "--dest", "release", "--icon", "packaging\unichat.ico", "--java-options", "-Xmx1g")
+            "--dest", "release", "--icon", "packaging\unichat.ico", "--java-options", "-Xmx1g",
+            # G1 gives back what it no longer uses, as package.sh says (PackagingJvmTest).
+            "--java-options", "-XX:G1PeriodicGCInterval=60000", "--java-options", "-XX:MinHeapFreeRatio=15",
+            "--java-options", "-XX:MaxHeapFreeRatio=35")
 
 jpackage @common --type app-image
 if ($LASTEXITCODE -ne 0) { throw "jpackage app-image failed" }
