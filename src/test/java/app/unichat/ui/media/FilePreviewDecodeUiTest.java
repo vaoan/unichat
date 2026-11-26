@@ -52,7 +52,7 @@ class FilePreviewDecodeUiTest {
             stage[0].show();
             MessageMedia media = new MessageMedia(source, s -> { }, s -> { },
                     new MediaLibrary(dir.resolve("media-library.json")), stage[0]::getScene,
-                    new app.unichat.ui.media.AudioPlayback(source, s -> { }));
+                    new AudioPlayback(source, s -> { }));
             Message m = new Message("$f", "!c", "@a:s", "Ana", false, Instant.EPOCH);
             m.setType(MessageType.FILE);
             m.setMediaUrl("mxc://s/wide");

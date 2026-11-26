@@ -1,5 +1,6 @@
 package app.unichat.support;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -22,6 +23,7 @@ class LighterPicturesTest {
     @TempDir
     Path dir;
 
+    @SuppressFBWarnings(value = "PREDICTABLE_RANDOM", justification = "seeded test data, the same on every run on purpose; nothing secret")
     private Path png(String name, int type, int w, int h, boolean noisy, int alphaAt00) throws IOException {
         BufferedImage img = new BufferedImage(w, h, type);
         Random r = new Random(7);
@@ -65,6 +67,7 @@ class LighterPicturesTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "PREDICTABLE_RANDOM", justification = "seeded test data, the same on every run on purpose; nothing secret")
     void aPalettePngWithTransparencyStaysAsItCame() throws Exception {
         byte[] pal = {0, 0, 0, (byte) 255, (byte) 255, (byte) 255};
         var cm = new java.awt.image.IndexColorModel(1, 2, pal, 0, false, 0); // index 0 transparent: written as tRNS
@@ -142,6 +145,7 @@ class LighterPicturesTest {
     }
 
     @Test
+    @SuppressFBWarnings(value = "PREDICTABLE_RANDOM", justification = "seeded test data, the same on every run on purpose; nothing secret")
     void aPalettePngWithoutTransparencyBecomesAJpegAfterTheScan() throws Exception {
         BufferedImage img = new BufferedImage(300, 300, BufferedImage.TYPE_BYTE_INDEXED);
         Random r = new Random(9);
@@ -158,5 +162,22 @@ class LighterPicturesTest {
         Path tmp = png("abc.download", BufferedImage.TYPE_INT_RGB, 320, 320, true, 255);
         assertEquals("abc.jpg", LighterPictures.lighter(tmp).getFileName().toString());
         assertFalse(Files.exists(tmp));
+    }
+
+    @Test
+    void aPictureOfMoreThanAMegapixelStaysAsItCameByDefault() throws Exception {
+        Path png = png("m.png", BufferedImage.TYPE_INT_RGB, 1100, 1000, true, 255);
+        assertEquals(png, LighterPictures.lighter(png), "a server thumbnail is far smaller: this is an original passed through");
+        assertTrue(Files.exists(png));
+    }
+
+    @Test
+    void aSourceThatWontDeleteStillGivesTheJpegAndNotTheSource() throws Exception {
+        Path png = png("n.png", BufferedImage.TYPE_INT_RGB, 320, 320, true, 255);
+        Path out = LighterPictures.lighter(png, LighterPictures.PIXEL_LIMIT, f -> {
+            throw new IOException("busy");
+        });
+        assertEquals("n.jpg", out.getFileName().toString());
+        assertEquals("image/jpeg", ImageHeaders.pictureMime(out));
     }
 }

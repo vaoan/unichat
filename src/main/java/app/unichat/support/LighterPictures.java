@@ -22,19 +22,32 @@ import java.nio.file.StandardCopyOption;
  * {@code /thumbnail}: what people sent is never converted.
  */
 public final class LighterPictures {
-    /** Pixels (width x height) above which a PNG is left alone before anything is decoded. */
-    static final long PIXEL_LIMIT = 16_000_000L;
+    /**
+     * Pixels (width x height) above which a PNG is left alone before anything is decoded: a thumbnail the server made is
+     * at most about half a megapixel, so a bigger one is the stranger's original passed through, never decoded here.
+     */
+    static final long PIXEL_LIMIT = 1_000_000L;
     private static final float QUALITY = 0.85f;
-    private static final byte[] SIGNATURE = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
+    private static final byte[] PNG_MAGIC = {(byte) 0x89, 'P', 'N', 'G', '\r', '\n', 0x1A, '\n'};
 
     private LighterPictures() {}
 
     /** The file to keep: {@code file} itself when left as it came, else the new {@code .jpg} beside it (the PNG is deleted). */
     public static Path lighter(Path file) {
-        return lighter(file, PIXEL_LIMIT);
+        return lighter(file, PIXEL_LIMIT, Files::deleteIfExists);
+    }
+
+    /** Deletes the source once the JPEG is in place. */
+    @FunctionalInterface
+    interface Remover {
+        void remove(Path file) throws IOException;
     }
 
     static Path lighter(Path file, long pixelLimit) {
+        return lighter(file, pixelLimit, Files::deleteIfExists);
+    }
+
+    static Path lighter(Path file, long pixelLimit, Remover remover) {
         Path part = file.resolveSibling(base(file) + ".jpg.part");
         try {
             if (!"image/png".equals(ImageHeaders.pictureMime(file))) return file;
@@ -58,7 +71,11 @@ public final class LighterPictures {
             } catch (AtomicMoveNotSupportedException e) {
                 Files.move(part, jpg, StandardCopyOption.REPLACE_EXISTING); // lesson-ok: atomic-move same as above
             }
-            Files.deleteIfExists(file);
+            try {
+                remover.remove(file);
+            } catch (IOException e) {
+                // the JPEG is the file now; a leftover source is cleaned by MediaCache's trim of old leftovers
+            }
             return jpg;
         } catch (IOException | RuntimeException | OutOfMemoryError e) { // a picture too big for the heap is just left as it came
             try {
@@ -93,7 +110,7 @@ public final class LighterPictures {
     static @Nullable Boolean header(Path png, long[] dims) throws IOException {
         try (InputStream raw = Files.newInputStream(png); DataInputStream in = new DataInputStream(new java.io.BufferedInputStream(raw))) {
             byte[] sig = in.readNBytes(8);
-            if (!java.util.Arrays.equals(sig, SIGNATURE)) return null;
+            if (!java.util.Arrays.equals(sig, PNG_MAGIC)) return null;
             if (in.readInt() != 13 || in.readInt() != 0x49484452) return null; // IHDR
             dims[0] = in.readInt() & 0xFFFFFFFFL;
             dims[1] = in.readInt() & 0xFFFFFFFFL;

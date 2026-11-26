@@ -423,11 +423,12 @@ public final class MessageMedia {
             return;
         }
         int px = FILE_THUMB * 2;
+        int side = (int) Math.ceil(FILE_THUMB * ScreenScale.max()); // read here: the screens are the FX thread's
         var _ = svc.media(url, px, px).thenAcceptAsync(p -> {
             Image img;
             try {
                 int[] size = app.unichat.support.ImageHeaders.size(p); // the header's word, no decoding
-                int[] box = MediaSizes.coverBox(size[0], size[1], (int) Math.ceil(FILE_THUMB * ScreenScale.max()));
+                int[] box = MediaSizes.coverBox(size[0], size[1], side);
                 img = AnimatedImage.still(p, box[0], box[1]);
             } catch (Exception e) {
                 return;

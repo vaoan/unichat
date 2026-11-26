@@ -94,7 +94,10 @@ public final class ImageCache {
             // Animated avatars (Discord) stay still: JavaFX's own GIF animation never lets the image go.
             Image img;
             try {
-                img = AnimatedImage.still(path, px, px); // a video sticker's first frame too
+                // A cover box: the short side is px, as the square the avatar fills (a fit box left it under px); {0, 0} gives the square
+                int[] size = app.unichat.support.ImageHeaders.size(path);
+                int[] box = MediaSizes.coverBox(size[0], size[1], px);
+                img = AnimatedImage.still(path, box[0], box[1]); // a video sticker's first frame too
             } catch (java.io.IOException e) {
                 img = null;
             }

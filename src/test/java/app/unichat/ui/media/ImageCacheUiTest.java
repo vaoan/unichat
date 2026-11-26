@@ -1,5 +1,6 @@
 package app.unichat.ui.media;
 
+import app.unichat.Present;
 import javafx.application.Platform;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -48,7 +49,7 @@ class ImageCacheUiTest {
                 "kept, nothing left loading");
     }
 
-    private Path png(int px) throws Exception {
+    private Path png(int px) throws java.io.IOException {
         Path png = dir.resolve("p" + px + ".png");
         if (!java.nio.file.Files.exists(png)) {
             assertTrue(javax.imageio.ImageIO.write(new BufferedImage(px, px, BufferedImage.TYPE_INT_ARGB), "png", png.toFile()));
@@ -78,7 +79,7 @@ class ImageCacheUiTest {
     }
 
     @Test
-    void bothTiersComeFromOneDownload() throws Exception {
+    void bothTiersAskTheSameThumbnail() throws Exception {
         String url = "mxc://s/both-" + System.nanoTime();
         Path big = png(168);
         java.util.List<String> asked = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
@@ -104,5 +105,32 @@ class ImageCacheUiTest {
         }
         assertEquals(500, ImageCache.size(ImageCache.Tier.SMALL));
         assertEquals(60, ImageCache.size(ImageCache.Tier.LARGE));
+    }
+
+    @Test
+    void aWidePictureIsDecodedWithItsShortSideAtTheTiersSize() throws Exception {
+        Path wide = dir.resolve("wide.png");
+        assertTrue(javax.imageio.ImageIO.write(new BufferedImage(640, 360, BufferedImage.TYPE_INT_RGB), "png", wide.toFile()));
+        String url = "mxc://s/wide-" + System.nanoTime();
+        var image = ImageCache.load(url, (u, w, h) -> CompletableFuture.completedFuture(wide), ImageCache.Tier.SMALL, Runnable::run).get();
+        assertNotNull(image);
+        assertEquals(ImageCache.decodePx(ImageCache.Tier.SMALL, ScreenScale.max()), Math.min(image.getWidth(), image.getHeight()),
+                "the avatar's square is filled by the short side, never stretched from less");
+    }
+
+    @Test
+    void twoTiersLoadingAtOnceEachGetTheirOwnSize() throws Exception {
+        String url = "mxc://s/tiers-" + System.nanoTime();
+        Path big = png(168);
+        CompletableFuture<Path> held = new CompletableFuture<>();
+        app.unichat.service.MediaSource svc = (u, w, h) -> held;
+        var small = ImageCache.load(url, svc, ImageCache.Tier.SMALL, Runnable::run);
+        var large = ImageCache.load(url, svc, ImageCache.Tier.LARGE, Runnable::run);
+        held.complete(big);
+        assertNotNull(small.get());
+        assertNotNull(large.get());
+        double scale = ScreenScale.max();
+        assertEquals(ImageCache.decodePx(ImageCache.Tier.SMALL, scale), Present.of(ImageCache.get(url, ImageCache.Tier.SMALL)).getWidth());
+        assertEquals(ImageCache.decodePx(ImageCache.Tier.LARGE, scale), Present.of(ImageCache.get(url, ImageCache.Tier.LARGE)).getWidth());
     }
 }

@@ -1,6 +1,8 @@
 package app.unichat.matrix;
 
+import app.unichat.Present;
 import com.sun.net.httpserver.HttpServer;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +35,7 @@ class LighterThumbnailDownloadTest {
     private byte[] png;
 
     @BeforeEach
+    @SuppressFBWarnings(value = "PREDICTABLE_RANDOM", justification = "seeded test data, the same on every run on purpose; nothing secret")
     void server() throws Exception {
         BufferedImage img = new BufferedImage(200, 200, BufferedImage.TYPE_INT_RGB);
         Random r = new Random(5);
@@ -78,12 +81,13 @@ class LighterThumbnailDownloadTest {
             var media = media(io);
             String url = mxc();
             Path first = media.media(url, 168, 168).get();
-            assertTrue(first.getFileName().toString().endsWith(".jpg"), first.toString());
+            String name = String.valueOf(first.getFileName());
+            assertTrue(name.endsWith(".jpg"), first.toString());
             assertTrue(Files.size(first) < png.length);
-            try (var same = Files.list(first.getParent())) {
-                String hash = first.getFileName().toString().replace(".jpg", "");
-                assertEquals(java.util.List.of(first.getFileName().toString()), same
-                        .map(f -> f.getFileName().toString()).filter(n -> n.startsWith(hash)).toList(),
+            try (var same = Files.list(Present.of(first.getParent()))) {
+                String hash = name.replace(".jpg", "");
+                assertEquals(java.util.List.of(name), same
+                        .map(f -> String.valueOf(f.getFileName())).filter(n -> n.startsWith(hash)).toList(),
                         "no .png ever carried the final name: only the file that stays");
             }
             int seen = requests.get();
@@ -126,7 +130,7 @@ class LighterThumbnailDownloadTest {
             }
         }
         assumeTrue(bridge != null, "every bridge's port is in use here");
-        bridge = app.unichat.Present.of(bridge);
+        bridge = Present.of(bridge);
         bridge.createContext("/", this::answer);
         bridge.start();
         try (ExecutorService io = Executors.newSingleThreadExecutor()) {

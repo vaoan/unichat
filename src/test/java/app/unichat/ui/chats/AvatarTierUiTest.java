@@ -41,7 +41,7 @@ class AvatarTierUiTest {
         Platform.setImplicitExit(false);
     }
 
-    private Path png() throws Exception {
+    private Path png() throws java.io.IOException {
         Path png = dir.resolve("a.png");
         assertTrue(javax.imageio.ImageIO.write(new BufferedImage(168, 168, BufferedImage.TYPE_INT_ARGB), "png", png.toFile()));
         return png;
