@@ -46,15 +46,20 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class OlderChatsButtonUiTest {
     /** The demo, saying what the test says about older chats, and keeping each question it was asked. */
     static final class Fake extends MockChatService implements OlderChats {
+        /** The networks with a step to run, while {@link #more}. */
+        static final List<Network> OFFERED = List.of(Network.TELEGRAM, Network.WHATSAPP);
         volatile boolean more = true;
         volatile @Nullable Loading loading;
-        final List<Set<Network>> askedHasMore = new CopyOnWriteArrayList<>();
+        final List<Set<Network>> askedPlans = new CopyOnWriteArrayList<>();
         final List<Runnable> listeners = new CopyOnWriteArrayList<>();
 
-        @Override public boolean hasMore(Collection<Network> inView) {
-            askedHasMore.add(Set.copyOf(inView));
-            return more;
+        @Override public List<Plan> plans(Collection<Network> inView) {
+            askedPlans.add(Set.copyOf(inView));
+            if (!more) return List.of();
+            return OFFERED.stream().filter(inView::contains).map(n -> new Plan(n, 100, true, false, false, null)).toList();
         }
+
+        @Override public boolean hasMore(Collection<Network> inView) { return !plans(inView).isEmpty(); }
 
         @Override public @Nullable Loading loading() { return loading; }
         @Override public void addLoadingListener(Runnable l) { listeners.add(l); }
@@ -175,9 +180,9 @@ class OlderChatsButtonUiTest {
         ChatListPane pane = show(svc);
         ChatFilter inbox = FxWait.fx(() -> pane.filterProperty().get());
         go(pane, inbox.switchTo(Network.TELEGRAM, null));
-        assertEquals(Set.of(Network.TELEGRAM), svc.askedHasMore.getLast(), "the rail on Telegram");
+        assertEquals(Set.of(Network.TELEGRAM), svc.askedPlans.getLast(), "the rail on Telegram");
         go(pane, inbox.switchTo(null, null));
-        assertEquals(withAccounts(), svc.askedHasMore.getLast(), "all: the networks with an account");
+        assertEquals(withAccounts(), svc.askedPlans.getLast(), "all: the networks with an account");
         assertTrue(withAccounts().contains(Network.WHATSAPP) && !withAccounts().contains(Network.MATRIX));
     }
 
@@ -226,8 +231,9 @@ class OlderChatsButtonUiTest {
         go(pane, FxWait.fx(() -> pane.filterProperty().get()).switchTo(Network.TELEGRAM, null));
         assertEquals(I18n.t("olderChats.button.a11y", "Telegram"), FxWait.fx(b::getAccessibleText));
         go(pane, FxWait.fx(() -> pane.filterProperty().get()).switchTo(null, null));
-        String all = FxWait.fx(b::getAccessibleText);
-        for (Network n : withAccounts()) assertTrue(all.contains(n.displayName()), all);
+        assertEquals(I18n.t("olderChats.button.a11y", "Telegram, WhatsApp"), FxWait.fx(b::getAccessibleText),
+                "only the networks a click would ask, not every one in view (Signal, Slack… have nothing)");
+        assertTrue(withAccounts().contains(Network.SIGNAL), "Signal is in view");
         assertTrue(FxWait.fx(b::isFocusTraversable), "reachable with Tab");
     }
 

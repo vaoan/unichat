@@ -37,8 +37,12 @@ public final class OlderChatsBar extends TaskBar {
     /** Changes come from the service's thread: one redraw per frame. */
     private final FxCoalescer redraw = new FxCoalescer(this::refresh);
     private final Runnable listener = redraw::request;
-    /** This bar saw a run, so its end is worth saying. */
-    private boolean sawRunning;
+    /**
+     * The last end said, or the one the service had when the bar was built (a run before a language change rebuilt
+     * the window): not said again. Any other end is, even unseen running: the loader can go straight to DONE (an
+     * account gone before Load) or tell a stage and DONE within one frame, and the coalesced redraw sees only DONE.
+     */
+    private @Nullable Loading said;
     /** The end being said, until a moment has passed. */
     private @Nullable Loading saying;
     private boolean disposed;
@@ -71,7 +75,8 @@ public final class OlderChatsBar extends TaskBar {
         setFocusTraversable(true);
         setAccessibleRole(AccessibleRole.TEXT);
         listen.accept(listener);
-        sawRunning = running(state.get());
+        Loading before = state.get();
+        said = running(before) ? null : before;
         refresh();
     }
 
@@ -94,9 +99,8 @@ public final class OlderChatsBar extends TaskBar {
     void refresh() {
         Loading l = state.get();
         boolean running = running(l);
-        if (running) sawRunning = true;
-        if (l != null && !running && sawRunning) {
-            sawRunning = false;
+        if (l != null && !running && l != said) {
+            said = l;
             saying = l;
             later.accept(() -> {
                 if (saying != l || disposed) return;

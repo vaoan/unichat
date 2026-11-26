@@ -15,7 +15,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 /**
- * "Load older chats", a plain row at the end of the inbox: shown while a network in view has more, disabled and
+ * "Load older chats", a plain row at the end of the inbox: shown while a network in view has a step to run ({@code plans}), disabled and
  * saying so while a run is under way. It only opens the warning sheet; nothing loads from here.
  */
 final class OlderChatsButton extends Button {
@@ -62,15 +62,18 @@ final class OlderChatsButton extends Button {
         return l != null && l.stage() != OlderChats.Stage.DONE;
     }
 
+    /** Shown while what a click would do has a network to ask (or a run goes on), named for a screen reader. */
     private void redraw() {
         boolean running = running();
-        Nodes.show(this, inInbox && !inView.isEmpty() && (running || svc.hasMore(inView)));
+        List<OlderChats.Plan> plans = inInbox && !inView.isEmpty() ? svc.plans(inView) : List.of();
+        Nodes.show(this, inInbox && !inView.isEmpty() && (running || !plans.isEmpty()));
         setDisable(running);
         setText(I18n.t(running ? "olderChats.button.loading" : "olderChats.button"));
-        setAccessibleText(running ? getText() : I18n.t("olderChats.button.a11y", names(inView)));
+        setAccessibleText(running ? getText() : I18n.t("olderChats.button.a11y", names(plans)));
     }
 
-    private static String names(List<Network> nets) {
-        return String.join(", ", nets.stream().map(Network::displayName).toList());
+    /** The networks a click would ask, in the order they'd run. */
+    private static String names(List<OlderChats.Plan> plans) {
+        return String.join(", ", plans.stream().map(p -> p.network().displayName()).toList());
     }
 }

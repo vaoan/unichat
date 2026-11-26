@@ -101,7 +101,7 @@ class OlderChatsBarUiTest {
         List<String> shown = FxWait.fx(() -> texts(bar));
         assertTrue(shown.contains(I18n.t("olderChats.bar.loading", "Telegram")), shown.toString());
         assertTrue(shown.contains(I18n.t("olderChats.bar.restarting")), shown.toString());
-        assertTrue(shown.contains("2 de 3"), "the second of three networks: " + shown);
+        assertTrue(shown.contains(I18n.t("olderChats.bar.count", 2, 3)), "the second of three networks: " + shown);
         set(at(Stage.ASKING, 0));
         assertTrue(FxWait.fx(() -> texts(bar)).contains(I18n.t("olderChats.bar.asking")));
         set(at(Stage.ARRIVING, 1));
@@ -141,6 +141,31 @@ class OlderChatsBarUiTest {
         String said = String.join(" ", FxWait.fx(() -> texts(bar)));
         assertTrue(said.contains(I18n.t("olderChats.bar.notPossible", "Instagram", reason)), said);
         assertTrue(said.contains(I18n.t("olderChats.bar.noneNew")), said);
+    }
+
+    @Test
+    void aRunThatOnlySaysDoneStillShowsItsResult() throws Exception {
+        // The loader can go straight to DONE (a network whose account dropped before Load: "not possible"), or tell a
+        // stage and DONE within one frame: the bar never sees it running, and the result is all there is to say.
+        OlderChatsBar bar = show();
+        String reason = I18n.t("olderChats.noAccount", "Telegram");
+        set(new Loading(Network.TELEGRAM, Stage.DONE, 0, 1, 1, Map.of(Network.TELEGRAM, new Answer.NotPossible(reason))));
+        assertTrue(FxWait.fx(bar::isVisible), "the result shows");
+        assertTrue(String.join(" ", FxWait.fx(() -> texts(bar))).contains(reason));
+        FxWait.onFx(() -> later.getFirst().run());
+        assertFalse(FxWait.fx(bar::isVisible), "then it goes");
+        listeners.forEach(Runnable::run);
+        FxWait.settled();
+        assertFalse(FxWait.fx(bar::isVisible), "and the same result isn't said twice");
+    }
+
+    @Test
+    void aNewRunAfterAnOldOneShowsItsResult() throws Exception {
+        state.set(new Loading(Network.TELEGRAM, Stage.DONE, 0, 1, 1, Map.of(Network.TELEGRAM, new Answer.Loaded(3))));
+        OlderChatsBar bar = show(); // the last run's end, from before the window was built
+        set(new Loading(Network.DISCORD, Stage.DONE, 0, 1, 1, Map.of(Network.DISCORD, new Answer.Loaded(7))));
+        assertTrue(FxWait.fx(bar::isVisible), "a new run's end shows");
+        assertTrue(String.join(" ", FxWait.fx(() -> texts(bar))).contains("Discord 7"));
     }
 
     @Test
