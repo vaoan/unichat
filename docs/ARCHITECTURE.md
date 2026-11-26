@@ -26,7 +26,7 @@ Each package may only depend on the ones below it. `ArchitectureTest` checks thi
 | `login` | Logging in to the bridges and browser cookies | `model`, `support` |
 | `update` | Asks GitHub whether there is a new version of Unichat (`UpdateChecker`; the rules without network in `UpdatePolicy`) | `settings`, `support` |
 | `settings` | Preferences | `support` |
-| `model`, `support`, `bridge` | Domain data; utilities (`Os`, `Hashes`, `Redactor`, `BundledTools`, `Urls`, `Errors`, `Folders`, `Processes`, `Threads`, `ConvertedFiles`, `AppVersion`, `ErrorReport`, `PathParts`, `BoundedMap`); what `matrix` and `server` share about the bridges (`BridgeStates`, `BridgePorts`, `LoginsCache`, `ChatLimits`: how many chats each bridge was asked for) | nothing in the project |
+| `model`, `support`, `bridge` | Domain data; utilities (`Os`, `Hashes`, `Redactor`, `BundledTools`, `Urls`, `Errors`, `Folders`, `Processes`, `Threads`, `ConvertedFiles`, `AppVersion`, `ErrorReport`, `PathParts`, `BoundedMap`, `LighterPictures`: a server thumbnail kept as the lightest file); what `matrix` and `server` share about the bridges (`BridgeStates`, `BridgePorts`, `LoginsCache`, `ChatLimits`: how many chats each bridge was asked for) | nothing in the project |
 
 Accepted exceptions:
 

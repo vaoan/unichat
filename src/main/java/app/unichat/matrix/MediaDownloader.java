@@ -8,6 +8,7 @@ import app.unichat.support.Hashes;
 import app.unichat.model.MimeTypes;
 import app.unichat.model.Mxc;
 import app.unichat.support.I18n;
+import app.unichat.support.LighterPictures;
 import app.unichat.support.PathParts;
 import app.unichat.support.Urls;
 import org.jspecify.annotations.Nullable;
@@ -243,6 +244,7 @@ final class MediaDownloader {
         Path tmp = dir.resolve(hash + ".download");
         Files.deleteIfExists(tmp);
         @Nullable String contentType;
+        boolean thumbnail = false; // the server's /thumbnail answered: the only download worth making lighter
         if (url.startsWith(Mxc.SCHEME)) {
             Mxc mxc = Mxc.parse(url);
             if (mxc == null) throw new MatrixException(0, null, I18n.t("media.badUrl"));
@@ -256,6 +258,7 @@ final class MediaDownloader {
                 String q = "?width=" + w + "&height=" + h + "&method=scale";
                 try {
                     contentType = fetchMedia("/thumbnail/" + sm + q, tmp, null);
+                    thumbnail = true;
                 } catch (MatrixException e) {
                     contentType = null; // not thumbnailable: fall back to the original
                 }
@@ -269,7 +272,7 @@ final class MediaDownloader {
         }
         Path target = dir.resolve(hash + extension(contentType));
         Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
-        return target;
+        return thumbnail ? LighterPictures.lighter(target) : target;
     }
 
     /** Authenticated media (Matrix 1.11) with fallback to the legacy unauthenticated endpoints. */
