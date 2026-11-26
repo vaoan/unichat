@@ -18,6 +18,17 @@ final class MediaSizes {
         return new Size(Math.max(80, w * s), Math.max(60, h * s));
     }
 
+    /**
+     * The box to decode a picture into so its middle square crop has {@code side} px: the short side is {@code side},
+     * the long one follows the shape up to three times it (a panorama isn't decoded whole for a crop of its middle).
+     */
+    static int[] coverBox(int width, int height, int side) {
+        if (width <= 0 || height <= 0) return new int[] {side, side};
+        int cap = 3 * side;
+        if (width >= height) return new int[] {(int) Math.min(cap, Math.ceil((double) side * width / height)), side};
+        return new int[] {side, (int) Math.min(cap, Math.ceil((double) side * height / width))};
+    }
+
     /** Stickers are small and shown without a bubble, like on the phone; square when unknown. */
     static Size sticker(int width, int height) {
         double w = width > 0 ? width : MAX_STICKER;

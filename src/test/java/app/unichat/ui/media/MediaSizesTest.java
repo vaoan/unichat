@@ -2,6 +2,7 @@ package app.unichat.ui.media;
 
 import org.junit.jupiter.api.Test;
 
+import static org.junit.jupiter.api.Assertions.assertArrayEquals;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 class MediaSizesTest {
@@ -27,5 +28,30 @@ class MediaSizesTest {
     @Test
     void aStickerOfUnknownSizeIsSquare() {
         assertEquals(new MediaSizes.Size(180, 180), MediaSizes.sticker(0, 0));
+    }
+
+    @Test
+    void aSquarePictureDecodesAtTheSide() {
+        assertArrayEquals(new int[] {76, 76}, MediaSizes.coverBox(500, 500, 76));
+    }
+
+    @Test
+    void aLandscapePictureKeepsItsShortSideAtTheSide() {
+        assertArrayEquals(new int[] {136, 76}, MediaSizes.coverBox(1600, 900, 76));
+    }
+
+    @Test
+    void aPortraitPictureToo() {
+        assertArrayEquals(new int[] {76, 136}, MediaSizes.coverBox(900, 1600, 76));
+    }
+
+    @Test
+    void aVeryWidePictureIsCappedAtThreeTimesItsShortSide() {
+        assertArrayEquals(new int[] {228, 76}, MediaSizes.coverBox(10000, 1000, 76));
+    }
+
+    @Test
+    void anUnknownSizeIsASquare() {
+        assertArrayEquals(new int[] {76, 76}, MediaSizes.coverBox(0, 0, 76));
     }
 }

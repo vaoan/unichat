@@ -413,7 +413,7 @@ public final class MessageMedia {
      * server's, and without this its picture vanished and came back each time (downloading the file again to make it).
      */
     private static final java.util.Map<String, Image> FILE_PREVIEWS = java.util.Collections.synchronizedMap(
-            app.unichat.support.BoundedMap.byUse(300)); // 300 of 152 px: about 30 MB at most
+            app.unichat.support.BoundedMap.byUse(300)); // 300 of about the square's side (a few dozen px, a screen's scale): a few MB at most
 
     /** The picture in place of the icon once it's here (a video keeps its play mark on top); the icon if it never comes. */
     private void showFilePreview(StackPane ic, String url, String key, boolean video) {
@@ -426,7 +426,9 @@ public final class MessageMedia {
         var _ = svc.media(url, px, px).thenAcceptAsync(p -> {
             Image img;
             try {
-                img = AnimatedImage.still(p, px * 2, px * 2);
+                int[] size = app.unichat.support.ImageHeaders.size(p); // the header's word, no decoding
+                int[] box = MediaSizes.coverBox(size[0], size[1], (int) Math.ceil(FILE_THUMB * ScreenScale.max()));
+                img = AnimatedImage.still(p, box[0], box[1]);
             } catch (Exception e) {
                 return;
             }
