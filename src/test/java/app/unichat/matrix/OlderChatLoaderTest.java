@@ -332,7 +332,9 @@ class OlderChatLoaderTest {
             throw new TimeoutException("no reply");
         });
         CompletableFuture<Map<Network, Answer>> run = loader.load(List.of(Network.TELEGRAM));
-        time.untilScheduled(); // the timeout is no end: it waits for what is still arriving
+        var _ = run.whenComplete((r, e) -> time.changes.changed());
+        time.changes.until("the quiet wait, or an answer", () -> run.isDone() || time.scheduled() > 0);
+        assertFalse(run.isDone(), "the timeout is no end: it waits for what is still arriving");
         arrive(Network.TELEGRAM, "!late", START.minus(Duration.ofDays(90)));
         assertEquals(new Answer.Loaded(13), answers(run).get(Network.TELEGRAM));
         assertTrue(marked.contains("!late"), "the room that came after the timeout is marked read too");
