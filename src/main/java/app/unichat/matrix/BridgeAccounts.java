@@ -231,6 +231,19 @@ final class BridgeAccounts {
         };
     }
 
+    /**
+     * A new account on {@code n} (its login ids changed, or one came after a logout) has its own older chats: what
+     * "Load older chats" kept as done goes. Logins not known before, the same ones, or a logout keep it.
+     */
+    static void forgetOlderChatsOnNewLogin(Network n, @Nullable List<Login> before, List<Login> now,
+                                           java.util.function.BiConsumer<String, @Nullable String> set) {
+        if (before == null || now.isEmpty()) return;
+        Set<String> was = before.stream().map(Login::id).collect(java.util.stream.Collectors.toSet());
+        Set<String> is = now.stream().map(Login::id).collect(java.util.stream.Collectors.toSet());
+        if (was.equals(is)) return;
+        for (String k : OlderChatSteps.keptPerLogin(n)) set.accept(k, null);
+    }
+
     /** The networks with an account signed in (or signing in), for "Load older chats". */
     Set<Network> withLogins() {
         Set<Network> out = java.util.EnumSet.noneOf(Network.class);
@@ -339,7 +352,7 @@ final class BridgeAccounts {
             if (reply == null) return null;
             parsed = n == Network.DISCORD ? parseDiscordPing(reply) : parseLogins(reply);
         }
-        logins.put(n, parsed);
+        forgetOlderChatsOnNewLogin(n, logins.put(n, parsed), parsed, Settings.get()::set);
         maybeResyncChats(n, parsed);
         discord.maybePauseArchivedGuilds(n, parsed);
         Settings.get().set(LoginsCache.key(n.protocolId()), LoginsCache.format(System.currentTimeMillis(),

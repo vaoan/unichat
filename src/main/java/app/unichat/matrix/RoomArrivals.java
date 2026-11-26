@@ -71,6 +71,8 @@ final class RoomArrivals {
         private Duration quietFor = Duration.ZERO;
         private Duration max = Duration.ZERO;
         private boolean waiting;
+        /** Once stopped, a change still under way tells nobody: no progress after the step is done. */
+        private boolean stopped;
 
         Count(Network network, Set<String> before, Instant at) {
             this.network = network;
@@ -81,11 +83,13 @@ final class RoomArrivals {
         void changed() {
             Set<String> nowThere = rooms.apply(network);
             synchronized (this) {
+                if (stopped) return;
                 for (String id : nowThere) {
                     if (!before.contains(id) && arrived.add(id)) lastArrival = now.get();
                 }
+                // Under the lock, so stop() returns only once no listener is running and none will.
+                for (Runnable l : listeners) l.run();
             }
-            for (Runnable l : listeners) l.run();
         }
 
         @Override public synchronized int newRooms() { return arrived.size(); }
@@ -138,6 +142,9 @@ final class RoomArrivals {
         }
 
         private void finish() {
+            synchronized (this) {
+                stopped = true;
+            }
             counting.remove(this);
             quiet.complete(newRooms());
         }

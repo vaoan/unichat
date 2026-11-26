@@ -144,7 +144,7 @@ class OlderChatLoaderTest {
     }
 
     private Map<Network, Answer> load(Network... networks) throws InterruptedException, ExecutionException {
-        return answers(loader.load(List.of(networks), Set.of()));
+        return answers(loader.load(List.of(networks)));
     }
 
     private void refuse(Network n, Exception e) {
@@ -216,10 +216,11 @@ class OlderChatLoaderTest {
 
     @Test
     void instagramRunsOnlyWhenIncluded() throws Exception {
-        Map<Network, Answer> without = answers(loader.load(List.of(Network.INSTAGRAM, Network.TELEGRAM), Set.of(Network.TELEGRAM)));
+        // The sheet puts Instagram in the list only when ticked (Task 8 guards the tick): left out, nothing touches it.
+        Map<Network, Answer> without = answers(loader.load(List.of(Network.TELEGRAM)));
         assertFalse(without.containsKey(Network.INSTAGRAM), "Instagram's answer is absent");
         assertTrue(events.stream().noneMatch(e -> e.contains("INSTAGRAM") || e.contains("instagram")), events.toString());
-        var _ = answers(loader.load(List.of(Network.INSTAGRAM), Set.of(Network.INSTAGRAM)));
+        var _ = answers(loader.load(List.of(Network.INSTAGRAM)));
         List<String> restarts = eventsStarting("reconfigure INSTAGRAM");
         assertEquals(1, restarts.size(), events.toString());
         assertTrue(restarts.getFirst().contains("olderChats.instagram.once=true"), restarts.toString());
@@ -229,7 +230,7 @@ class OlderChatLoaderTest {
     void oneShotSettingsAreClearedWhenTheirStepEnds() throws Exception {
         arrive(Network.GOOGLE_MESSAGES, "!sms-before", null);
         refuse(Network.INSTAGRAM, new IOException("Esta versión del puente de Instagram no lo permite"));
-        Map<Network, Answer> a = answers(loader.load(List.of(Network.GOOGLE_MESSAGES, Network.INSTAGRAM), EnumSet.allOf(Network.class)));
+        Map<Network, Answer> a = answers(loader.load(List.of(Network.GOOGLE_MESSAGES, Network.INSTAGRAM)));
         assertEquals(new Answer.NotPossible("Esta versión del puente de Instagram no lo permite"), a.get(Network.INSTAGRAM));
         assertEquals(new Answer.NothingMore(), a.get(Network.GOOGLE_MESSAGES));
         assertNull(settings.get("olderChats.gmessages.once"));
@@ -279,7 +280,7 @@ class OlderChatLoaderTest {
     @Test
     void networksRunOneAtATime() throws Exception {
         reconfigureHeld = new CountDownLatch(1);
-        CompletableFuture<Map<Network, Answer>> run = loader.load(List.of(Network.TELEGRAM, Network.DISCORD), Set.of());
+        CompletableFuture<Map<Network, Answer>> run = loader.load(List.of(Network.TELEGRAM, Network.DISCORD));
         time.changes.until("Telegram's restart", () -> !eventsStarting("reconfigure").isEmpty());
         assertEquals(List.of("reconfigure TELEGRAM olderChats.telegram.extra=100"), eventsStarting("reconfigure"));
         assertTrue(events.stream().noneMatch(e -> e.contains("DISCORD")), "Discord waits for Telegram");
@@ -293,10 +294,10 @@ class OlderChatLoaderTest {
     @Test
     void aSecondClickWhileRunningIsIgnored() throws Exception {
         reconfigureHeld = new CountDownLatch(1);
-        CompletableFuture<Map<Network, Answer>> run = loader.load(List.of(Network.TELEGRAM), Set.of());
+        CompletableFuture<Map<Network, Answer>> run = loader.load(List.of(Network.TELEGRAM));
         time.changes.until("Telegram's restart", () -> !eventsStarting("reconfigure").isEmpty());
         List<String> before = List.copyOf(events);
-        assertSame(run, loader.load(List.of(Network.DISCORD), Set.of()));
+        assertSame(run, loader.load(List.of(Network.DISCORD)));
         assertEquals(before, events, "nothing new recorded");
         reconfigureHeld.countDown();
         var _ = answers(run);
@@ -330,7 +331,25 @@ class OlderChatLoaderTest {
             for (int i = 0; i < 12; i++) arrive(Network.TELEGRAM, "!t" + i, START.minus(Duration.ofDays(60)));
             throw new TimeoutException("no reply");
         });
-        assertEquals(new Answer.Loaded(12), load(Network.TELEGRAM).get(Network.TELEGRAM));
+        CompletableFuture<Map<Network, Answer>> run = loader.load(List.of(Network.TELEGRAM));
+        time.untilScheduled(); // the timeout is no end: it waits for what is still arriving
+        arrive(Network.TELEGRAM, "!late", START.minus(Duration.ofDays(90)));
+        assertEquals(new Answer.Loaded(13), answers(run).get(Network.TELEGRAM));
+        assertTrue(marked.contains("!late"), "the room that came after the timeout is marked read too");
+        assertNull(settings.get("olderChats.telegram.done"));
+    }
+
+    @Test
+    void stopEndsARunBeforeTheNextNetwork() throws Exception {
+        reconfigureHeld = new CountDownLatch(1);
+        CompletableFuture<Map<Network, Answer>> run = loader.load(List.of(Network.TELEGRAM, Network.DISCORD));
+        time.changes.until("Telegram's restart", () -> !eventsStarting("reconfigure").isEmpty());
+        loader.cancel();
+        Map<Network, Answer> a = run.get();
+        assertFalse(a.containsKey(Network.DISCORD), a.toString());
+        assertTrue(events.stream().noneMatch(e -> e.contains("DISCORD")), events.toString());
+        assertEquals(Map.of(), loader.load(List.of(Network.DISCORD)).get(), "a stopped loader runs nothing again");
+        assertTrue(events.stream().noneMatch(e -> e.contains("DISCORD")), events.toString());
     }
 
     @Test

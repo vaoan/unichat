@@ -69,6 +69,11 @@ final class OlderChatSteps {
         return now.get();
     }
 
+    /** What a new login on {@code n} forgets: "nothing more" was the old account's, and so were WhatsApp's groups. */
+    static List<String> keptPerLogin(Network n) {
+        return n == Network.WHATSAPP ? List.of(doneKey(n), WHATSAPP_GROUPS) : List.of(doneKey(n));
+    }
+
     /** The key that says {@code n} has nothing more to load. */
     static String doneKey(Network n) {
         return "olderChats." + n.protocolId() + ".done";

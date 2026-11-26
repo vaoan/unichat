@@ -160,6 +160,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
             bridges.unwatchLiveStates();
             WakeWatch.removeListener(onWake);
             rest.stop();
+            olderChats.cancel(); // a load of this session never runs next to the next session's
             core.running = false;
             if (syncThread != null) syncThread.interrupt();
             timer.shutdownNow();

@@ -71,6 +71,10 @@ final class OlderChatLoader {
     private final List<Runnable> listeners = new CopyOnWriteArrayList<>();
 
     private @Nullable CompletableFuture<Map<Network, Answer>> running;
+    /** Guards {@link #runner} against a cancel landing after the run left its thread. */
+    private final Object runLock = new Object();
+    private @Nullable Thread runner;
+    private volatile boolean cancelled;
     private volatile @Nullable Loading loading;
 
     /** markRead: ChatPreferences.markRead in production; newest: a room's newest message time (null when none). */
@@ -104,16 +108,29 @@ final class OlderChatLoader {
     boolean hasMore(Collection<Network> inView) { return steps.hasMore(inView); }
 
     /**
-     * One step for each of {@code networks}, in that order, one at a time. Instagram runs only if {@code included}
-     * holds it (the sheet's tick); otherwise it has no answer.
+     * One step for each of {@code networks}, in that order, one at a time. Instagram is among them only when ticked in
+     * the sheet ({@code OlderChatsSheet}, which guards it); nothing here adds it.
      */
-    synchronized CompletableFuture<Map<Network, Answer>> load(List<Network> networks, Set<Network> included) {
+    synchronized CompletableFuture<Map<Network, Answer>> load(List<Network> networks) {
+        if (cancelled) return CompletableFuture.completedFuture(Map.of());
         CompletableFuture<Map<Network, Answer>> run = running;
         if (run != null && !run.isDone()) return run;
-        List<Network> asked = networks.stream().filter(n -> n != Network.INSTAGRAM || included.contains(n)).toList();
+        List<Network> asked = List.copyOf(networks);
         run = CompletableFuture.supplyAsync(() -> runAll(asked), io);
         running = run;
         return run;
+    }
+
+    /**
+     * The session ended (logout, quit): the step under way is interrupted, no other network runs, and nothing runs
+     * again, so a new session's loader is never one of two.
+     */
+    void cancel() {
+        synchronized (runLock) {
+            cancelled = true;
+            Thread t = runner;
+            if (t != null) t.interrupt();
+        }
     }
 
     @Nullable Loading loading() { return loading; }
@@ -123,8 +140,26 @@ final class OlderChatLoader {
     void removeListener(Runnable l) { listeners.remove(l); }
 
     private Map<Network, Answer> runAll(List<Network> networks) {
+        synchronized (runLock) {
+            runner = Thread.currentThread();
+        }
+        try {
+            return runEach(networks);
+        } finally {
+            synchronized (runLock) {
+                runner = null;
+                // A cancel's interrupt is this run's: the pool's thread goes on without it.
+                if (cancelled) {
+                    var _ = Thread.interrupted();
+                }
+            }
+        }
+    }
+
+    private Map<Network, Answer> runEach(List<Network> networks) {
         Map<Network, Answer> answers = Collections.synchronizedMap(new EnumMap<>(Network.class));
         for (Network n : networks) {
+            if (cancelled) break;
             Answer a;
             try {
                 a = runOne(n, answers, networks.size());
@@ -161,14 +196,15 @@ final class OlderChatLoader {
             String command = step.command();
             if (command != null) {
                 p.stage(Stage.ASKING);
-                Answer failed;
+                Answer failed = null;
+                boolean answered = true;
                 try {
                     failed = ask(step, command);
                 } catch (TimeoutException noReply) {
-                    return counted(step, counting.newRooms()); // what arrived is the answer
+                    answered = false; // the bridge may still be at it: what arrives is the answer
                 }
                 if (failed != null) return failed;
-                if (step.kind() == OlderChatSteps.Kind.COMMAND) step.settings().forEach(settings::set);
+                if (answered && step.kind() == OlderChatSteps.Kind.COMMAND) step.settings().forEach(settings::set);
             }
             p.stage(Stage.ARRIVING);
             int count = waitQuiet(counting);
@@ -242,8 +278,12 @@ final class OlderChatLoader {
                     : I18n.t("olderChats.failed", reply));
         }
         // Telegram's sync-chats says "Successfully…" when it walked the list; anything else is the bridge saying why not.
-        if (step.kind() == OlderChatSteps.Kind.RAISE_RESTART_COMMAND && !reply.startsWith("Successfully")) {
-            return new Answer.NotPossible(I18n.t("olderChats.failed", reply));
+        if (step.kind() == OlderChatSteps.Kind.RAISE_RESTART_COMMAND) {
+            try {
+                BridgeProtocol.requireSuccess(reply);
+            } catch (MatrixException e) {
+                return new Answer.NotPossible(I18n.t("olderChats.failed", reply));
+            }
         }
         return null;
     }

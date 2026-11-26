@@ -20,6 +20,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -68,12 +69,23 @@ class MatrixServiceDirectTest {
     /** A loader over fakes: what it asks the bot and the provisioner goes in {@code asked}. */
     private static OlderChatLoader fakeLoader(RoomArrivals arrivals, Map<String, String> settings, List<String> asked,
                                               ExecutorService io) {
+        return fakeLoader(arrivals, settings, asked, io, new CountDownLatch(0), new CountDownLatch(1));
+    }
+
+    /** The same, its restarts held until {@code restarted} is released; {@code restarting} goes down as one starts. */
+    private static OlderChatLoader fakeLoader(RoomArrivals arrivals, Map<String, String> settings, List<String> asked,
+                                              ExecutorService io, CountDownLatch restarted, CountDownLatch restarting) {
         ManualTime time = new ManualTime(Instant.parse("2026-11-24T12:00:00Z"));
         OlderChatSteps steps = new OlderChatSteps(settings::get, EnumSet.of(Network.WHATSAPP, Network.TELEGRAM), time::now);
         BridgeProvisioner provisioner = new BridgeProvisioner() {
             @Override public void ensure(Network network) { asked.add("ensure " + network); }
 
-            @Override public void reconfigure(Network network, java.util.function.Consumer<String> progress) { asked.add("reconfigure " + network); }
+            @Override
+            public void reconfigure(Network network, java.util.function.Consumer<String> progress) throws InterruptedException {
+                asked.add("reconfigure " + network);
+                restarting.countDown();
+                restarted.await();
+            }
         };
         return new OlderChatLoader(steps, (n, command, patience) -> {
             asked.add("command " + n + " " + command);
@@ -99,6 +111,22 @@ class MatrixServiceDirectTest {
             assertInstanceOf(OlderChats.Answer.NotPossible.class, a.get(Network.WHATSAPP));
             assertEquals(List.of("command WHATSAPP sync-history-chats 100"), asked);
             assertEquals(OlderChats.Stage.DONE, Present.of(older.loading()).stage());
+        }
+    }
+
+    @Test
+    void stoppingTheServiceEndsALoad() throws Exception {
+        MatrixChatService svc = new MatrixChatService("http://127.0.0.1:9", "@me:x", "stopping-ends-a-load");
+        List<String> asked = new CopyOnWriteArrayList<>();
+        try (ExecutorService io = Executors.newSingleThreadExecutor()) {
+            CountDownLatch never = new CountDownLatch(1);
+            CountDownLatch restarting = new CountDownLatch(1);
+            svc.useOlderChats(fakeLoader(svc.olderChatLoader().arrivals(), new ConcurrentHashMap<>(), asked, io, never, restarting));
+            var run = svc.load(List.of(Network.TELEGRAM, Network.WHATSAPP));
+            restarting.await(); // Telegram's restart, held for good
+            svc.stop();
+            assertTrue(run.get().isEmpty(), "the run ended in Telegram's restart, before WhatsApp");
+            assertTrue(asked.stream().noneMatch(e -> e.contains("WHATSAPP") || e.contains("whatsapp")), asked.toString());
         }
     }
 
