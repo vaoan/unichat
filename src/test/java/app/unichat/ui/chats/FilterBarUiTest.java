@@ -57,12 +57,16 @@ class FilterBarUiTest {
     @Test
     void allFourPartsSitOnOneLineInsideTheColumnAtAnyTextSize() throws Exception {
         List<String> wrong = new ArrayList<>();
-        for (double scale : new double[] {1.0, 1.6}) {
-            for (int width : WIDTHS) {
-                for (String look : new String[] {"", "dark", "contrast"}) {
-                    ChatListPane pane = show(width, scale, look);
-                    String where = "text " + scale + ", " + width + " px" + (look.isEmpty() ? "" : ", " + look) + ": ";
-                    wrong.addAll(FxWait.fx(() -> oneLine(pane, width, where)));
+        // Linux's fonts are wider than the Mac's: "Prioridad baja" left a 260 px column at 160 % with high contrast, in CI
+        // only. A wide font (Monospaced) shows it on any machine.
+        for (String font : List.of("System", "Monospaced")) {
+            for (double scale : new double[] {1.0, 1.6}) {
+                for (int width : WIDTHS) {
+                    for (String look : new String[] {"", "dark", "contrast"}) {
+                        ChatListPane pane = show(width, scale, look, font);
+                        String where = font + ", text " + scale + ", " + width + " px" + (look.isEmpty() ? "" : ", " + look) + ": ";
+                        wrong.addAll(FxWait.fx(() -> oneLine(pane, width, where)));
+                    }
                 }
             }
         }
@@ -211,6 +215,10 @@ class FilterBarUiTest {
     }
 
     private ChatListPane show(int width, double scale, String look) throws InterruptedException {
+        return show(width, scale, look, "System");
+    }
+
+    private ChatListPane show(int width, double scale, String look, String font) throws InterruptedException {
         toolkit();
         ChatListPane pane = FxWait.fx(() -> {
             Icons.SCALE.set(scale);
@@ -218,7 +226,7 @@ class FilterBarUiTest {
             Scene scene = new Scene(p, width, 700);
             scene.getStylesheets().add(FilterBarUiTest.class.getResource("/app/unichat/css/app.css").toExternalForm());
             if (!look.isEmpty()) p.getStyleClass().add(look);
-            p.setStyle("-fx-font-size: " + 13 * scale + "px;");
+            p.setStyle("-fx-font-size: " + 13 * scale + "px; -fx-font-family: '" + font + "';");
             Stage stage = new Stage();
             stage.setOpacity(0);
             stage.setScene(scene);

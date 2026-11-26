@@ -231,6 +231,9 @@
     -fx-padding: 0.3em 0.7em;
     -fx-alignment: center;
 }
+/* The icon parts grow to share the bar: their own padding is only the least they need, so "All" with a wide font (Linux's)
+   at 160 % still fits a narrow column (FilterBarUiTest). */
+.filter-icon { -fx-padding: 0.3em 0.35em; }
 .filter-part .icon { -fx-background-color: -text-2; }
 .filter-part:hover { -fx-background-color: -hover; }
 .filter-part:selected { -fx-background-color: -text; -fx-text-fill: -bg; }
