@@ -39,7 +39,7 @@ What exists only with bridges goes in `BridgeAccess`, which the demo doesn't imp
 ## `service`: small interfaces
 
 `ChatService` brings together interfaces by role: `ChatSession`, `ChatReader`, `MediaSource`, `ChatMessaging`, `ChatPreferences`,
-`NetworkAccounts`, `ContactDirectory`, `GroupDirectory`, `ChatFolders` (folders) `ArchiveWaking` (what rests while the archive is closed; nothing in the demo) and `OlderChats` ("Load older chats"; only with bridges, and in the demo only for snapshots). A new class asks only for the role it needs: `ImageCache`
+`NetworkAccounts`, `ContactDirectory`, `GroupDirectory`, `ChatFolders` (folders), `ArchiveWaking` (what rests while the archive is closed; nothing in the demo) and `OlderChats` ("Load older chats"; only with bridges, and in the demo only for snapshots). A new class asks only for the role it needs: `ImageCache`
 receives `MediaSource`, not the whole service.
 
 ## `matrix`
