@@ -74,6 +74,11 @@ final class OlderChatSteps {
         return n == Network.WHATSAPP ? List.of(doneKey(n), WHATSAPP_GROUPS) : List.of(doneKey(n));
     }
 
+    /** The key that keeps {@code n}'s login ids as last seen, sorted and joined by commas. */
+    static String loginKey(Network n) {
+        return "olderChats." + n.protocolId() + ".login";
+    }
+
     /** The key that says {@code n} has nothing more to load. */
     static String doneKey(Network n) {
         return "olderChats." + n.protocolId() + ".done";

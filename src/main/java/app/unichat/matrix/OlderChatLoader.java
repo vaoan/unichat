@@ -190,6 +190,7 @@ final class OlderChatLoader {
             markLoaded(counting.rooms(), seen, start);
             p.newChats(counting.newRooms());
         });
+        boolean answered = true;
         try {
             Answer refused = step.kind() == OlderChatSteps.Kind.COMMAND ? null : raiseAndRestart(step, p);
             if (refused != null) return refused;
@@ -197,7 +198,6 @@ final class OlderChatLoader {
             if (command != null) {
                 p.stage(Stage.ASKING);
                 Answer failed = null;
-                boolean answered = true;
                 try {
                     failed = ask(step, command);
                 } catch (TimeoutException noReply) {
@@ -208,7 +208,7 @@ final class OlderChatLoader {
             }
             p.stage(Stage.ARRIVING);
             int count = waitQuiet(counting);
-            return counted(step, count);
+            return counted(step, count, answered);
         } finally {
             counting.stop();
             for (String k : List.of(ChatLimits.GMESSAGES_ONCE, ChatLimits.INSTAGRAM_ONCE)) {
@@ -217,10 +217,14 @@ final class OlderChatLoader {
         }
     }
 
-    /** The answer for {@code count} new rooms, keeping "nothing more" when the network has none left to give. */
-    private Answer counted(OlderChatSteps.Step step, int count) {
+    /**
+     * The answer for {@code count} new rooms, keeping "nothing more" when the network has none left to give. A command
+     * that got no answer proves nothing, so the next click asks again.
+     */
+    private Answer counted(OlderChatSteps.Step step, int count, boolean answered) {
         boolean groupsFirst = step.settings().containsKey(OlderChatSteps.WHATSAPP_GROUPS);
-        if (OlderChatSteps.onlyOnce(step) || (count == 0 && !groupsFirst)) settings.set(OlderChatSteps.doneKey(step.network()), "true");
+        boolean nothingLeft = OlderChatSteps.onlyOnce(step) || (count == 0 && !groupsFirst);
+        if (answered && nothingLeft) settings.set(OlderChatSteps.doneKey(step.network()), "true");
         return count > 0 ? new Answer.Loaded(count) : new Answer.NothingMore();
     }
 
@@ -237,6 +241,9 @@ final class OlderChatLoader {
             provisioner.reconfigure(step.network(), OlderChatLoader::notShown);
             return null;
         } catch (InterruptedException e) {
+            // Ended mid-restart (a logout): the old setting goes back, so the next config written is the one it had.
+            old.forEach(settings::set);
+            Thread.currentThread().interrupt();
             throw e;
         } catch (BridgeDidntAnswer e) {
             old.remove(OlderChatSteps.DISCORD_AT);

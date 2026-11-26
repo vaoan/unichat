@@ -342,6 +342,25 @@ class OlderChatLoaderTest {
     }
 
     @Test
+    void aTimeoutWithNothingArrivedDoesntMarkDone() throws Exception {
+        replies.put("sync-chats", () -> { throw new TimeoutException("no reply"); });
+        assertEquals(new Answer.NothingMore(), load(Network.TELEGRAM).get(Network.TELEGRAM));
+        assertNull(settings.get("olderChats.telegram.done"), "unanswered is no proof there's nothing more: the next click asks again");
+    }
+
+    @Test
+    void aCancelDuringTheRestartPutsTheOldLimitBack() throws Exception {
+        settings.put("olderChats.telegram.extra", "100");
+        reconfigureHeld = new CountDownLatch(1);
+        CompletableFuture<Map<Network, Answer>> run = loader.load(List.of(Network.TELEGRAM));
+        time.changes.until("Telegram's restart", () -> !eventsStarting("reconfigure").isEmpty());
+        assertEquals("200", settings.get("olderChats.telegram.extra"), "raised for the restart");
+        loader.cancel();
+        var _ = run.get();
+        assertEquals("100", settings.get("olderChats.telegram.extra"), "the logout came mid-restart: the old limit is back");
+    }
+
+    @Test
     void stopEndsARunBeforeTheNextNetwork() throws Exception {
         reconfigureHeld = new CountDownLatch(1);
         CompletableFuture<Map<Network, Answer>> run = loader.load(List.of(Network.TELEGRAM, Network.DISCORD));

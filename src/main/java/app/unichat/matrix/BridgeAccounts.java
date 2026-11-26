@@ -232,16 +232,19 @@ final class BridgeAccounts {
     }
 
     /**
-     * A new account on {@code n} (its login ids changed, or one came after a logout) has its own older chats: what
-     * "Load older chats" kept as done goes. Logins not known before, the same ones, or a logout keep it.
+     * A new account on {@code n} has its own older chats: when its login ids aren't the ones "Load older chats" last saw
+     * (kept in the settings, so a different account after a restart counts too), what was kept as done goes. The same
+     * ids, a first sight of them, or a logout keep it.
      */
-    static void forgetOlderChatsOnNewLogin(Network n, @Nullable List<Login> before, List<Login> now,
+    static void forgetOlderChatsOnNewLogin(Network n, List<Login> now, java.util.function.Function<String, @Nullable String> get,
                                            java.util.function.BiConsumer<String, @Nullable String> set) {
-        if (before == null || now.isEmpty()) return;
-        Set<String> was = before.stream().map(Login::id).collect(java.util.stream.Collectors.toSet());
-        Set<String> is = now.stream().map(Login::id).collect(java.util.stream.Collectors.toSet());
-        if (was.equals(is)) return;
-        for (String k : OlderChatSteps.keptPerLogin(n)) set.accept(k, null);
+        if (now.isEmpty()) return;
+        String ids = String.join(",", now.stream().map(Login::id).sorted().distinct().toList());
+        String key = OlderChatSteps.loginKey(n);
+        String was = get.apply(key);
+        if (ids.equals(was)) return;
+        if (was != null) for (String k : OlderChatSteps.keptPerLogin(n)) set.accept(k, null);
+        set.accept(key, ids);
     }
 
     /** The networks with an account signed in (or signing in), for "Load older chats". */
@@ -352,7 +355,8 @@ final class BridgeAccounts {
             if (reply == null) return null;
             parsed = n == Network.DISCORD ? parseDiscordPing(reply) : parseLogins(reply);
         }
-        forgetOlderChatsOnNewLogin(n, logins.put(n, parsed), parsed, Settings.get()::set);
+        logins.put(n, parsed);
+        forgetOlderChatsOnNewLogin(n, parsed, Settings.get()::getString, Settings.get()::set);
         maybeResyncChats(n, parsed);
         discord.maybePauseArchivedGuilds(n, parsed);
         Settings.get().set(LoginsCache.key(n.protocolId()), LoginsCache.format(System.currentTimeMillis(),
