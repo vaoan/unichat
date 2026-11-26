@@ -270,9 +270,14 @@ final class MediaDownloader {
         } else {
             throw new MatrixException(0, null, I18n.t("media.unsupportedUrl"));
         }
+        // Lightened before it has its final name: a cached name only ever points at the file that stays.
+        if (thumbnail) {
+            Path lighter = LighterPictures.lighter(tmp);
+            if (!lighter.equals(tmp)) return lighter;
+        }
         Path target = dir.resolve(hash + extension(contentType));
         Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
-        return thumbnail ? LighterPictures.lighter(target) : target;
+        return target;
     }
 
     /** Authenticated media (Matrix 1.11) with fallback to the legacy unauthenticated endpoints. */

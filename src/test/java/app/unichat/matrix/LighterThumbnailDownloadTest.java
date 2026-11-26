@@ -80,6 +80,12 @@ class LighterThumbnailDownloadTest {
             Path first = media.media(url, 168, 168).get();
             assertTrue(first.getFileName().toString().endsWith(".jpg"), first.toString());
             assertTrue(Files.size(first) < png.length);
+            try (var same = Files.list(first.getParent())) {
+                String hash = first.getFileName().toString().replace(".jpg", "");
+                assertEquals(java.util.List.of(first.getFileName().toString()), same
+                        .map(f -> f.getFileName().toString()).filter(n -> n.startsWith(hash)).toList(),
+                        "no .png ever carried the final name: only the file that stays");
+            }
             int seen = requests.get();
             assertEquals(first, media.media(url, 168, 168).get());
             assertEquals(seen, requests.get(), "a cache hit: no second request");

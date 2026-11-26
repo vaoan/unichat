@@ -31,10 +31,14 @@ public final class LighterPictures {
 
     /** The file to keep: {@code file} itself when left as it came, else the new {@code .jpg} beside it (the PNG is deleted). */
     public static Path lighter(Path file) {
+        return lighter(file, PIXEL_LIMIT);
+    }
+
+    static Path lighter(Path file, long pixelLimit) {
         Path part = file.resolveSibling(base(file) + ".jpg.part");
         try {
-            if (!"image/png".equals(ImageHeaders.pictureMime(file)) || !candidate(file)) return file;
-            BufferedImage png = ImageIO.read(file.toFile());
+            if (!"image/png".equals(ImageHeaders.pictureMime(file))) return file;
+            BufferedImage png = candidate(file, pixelLimit);
             if (png == null) return file;
             BufferedImage rgb = new BufferedImage(png.getWidth(), png.getHeight(), BufferedImage.TYPE_INT_RGB);
             var g = rgb.createGraphics();
@@ -56,7 +60,7 @@ public final class LighterPictures {
             }
             Files.deleteIfExists(file);
             return jpg;
-        } catch (IOException | RuntimeException | OutOfMemoryError e) {
+        } catch (IOException | RuntimeException | OutOfMemoryError e) { // a picture too big for the heap is just left as it came
             try {
                 Files.deleteIfExists(part);
             } catch (IOException ignored) {
@@ -66,14 +70,13 @@ public final class LighterPictures {
         }
     }
 
-    /** Within the pixel limit and either opaque by its header or by every pixel's alpha. */
-    private static boolean candidate(Path png) throws IOException {
+    /** The decoded picture when it is within the pixel limit and opaque (by its header or by every pixel's alpha), else null. */
+    private static @Nullable BufferedImage candidate(Path png, long pixelLimit) throws IOException {
         long[] dims = new long[2];
         Boolean byHeader = header(png, dims);
-        if (byHeader == null || dims[0] * dims[1] > PIXEL_LIMIT) return false;
-        if (byHeader) return true;
+        if (byHeader == null || dims[0] * dims[1] > pixelLimit) return null;
         BufferedImage img = ImageIO.read(png.toFile());
-        return img != null && allOpaque(img);
+        return img != null && (byHeader || allOpaque(img)) ? img : null;
     }
 
     private static boolean allOpaque(BufferedImage img) {

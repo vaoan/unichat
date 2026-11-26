@@ -132,4 +132,31 @@ class LighterPicturesTest {
         assertTrue(LighterPictures.opaque(p), "by its header it is opaque");
         assertEquals(p, LighterPictures.lighter(p));
     }
+
+    @Test
+    void aPngOverTheLimitIsNotConvertedAndOneWithinItIs() throws Exception {
+        Path png = png("k.png", BufferedImage.TYPE_INT_RGB, 100, 100, true, 255);
+        assertEquals(png, LighterPictures.lighter(png, 9_999), "10 000 pixels over a limit of 9 999");
+        assertTrue(Files.exists(png));
+        assertEquals("k.jpg", LighterPictures.lighter(png, 10_000).getFileName().toString());
+    }
+
+    @Test
+    void aPalettePngWithoutTransparencyBecomesAJpegAfterTheScan() throws Exception {
+        BufferedImage img = new BufferedImage(300, 300, BufferedImage.TYPE_BYTE_INDEXED);
+        Random r = new Random(9);
+        for (int y = 0; y < 300; y++) for (int x = 0; x < 300; x++) img.setRGB(x, y, 0xFF000000 | r.nextInt(1 << 24));
+        Path png = dir.resolve("l.png");
+        assertTrue(ImageIO.write(img, "png", png.toFile()));
+        assertFalse(Files.readString(png, java.nio.charset.StandardCharsets.ISO_8859_1).contains("tRNS"));
+        assertFalse(LighterPictures.opaque(png), "palette: the header alone doesn't say");
+        assertEquals("l.jpg", LighterPictures.lighter(png).getFileName().toString());
+    }
+
+    @Test
+    void aFileNamedDotDownloadComesOutWithItsFinalNameBase() throws Exception {
+        Path tmp = png("abc.download", BufferedImage.TYPE_INT_RGB, 320, 320, true, 255);
+        assertEquals("abc.jpg", LighterPictures.lighter(tmp).getFileName().toString());
+        assertFalse(Files.exists(tmp));
+    }
 }
