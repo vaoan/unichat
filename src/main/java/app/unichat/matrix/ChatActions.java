@@ -52,6 +52,7 @@ final class ChatActions {
         this.restChanged = restChanged;
     }
 
+    /** The last read marker sent for each chat: its receipt type and event ("m.read $e"). */
     private final Map<String, String> lastReadSent = new ConcurrentHashMap<>();
 
     /**
@@ -60,6 +61,19 @@ final class ChatActions {
      * itself: bridges never see it.
      */
     void markRead(String chatId) {
+        markRead(chatId, Settings.get().readReceipts() == Settings.ReadReceipts.ALWAYS);
+    }
+
+    /**
+     * As {@link #markRead(String)}, read in Unichat only: always a private receipt, whatever the setting. For chats the
+     * person didn't open ("Load older chats"): a public m.read goes through the bridge, telling the sender and the phone.
+     */
+    void markReadHere(String chatId) {
+        markRead(chatId, false);
+    }
+
+    private void markRead(String chatId, boolean publicReceipt) {
+        String receipt = publicReceipt ? "m.read" : "m.read.private";
         String last;
         boolean wasMarked;
         synchronized (proc) {
@@ -71,16 +85,16 @@ final class ChatActions {
             r.chat.setUnreadCount(0);
             r.chat.setMentionCount(0);
             r.chat.setMarkedUnread(false);
-            if (!wasMarked && !wasUnread && last != null && last.equals(lastReadSent.get(chatId))) return;
+            if (!wasMarked && !wasUnread && last != null && (receipt + " " + last).equals(lastReadSent.get(chatId))) return;
         }
         core.fire(Listener::chatsChanged);
         core.io.execute(() -> {
             try {
                 if (last != null) {
                     ObjectNode body = MatrixClient.JSON.createObjectNode().put("m.fully_read", last);
-                    body.put(Settings.get().readReceipts() == Settings.ReadReceipts.ALWAYS ? "m.read" : "m.read.private", last);
+                    body.put(receipt, last);
                     client.post(CLIENT + "/rooms/" + enc(chatId) + "/read_markers", body);
-                    lastReadSent.put(chatId, last);
+                    lastReadSent.put(chatId, receipt + " " + last);
                 }
                 if (wasMarked) putRoomAccountData(chatId, "m.marked_unread", MatrixClient.JSON.createObjectNode().put("unread", false));
             } catch (Exception e) {

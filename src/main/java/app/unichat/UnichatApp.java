@@ -177,7 +177,7 @@ public final class UnichatApp extends Application {
 
     /** The demo keeps its choices and folders in the same files as the real service. */
     private static MockChatService demoService() {
-        return new MockChatService(new PreferencesFile(
+        return app.unichat.service.DemoOlderChats.of(new PreferencesFile(
                 Settings.dataDir().resolve("preferences.json"), Settings.dataDir().resolve("server-seen.json")));
     }
 
@@ -228,6 +228,14 @@ public final class UnichatApp extends Application {
 
             @Override public void loggedOut(Network n) {
                 local.loggedOut(n.protocolId());
+            }
+
+            @Override public void reconfigure(Network n, java.util.function.Consumer<String> progress) throws Exception {
+                local.reconfigureBridge(n.protocolId(), n.displayName(), progress);
+            }
+
+            @Override public void rewrite(Network n) throws Exception {
+                local.rewriteBridgeConfig(n.protocolId());
             }
         };
     }

@@ -63,6 +63,9 @@ memoria, con mensajes entrantes, "escribiendo…" y confirmaciones de lectura si
   solo las redes que tienes conectadas).
 - **Hilos** con burbujas agrupadas, separadores de día, respuestas, reacciones, edición, borrado,
   emojis grandes, enlaces, **negrita**/*cursiva*/`código`, imágenes, archivos, video y audio.
+- **Cargar chats anteriores**: un botón al final de la bandeja pide al puente de cada red los chats que aún no trajo,
+  de una red en una, tras un aviso que dice qué hace y qué riesgos tiene (Instagram solo si lo marcas).
+  Nada se carga solo, y lo que llega viene leído.
 - **Estado de las cuentas, claro y en vivo**: si una red deja de funcionar, una franja arriba de la lista lo dice.
   Roja con "Volver a vincular" si se cerró la sesión; ámbar mientras Unichat la recupera solo. En la barra lateral
   la red queda marcada. Con el servidor local, Unichat reinicia por su cuenta un puente que no responde, que lleva
@@ -175,7 +178,7 @@ Cada push a `main` compila los paquetes en GitHub Actions (artefactos `unichat-w
 Para publicar una versión: cambia `<version>` en `pom.xml`, haz commit y empuja el tag `v<versión>`
 (`git tag v1.1.0 && git push origin v1.1.0`); el workflow `build` crea el release con los paquetes y
 `sha256sums.txt`. Un tag con sufijo (`v1.1.0-beta.1`) sale como pre-release y la app no lo ofrece como actualización.
-El servidor, los puentes de Windows y los de X y Discord para todos los sistemas los compila aparte el workflow
+El servidor, los puentes de Windows y los de X, Discord y WhatsApp para todos los sistemas los compila aparte el workflow
 `natives` (ver [docs/NATIVE-SERVER.md](docs/NATIVE-SERVER.md#own-builds)).
 
 ```powershell
@@ -250,9 +253,10 @@ dar crédito. Eso cubre solo este código. Las piezas de terceros conservan sus 
 (GPLv2 con excepción de classpath), las bibliotecas Java (Apache 2.0 y BSD), whisper.cpp (MIT), libwebp (BSD), tuwunel
 y libolm (Apache 2.0). Los puentes de mautrix (AGPL-3.0) no vienen en la app: se descargan aparte al conectar cada red,
 de sus releases oficiales o, en Windows, del release `natives-*` de este repositorio, compilados sin cambios desde
-el código de cada versión (enlazado en ese release). X y Discord vienen de ese release `natives-*` en todos los sistemas:
-Discord con los arreglos de [`native/patches/discord/`](native/patches/discord/), X en un commit que aún no tiene
-release; ambos enlazados en ese release.
+el código de cada versión (enlazado en ese release). X, Discord y WhatsApp vienen de ese release `natives-*` en todos
+los sistemas: Discord con los arreglos de [`native/patches/discord/`](native/patches/discord/), WhatsApp con el comando
+de [`native/patches/whatsapp/`](native/patches/whatsapp/), X en un commit que aún no tiene release; todos enlazados en
+ese release.
 La lista completa, con los textos de licencia, está en [THIRD-PARTY.md](THIRD-PARTY.md), que también va dentro de los paquetes.
 
 ---

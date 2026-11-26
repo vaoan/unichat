@@ -1,0 +1,204 @@
+WhatsApp older chats on request (mautrix-whatsapp v0.2610.0).
+
+The bridge stores every conversation the phone sends at pairing (history sync) but creates rooms only for the newest
+max_initial_conversations of them, once. Unichat's "Load older chats" needs the rest: `!whatsapp sync-history-chats <n>`
+(n from 1 to 500, the command's own login, no admin) runs createPortalsFromHistorySync with limit n, which takes the
+n most recent conversations not synced since this login, and replies "Created <k> chats from history sync" (k: the
+rooms queued). The function now takes its limit and returns that count; the startup call passes the config's, as before.
+A bad n replies with usage. history_sync_portals_need_creating is left alone: it only schedules the startup run.
+Applied by .github/workflows/natives.yml (git apply), for macOS and Windows.
+
+diff --git a/pkg/connector/backfill.go b/pkg/connector/backfill.go
+index e582ad1..ae3404c 100644
+--- a/pkg/connector/backfill.go
++++ b/pkg/connector/backfill.go
+@@ -56,7 +56,7 @@ func (wa *WhatsAppClient) historySyncLoop(ctx context.Context) {
+ 			select {
+ 			case <-dispatchTimer.C:
+ 				timerPending.Store(false)
+-				wa.createPortalsFromHistorySync(ctx)
++				wa.createPortalsFromHistorySync(ctx, wa.Main.Config.HistorySync.MaxInitialConversations)
+ 			case <-ctx.Done():
+ 				wa.UserLogin.Log.Debug().Msg("Stopping portal creation history sync loop")
+ 				return
+@@ -382,7 +382,9 @@ func (wa *WhatsAppClient) handleWAHistorySync(
+ 	return nil
+ }
+ 
+-func (wa *WhatsAppClient) createPortalsFromHistorySync(ctx context.Context) {
++// createPortalsFromHistorySync creates rooms for the limit most recent history sync conversations not synced since
++// this login, and returns how many it queued (Unichat's patch: the limit and the count, for sync-history-chats).
++func (wa *WhatsAppClient) createPortalsFromHistorySync(ctx context.Context, limit int) (queued int) {
+ 	log := wa.UserLogin.Log.With().
+ 		Str("action", "create portals from history sync").
+ 		Logger()
+@@ -394,12 +396,11 @@ func (wa *WhatsAppClient) createPortalsFromHistorySync(ctx context.Context) {
+ 		}
+ 	}()
+ 	ctx = log.WithContext(ctx)
+-	limit := wa.Main.Config.HistorySync.MaxInitialConversations
+ 	loginTS := wa.UserLogin.Metadata.(*waid.UserLoginMetadata).LoggedInAt
+ 	conversations, err := wa.Main.DB.Conversation.GetRecent(ctx, wa.UserLogin.ID, limit, loginTS)
+ 	if err != nil {
+ 		log.Err(err).Msg("Failed to get recent conversations from database")
+-		return
++		return 0
+ 	}
+ 	log.Info().
+ 		Int("limit", limit).
+@@ -412,10 +413,10 @@ func (wa *WhatsAppClient) createPortalsFromHistorySync(ctx context.Context) {
+ 	for i := 0; i < len(conversations); i++ {
+ 		if ctx.Err() != nil {
+ 			log.Warn().Err(ctx.Err()).Msg("Context cancelled, stopping history sync portal creation")
+-			return
++			return queued
+ 		} else if wa.Client == nil {
+ 			log.Warn().Msg("Client is nil, stopping history sync portal creation")
+-			return
++			return queued
+ 		}
+ 		conv := conversations[i]
+ 		if conv.ChatJID == types.StatusBroadcastJID && !wa.Main.Config.EnableStatusBroadcast {
+@@ -431,7 +432,7 @@ func (wa *WhatsAppClient) createPortalsFromHistorySync(ctx context.Context) {
+ 		case <-time.After(time.Duration(rateLimitErrors) * time.Second):
+ 		case <-ctx.Done():
+ 			log.Warn().Err(ctx.Err()).Msg("Context cancelled, stopping history sync portal creation")
+-			return
++			return queued
+ 		}
+ 		wrappedInfo, err := wa.getChatInfo(ctx, conv.ChatJID, conv, true)
+ 		if errors.Is(err, whatsmeow.ErrNotInGroup) || errors.Is(err, whatsmeow.ErrGroupNotFound) {
+@@ -457,7 +458,7 @@ func (wa *WhatsAppClient) createPortalsFromHistorySync(ctx context.Context) {
+ 			case <-time.After(time.Duration(rateLimitErrors) * time.Second):
+ 			case <-ctx.Done():
+ 				log.Warn().Err(ctx.Err()).Msg("Context cancelled, stopping history sync portal creation")
+-				return
++				return queued
+ 			}
+ 			continue
+ 		} else if err != nil {
+@@ -488,8 +489,9 @@ func (wa *WhatsAppClient) createPortalsFromHistorySync(ctx context.Context) {
+ 		})
+ 		if !res.Success {
+ 			log.Debug().Msg("Cancelling history sync portal creation loop")
+-			return
++			return queued
+ 		}
++		queued++
+ 	}
+ 	log.Info().Int("conversation_count", len(conversations)).Msg("Finished creating portals from history sync")
+ 	go func() {
+@@ -501,6 +503,7 @@ func (wa *WhatsAppClient) createPortalsFromHistorySync(ctx context.Context) {
+ 		}
+ 		log.Info().Msg("Finished processing all history sync chat resync events")
+ 	}()
++	return queued
+ }
+ 
+ func (wa *WhatsAppClient) FetchMessages(ctx context.Context, params bridgev2.FetchMessagesParams) (*bridgev2.FetchMessagesResponse, error) {
+diff --git a/pkg/connector/commands.go b/pkg/connector/commands.go
+index 037d24e..5fce129 100644
+--- a/pkg/connector/commands.go
++++ b/pkg/connector/commands.go
+@@ -22,6 +22,7 @@ import (
+ 	"fmt"
+ 	"html"
+ 	"slices"
++	"strconv"
+ 	"strings"
+ 
+ 	"github.com/rs/zerolog"
+@@ -174,6 +175,52 @@ func fnSync(ce *commands.Event) {
+ 	}
+ }
+ 
++// Unichat's patch: rooms for older chats the history sync stored but didn't bridge, on request.
++var cmdSyncHistoryChats = &commands.FullHandler{
++	Func: fnSyncHistoryChats,
++	Name: "sync-history-chats",
++	Help: commands.HelpMeta{
++		Section:     commands.HelpSectionChats,
++		Description: "Create rooms for the most recent chats from the history sync that don't have one yet.",
++		Args:        "<1-500>",
++	},
++	RequiresLogin: true,
++}
++
++const maxHistoryChats = 500
++
++// parseHistoryChatsLimit reads sync-history-chats' only argument: a whole number from 1 to maxHistoryChats.
++func parseHistoryChatsLimit(args []string) (int, bool) {
++	if len(args) != 1 {
++		return 0, false
++	}
++	n, err := strconv.Atoi(args[0])
++	if err != nil || n < 1 || n > maxHistoryChats {
++		return 0, false
++	}
++	return n, true
++}
++
++func fnSyncHistoryChats(ce *commands.Event) {
++	login := ce.User.GetDefaultLogin()
++	if login == nil {
++		ce.Reply("Login not found")
++		return
++	}
++	limit, ok := parseHistoryChatsLimit(ce.Args)
++	if !ok {
++		ce.Reply("Usage: `$cmdprefix sync-history-chats <1-%d>`", maxHistoryChats)
++		return
++	} else if !login.Client.IsLoggedIn() {
++		ce.Reply("Not logged in")
++		return
++	}
++	wa := login.Client.(*WhatsAppClient)
++	// The bridge's own context, not the command's: the rooms are created after the reply.
++	created := wa.createPortalsFromHistorySync(ce.Bridge.BackgroundCtx, limit)
++	ce.Reply("Created %d chats from history sync", created)
++}
++
+ var cmdInviteLink = &commands.FullHandler{
+ 	Func: fnInviteLink,
+ 	Name: "invite-link",
+diff --git a/pkg/connector/commands_test.go b/pkg/connector/commands_test.go
+new file mode 100644
+index 0000000..fe2cfa3
+--- /dev/null
++++ b/pkg/connector/commands_test.go
+@@ -0,0 +1,22 @@
++// Unichat's patch: tests for sync-history-chats' argument.
++
++package connector
++
++import (
++	"strconv"
++	"testing"
++)
++
++func TestParseHistoryChatsLimit(t *testing.T) {
++	for _, args := range [][]string{{"0"}, {"501"}, {"abc"}, {"-1"}, {"1.5"}, {}, {"100", "1"}} {
++		if n, ok := parseHistoryChatsLimit(args); ok {
++			t.Errorf("parseHistoryChatsLimit(%q) = %d, want refused", args, n)
++		}
++	}
++	for _, want := range []int{1, 100, 500} {
++		args := []string{strconv.Itoa(want)}
++		if n, ok := parseHistoryChatsLimit(args); !ok || n != want {
++			t.Errorf("parseHistoryChatsLimit(%q) = %d, %v, want %d, true", args, n, ok, want)
++		}
++	}
++}
+diff --git a/pkg/connector/connector.go b/pkg/connector/connector.go
+index d7261d3..0279148 100644
+--- a/pkg/connector/connector.go
++++ b/pkg/connector/connector.go
+@@ -110,7 +110,7 @@ func (wa *WhatsAppConnector) Init(bridge *bridgev2.Bridge) {
+ 	wa.DB = wadb.New(bridge.ID, bridge.DB.Database, bridge.Log.With().Str("db_section", "whatsapp").Logger())
+ 	wa.MsgConv.DB = wa.DB
+ 	wa.Bridge.Commands.(*commands.Processor).AddHandlers(
+-		cmdAccept, cmdSync, cmdInviteLink, cmdResolveLink, cmdJoin,
++		cmdAccept, cmdSync, cmdSyncHistoryChats, cmdInviteLink, cmdResolveLink, cmdJoin,
+ 	)
+ 	wa.mediaEditCache = make(MediaEditCache)
+ 	wa.unmigratedDMs = exsync.NewSet[networkid.PortalKey]()

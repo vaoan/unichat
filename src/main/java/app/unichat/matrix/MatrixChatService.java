@@ -50,7 +50,7 @@ import static app.unichat.support.Urls.enc;
  * End-to-end encryption is not supported: bridges must be configured without encryption.
  */
 @SuppressWarnings({"PMD.TooManyMethods", "PMD.ExcessivePublicCount"}) // ChatService's and BridgeAccess's whole interfaces
-public final class MatrixChatService implements ChatService, BridgeAccess, FolderForwarding {
+public final class MatrixChatService implements ChatService, BridgeAccess, FolderForwarding, LoadsOlderChats {
     private static final String HISTORY_FILTER = "{\"lazy_load_members\":true}";
     private final MatrixClient client;
     private final String userId;
@@ -86,6 +86,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     private final Profiles profiles;
     private final Invites invites;
     private final FetchedMessages fetched;
+    private volatile OlderChatLoader olderChats;
 
     private final String serverIdentity;
     private final PreferencesFile prefs;
@@ -125,6 +126,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         this.profiles = new Profiles(core);
         this.invites = new Invites(core);
         this.fetched = new FetchedMessages(core);
+        this.olderChats = OlderChatLoader.of(bridges, this::roomIdsOf, chatActions::markReadHere, this::newestOf, io);
     }
 
     // ---------------------------------------------------------------- folders
@@ -158,6 +160,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
             bridges.unwatchLiveStates();
             WakeWatch.removeListener(onWake);
             rest.stop();
+            olderChats.cancel(); // a load of this session never runs next to the next session's
             core.running = false;
             if (syncThread != null) syncThread.interrupt();
             timer.shutdownNow();
@@ -480,6 +483,7 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
         r.bridgeNotReady.keySet().forEach(id -> { var _ = sender.sendAgainWhenReady(id); });
         if (r.chatsChanged) core.fire(Listener::chatsChanged);
         for (String id : r.messagesChanged) core.fire(l -> l.messagesChanged(id));
+        if (r.chatsChanged || !r.messagesChanged.isEmpty()) olderChats.arrivals().roomsChanged();
         // Read elsewhere (the phone, another client): nothing up to there is news any more.
         r.readByMe.forEach(notifyGate::seen);
         if (!notify) {
@@ -605,6 +609,28 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     /** Chats muted at the last sync ({@link app.unichat.service.QuietRule#toArchive}). */
     private final Set<String> mutedSeen = new java.util.HashSet<>();
 
+    // ---------------------------------------------------------------- older chats
+
+    /** The ids of {@code n}'s rooms now, its bridge bot's left out. */
+    Set<String> roomIdsOf(Network n) {
+        Set<String> out = new java.util.HashSet<>();
+        synchronized (proc) {
+            for (MatrixRoom r : proc.rooms()) if (r.chat.network() == n && !r.chat.bridgeBot()) out.add(r.id);
+        }
+        return out;
+    }
+
+    /** A room's newest message time, null when it has none yet. */
+    private @Nullable Instant newestOf(String chatId) {
+        Chat c = chat(chatId);
+        return c == null || c.lastActivity().equals(Instant.EPOCH) ? null : c.lastActivity();
+    }
+
+    /** Tests run it with fakes. */
+    void useOlderChats(OlderChatLoader loader) { olderChats = loader; }
+
+    @Override public OlderChatLoader olderChatLoader() { return olderChats; }
+
     // ---------------------------------------------------------------- the parts
 
     Path syncCacheFile() { return cache.file(); }
@@ -645,6 +671,9 @@ public final class MatrixChatService implements ChatService, BridgeAccess, Folde
     @Override public CompletableFuture<Void> toggleReaction(String chatId, String messageId, String emoji) { return sender.toggleReaction(chatId, messageId, emoji); }
     @Override public void sendTyping(String chatId, boolean typing) { sender.sendTyping(chatId, typing); }
     @Override public void markRead(String chatId) { chatActions.markRead(chatId); }
+
+    /** A chat "Load older chats" brought, marked read here only: never a public receipt (the bridge would pass it on). */
+    void markLoadedRead(String chatId) { chatActions.markReadHere(chatId); }
     @Override public CompletableFuture<Void> setMarkedUnread(String chatId, boolean unread) { return chatActions.setMarkedUnread(chatId, unread); }
     @Override public CompletableFuture<Void> setFavorite(String chatId, boolean favorite) { return chatActions.setFavorite(chatId, favorite); }
     @Override public CompletableFuture<Void> setLowPriority(String chatId, boolean lowPriority) { return chatActions.setLowPriority(chatId, lowPriority); }

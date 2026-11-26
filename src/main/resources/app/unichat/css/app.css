@@ -966,6 +966,18 @@
 .root.contrast .folder-tile { -fx-border-color: -text; -fx-border-width: 1.5; -fx-border-radius: 14; }
 .folder-new { -fx-alignment: center; }
 .folder-dialog { -fx-padding: 18; -fx-spacing: 14; }
+/* Cargar chats anteriores: the warning sheet, the row under the list */
+.older-chats-row { -fx-padding: 0.4em; -fx-background-radius: 8; }
+.older-chats-row:focused { -fx-background-color: -hover; }
+.root.contrast .older-chats-row:focused { -fx-border-color: -text; -fx-border-width: 2; -fx-border-radius: 8; }
+.older-chats-network { -fx-font-weight: bold; }
+.older-chats-icon { -fx-background-radius: 8; }
+.older-chats-button { -fx-background-color: transparent; -fx-text-fill: -accent; -fx-alignment: center-left; -fx-padding: 0.75em 1em;
+    -fx-background-radius: 12; -fx-cursor: hand; }
+.older-chats-button:hover, .older-chats-button:focused { -fx-background-color: -hover; }
+.older-chats-button:disabled { -fx-text-fill: -text-2; -fx-opacity: 1; }
+.root.contrast .older-chats-button { -fx-text-fill: -text; -fx-underline: true; }
+.root.contrast .older-chats-button:focused { -fx-border-color: -text; -fx-border-width: 2; -fx-border-radius: 12; }
 /* Nuevo chat */
 .new-chat-pane { -fx-padding: 18; -fx-spacing: 10; }
 .new-chat-list { -fx-background-color: transparent; }

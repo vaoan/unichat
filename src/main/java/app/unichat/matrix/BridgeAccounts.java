@@ -213,6 +213,58 @@ final class BridgeAccounts {
 
     static volatile @Nullable BridgeProvisioner provisioner; // NOPMD: MutableStaticState, a seam tests swap
 
+    /** The provisioner set when it's asked, not when this is made (the local server sets it after the session starts). */
+    static BridgeProvisioner live() {
+        return new BridgeProvisioner() {
+            @Override
+            public void ensure(Network network) throws Exception {
+                BridgeProvisioner p = provisioner;
+                if (p != null) p.ensure(network);
+            }
+
+            @Override
+            public void reconfigure(Network network, java.util.function.Consumer<String> progress) throws Exception {
+                BridgeProvisioner p = provisioner;
+                if (p == null) throw new IOException(I18n.t("server.bridgeNotInUse", network.displayName()));
+                p.reconfigure(network, progress);
+            }
+        };
+    }
+
+    /**
+     * A new account on {@code n} has its own older chats: when its login ids aren't the ones "Load older chats" last saw
+     * (kept in the settings, so a different account after a restart counts too), what was kept as done goes. The same
+     * ids, a first sight of them, or a logout keep it.
+     */
+    static void forgetOlderChatsOnNewLogin(Network n, List<Login> now, java.util.function.Function<String, @Nullable String> get,
+                                           java.util.function.BiConsumer<String, @Nullable String> set) {
+        if (now.isEmpty()) return;
+        String ids = String.join(",", now.stream().map(Login::id).sorted().distinct().toList());
+        String key = OlderChatSteps.loginKey(n);
+        String was = get.apply(key);
+        if (ids.equals(was)) return;
+        if (was != null) for (String k : OlderChatSteps.keptPerLogin(n)) set.accept(k, null);
+        set.accept(key, ids);
+    }
+
+    /** The networks with an account signed in (or signing in), for "Load older chats". */
+    Set<Network> withLogins() {
+        Set<Network> out = java.util.EnumSet.noneOf(Network.class);
+        for (Account a : accounts()) {
+            if (a.status() != AccountStatus.NEEDS_LOGIN && a.status() != AccountStatus.NOT_AVAILABLE) out.add(a.network());
+        }
+        return out;
+    }
+
+    /** A "Load older chats" command to {@code n}'s bot: its reply, or a TimeoutException when none came in time. */
+    String olderChatsCommand(Network n, String command, java.time.Duration patience) throws IOException, InterruptedException,
+            java.util.concurrent.TimeoutException {
+        if (bots.find(n) == null) throw new IOException(I18n.t("server.bridgeNotInUse", n.displayName()));
+        String reply = bots.ask(n, command, patience);
+        if (reply == null) throw new java.util.concurrent.TimeoutException(n.protocolId() + " " + command + ": no reply");
+        return reply;
+    }
+
     CompletableFuture<String> connectNetwork(Network network) {
         if (!network.isBridged()) return CompletableFuture.failedFuture(new MatrixException(0, null, I18n.t("error.networkUnsupported")));
         return CompletableFuture.supplyAsync(() -> {
@@ -304,6 +356,7 @@ final class BridgeAccounts {
             parsed = n == Network.DISCORD ? parseDiscordPing(reply) : parseLogins(reply);
         }
         logins.put(n, parsed);
+        forgetOlderChatsOnNewLogin(n, parsed, Settings.get()::getString, Settings.get()::set);
         maybeResyncChats(n, parsed);
         discord.maybePauseArchivedGuilds(n, parsed);
         Settings.get().set(LoginsCache.key(n.protocolId()), LoginsCache.format(System.currentTimeMillis(),

@@ -84,6 +84,12 @@ class SettingsSplitTest {
         assertEquals("/usr/local/bin/whisper {file}", made(new Settings(dir)).sttCommand());
     }
 
+    /** How many chats this computer's bridges were asked for: they describe its bridges, not a choice to carry elsewhere. */
+    @Test void olderChatsStayOnThisMachine() {
+        assertTrue(Settings.staysOnThisMachine("olderChats.telegram.extra"));
+        assertTrue(Settings.staysOnThisMachine("olderChats.instagram.once"));
+    }
+
     @Test void anOldFileIsMigratedOnceAndTwiceIsHarmless() throws IOException {
         Files.writeString(dir.resolve("settings.properties"), "matrix.accessToken=TOKEN\nui.theme=DARK\n");
         Files.writeString(dir.resolve("settings.properties.docker-backup"), "matrix.accessToken=OLD\n");

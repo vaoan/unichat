@@ -215,6 +215,25 @@ Unichat reads the list of sessions with `list-logins` (when connecting or discon
 opening the app). Limitation: the bridges don't always say which session each chat belongs to; when it isn't
 known, the chats show up together under the network and the per-account filter isn't shown (so as not to hide chats).
 
+## Older chats
+
+Each bridge brings only its newest chats when it connects (WhatsApp 200, Telegram 100, Discord 50 private channels,
+Instagram its first inbox page). The rest has no Matrix room yet: the **Load older chats** button at the end of the
+inbox asks for them, one network at a time, after a warning sheet. Nothing does it by itself. Unichat keeps what it
+asked for in this computer's settings (`olderChats.*`) and writes the limits into each bridge's config.
+
+| Network | One click | Bridge restarts |
+|---|---|---|
+| Telegram | 100 more chats (`create_limit` and `update_limit` together), then `sync-chats` | yes |
+| WhatsApp | First every joined group (`sync groups`), then `sync-history-chats 100` (Unichat's patch; chats older than what the phone sent when linking, about 3 months, can't come) | no |
+| Discord | 50 more private chats, at most once every 10 minutes (the restart resubscribes every server) | yes |
+| LinkedIn, Google Messages | Everything, in one step (Google Messages asks the phone for 500 chats once) | yes |
+| Instagram | 3 inbox pages, only if ticked in the sheet: Meta may ask you to verify the account or close the session | yes |
+| Messenger, X | Nothing: their bridges already brought the whole inbox | no |
+
+Each new chat brings its last 50 messages and arrives read, without notifications. A bridge that doesn't come back after
+its restart gets its old limit back.
+
 ## History (backfill)
 
 `setup` turns on backfill in every bridge (the last 50 messages per chat when linking and up to 500 missed

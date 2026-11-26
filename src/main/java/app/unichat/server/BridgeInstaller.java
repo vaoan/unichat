@@ -1,6 +1,8 @@
 package app.unichat.server;
 
 import app.unichat.bridge.BridgePorts;
+import app.unichat.bridge.ChatLimits;
+import app.unichat.settings.Settings;
 import app.unichat.support.Folders;
 import app.unichat.support.I18n;
 import app.unichat.support.Processes;
@@ -34,6 +36,7 @@ final class BridgeInstaller {
     private final BinaryStore store;
     private final Manifest manifest;
     private final Function<String, List<String>> program;
+    private final Function<String, @Nullable String> settings;
 
     BridgeInstaller(Path dir, BinaryStore store, Manifest manifest) {
         this(dir, store, manifest, b -> List.of(store.path(b).toString()));
@@ -41,10 +44,17 @@ final class BridgeInstaller {
 
     /** {@code program}: the command that runs a bridge (tests use a child JVM). */
     BridgeInstaller(Path dir, BinaryStore store, Manifest manifest, Function<String, List<String>> program) {
+        this(dir, store, manifest, program, key -> Settings.get().getString(key));
+    }
+
+    /** {@code settings}: a settings key's value or null, where the chat limits the person asked for are read. */
+    BridgeInstaller(Path dir, BinaryStore store, Manifest manifest, Function<String, List<String>> program,
+                    Function<String, @Nullable String> settings) {
         this.dir = dir;
         this.store = store;
         this.manifest = manifest;
         this.program = program;
+        this.settings = settings;
     }
 
     /** {@code telegram} may be null for any other bridge, and without it Telegram can't be prepared. Blocking. */
@@ -66,7 +76,7 @@ final class BridgeInstaller {
         int port = Objects.requireNonNull(BridgePorts.BRIDGE_PORTS.get(b), "every bridge the manifest pins has its port");
         BridgeConfig.rewrite(config, new BridgeConfig.Settings(b, port, LocalServer.DOMAIN,
                 "@" + LocalServer.USER + ":" + LocalServer.DOMAIN, LocalServer.URL, bd, doublePuppetToken,
-                keys == null ? null : keys.id(), keys == null ? null : keys.hash(), statusUrl));
+                keys == null ? null : keys.id(), keys == null ? null : keys.hash(), statusUrl, ChatLimits.parse(settings)));
         Path reg = bd.resolve("registration.yaml");
         if (!Files.exists(reg)) run(bd, command(b, "-g", "-c", "config.yaml", "-r", "registration.yaml"));
         // The bridge writes these with the default mode (and -g puts the tokens in config.yaml): only the person's.

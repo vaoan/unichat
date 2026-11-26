@@ -1,6 +1,7 @@
 package app.unichat.server;
 
 import app.unichat.Present;
+import app.unichat.bridge.ChatLimits;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -10,7 +11,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -25,6 +28,8 @@ class BridgeInstallerTest {
             whatsapp=mautrix/whatsapp@v1:mautrix-whatsapp
             telegram=mautrix/telegram@v1:mautrix-telegram
             discord=mautrix/discord@v1:mautrix-discord
+            gmessages=mautrix/gmessages@v1:mautrix-gmessages
+            instagram=mautrix/meta@v1:mautrix-meta
             """);
     private static final BridgeInstaller.TelegramApi KEYS = new BridgeInstaller.TelegramApi("12345", "abc");
 
@@ -37,7 +42,7 @@ class BridgeInstallerTest {
         store = new BinaryStore(dir.resolve("bin"), Platform.MAC_ARM64, c -> "http://127.0.0.1:1/nothing-here", c -> null);
         Files.createDirectories(dir.resolve("appservices"));
         Path anything = Files.writeString(dir.resolve("anything"), "x");
-        for (String b : List.of("whatsapp", "telegram", "discord")) store.installBundled(b, anything, "v1");
+        for (String b : List.of("whatsapp", "telegram", "discord", "gmessages", "instagram")) store.installBundled(b, anything, "v1");
     }
 
     private BridgeInstaller installer(String mode) {
@@ -103,6 +108,31 @@ class BridgeInstallerTest {
     void aLegacyBridgeThatWritesNoConfigIsAnError() {
         IOException e = assertThrows(IOException.class, () -> installer("broken-bridge").prepare("discord", "t", "u", null, m -> { }));
         assertEquals("discord no generó su configuración", e.getMessage());
+    }
+
+    @Test
+    void theChatLimitsSavedReachTheConfig() throws Exception {
+        Map<String, String> saved = Map.of("olderChats.discord.extra", "50");
+        String jvm = ProcessHandle.current().info().command().orElse("java");
+        new BridgeInstaller(dir, store, MANIFEST,
+                b -> List.of(jvm, "-cp", System.getProperty("java.class.path"), FakeService.class.getName(), "bridge"), saved::get)
+                .prepare("discord", "dp-token", "http://127.0.0.1:9/status/discord", null, m -> { });
+        var config = BridgeConfig.read(Files.readString(dir.resolve("discord/config.yaml")));
+        assertEquals(100, config.at("/bridge/startup_private_channel_create_limit").asInt());
+    }
+
+    /** The one-shot limits a quit left set are cleared at launch (BridgeLauncher.prepareAtLaunch): the launch config asks for neither. */
+    @Test
+    void aOneShotLimitLeftByAQuitIsGoneFromTheLaunchConfig() throws Exception {
+        Map<String, String> saved = new HashMap<>(Map.of("olderChats.gmessages.once", "true", "olderChats.instagram.once", "true"));
+        ChatLimits.clearOneShots(saved::remove);
+        String jvm = ProcessHandle.current().info().command().orElse("java");
+        BridgeInstaller installer = new BridgeInstaller(dir, store, MANIFEST,
+                b -> List.of(jvm, "-cp", System.getProperty("java.class.path"), FakeService.class.getName(), "bridge"), saved::get);
+        installer.prepare("gmessages", "dp-token", "http://127.0.0.1:9/status/gmessages", null, m -> { });
+        installer.prepare("instagram", "dp-token", "http://127.0.0.1:9/status/instagram", null, m -> { });
+        assertEquals(25, BridgeConfig.read(Files.readString(dir.resolve("gmessages/config.yaml"))).at("/network/initial_chat_sync_count").asInt());
+        assertEquals(0, BridgeConfig.read(Files.readString(dir.resolve("instagram/config.yaml"))).at("/network/thread_backfill/batch_count").asInt());
     }
 
     @Test

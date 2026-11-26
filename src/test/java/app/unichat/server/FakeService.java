@@ -53,6 +53,9 @@ public final class FakeService {
             java.nio.file.Files.writeString(here.resolve("config.yaml"), """
                     network:
                         some_network_key: 1
+                        initial_chat_sync_count: 500
+                        thread_backfill:
+                            batch_count: 3
                     homeserver:
                         address: http://example.localhost:8008
                     appservice:
@@ -74,6 +77,7 @@ public final class FakeService {
                         database:
                             type: postgres
                     bridge:
+                        startup_private_channel_create_limit: 5
                         backfill:
                             forward_limits:
                                 initial:

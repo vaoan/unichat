@@ -3,6 +3,7 @@ package app.unichat.server;
 import app.unichat.support.BundledTools;
 import app.unichat.settings.Settings;
 import app.unichat.bridge.BridgePorts;
+import app.unichat.bridge.ChatLimits;
 import app.unichat.bridge.BridgeStates;
 import app.unichat.bridge.LoginsCache;
 import app.unichat.support.I18n;
@@ -59,6 +60,8 @@ public final class LocalServer {
     private final Watchdog watchdog;
     /** Which bridges run: a bridge with no account waits until its sign-in is opened. */
     private final BridgeLauncher bridges;
+    /** The thread inside {@link #reconfigureBridge}, which {@link #stop} interrupts; null when none. */
+    private volatile @Nullable Thread reconfiguring;
 
     private LocalServer(Platform platform) {
         this.platform = platform;
@@ -197,6 +200,26 @@ public final class LocalServer {
         bridges.open(bridge, network, progress);
     }
 
+    /**
+     * New chat limits for {@code bridge}: rewrites its config, restarts it alone and returns once it answers
+     * ({@link BridgeLauncher#reconfigure}). Blocking, at most the minute a sign-in waits.
+     */
+    public synchronized void reconfigureBridge(String bridge, String network, Consumer<String> progress)
+            throws IOException, InterruptedException {
+        if (!running) throw new app.unichat.bridge.BridgeRefused(I18n.t("server.bridgeNotInUse", network));
+        reconfiguring = Thread.currentThread(); // NOPMD: UnusedAssignment, stop() reads it on the thread that quits
+        try {
+            bridges.reconfigure(bridge, network, progress);
+        } finally {
+            reconfiguring = null;
+        }
+    }
+
+    /** Writes {@code bridge}'s config from the settings again, without restarting it ({@link BridgeLauncher#rewrite}). */
+    public synchronized void rewriteBridgeConfig(String bridge) throws IOException, InterruptedException {
+        bridges.rewrite(bridge, msg -> { });
+    }
+
     /** The person logged out of {@code bridge}'s last account (the bridge confirmed it): it stops. */
     public synchronized void loggedOut(String bridge) {
         bridges.loggedOut(bridge);
@@ -217,9 +240,20 @@ public final class LocalServer {
         @Override public void restarting(String b) { states.restarting(b, BridgeStates.now()); }
 
         @Override public Path log(String b) { return dir.resolve(b).resolve("bridge.log"); }
+
+        @Override public Path config(String b) { return dir.resolve(b).resolve("config.yaml"); }
+
+        @Override public void clearOneShotLimits() { ChatLimits.clearOneShots(k -> Settings.get().set(k, null)); }
     }
 
-    public synchronized void stop() {
+    /** Stops everything. A reconfigure waiting for its bridge holds the lock up to a minute: it's interrupted first. */
+    public void stop() {
+        Thread waiting = reconfiguring;
+        if (waiting != null) waiting.interrupt();
+        stopAll();
+    }
+
+    private synchronized void stopAll() {
         watchdog.stop();
         supervisor.stopAll();
         statusEndpoint.stop();

@@ -4,6 +4,8 @@ import app.unichat.model.Network;
 import app.unichat.bridge.BridgeStates;
 import org.jspecify.annotations.Nullable;
 
+import java.util.function.Consumer;
+
 /** Makes a network's bridge available before signing in to it (the local server downloads and starts it). */
 @FunctionalInterface
 public interface BridgeProvisioner {
@@ -20,4 +22,21 @@ public interface BridgeProvisioner {
 
     /** The person logged out of {@code network}'s last account and its bridge confirmed it: it needn't run. */
     default void loggedOut(Network network) { /* nothing by default */ }
+
+    /**
+     * Rewrites {@code network}'s config from the settings and restarts its bridge only; returns once it answers. Throws
+     * before stopping anything when a limit key is missing (an IOException, its message in the person's words), and
+     * {@link app.unichat.bridge.BridgeDidntAnswer} when the bridge doesn't answer within 60 s.
+     */
+    default void reconfigure(Network network, Consumer<String> progress) throws Exception { // NOPMD: SignatureDeclareThrowsException, a callback: the local server restarts a bridge, failing as it does
+        throw new UnsupportedOperationException("reconfigure");
+    }
+
+    /**
+     * Writes {@code network}'s config from the settings again without restarting its bridge (a one-shot limit cleared
+     * after its step), so a restart by the watchdog doesn't ask for it again. Nothing where no bridge runs here.
+     */
+    default void rewrite(Network network) throws Exception { // NOPMD: SignatureDeclareThrowsException, a callback: the local server writes a config, failing as it does
+        /* nothing by default */
+    }
 }
