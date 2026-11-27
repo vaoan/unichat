@@ -4,6 +4,7 @@ import app.unichat.service.ScriptedChatService;
 import app.unichat.support.Seen;
 import app.unichat.ui.FxWait;
 import app.unichat.ui.MainView;
+import app.unichat.ui.SessionAlerts;
 import javafx.application.Platform;
 import javafx.scene.Scene;
 import javafx.scene.control.ContextMenu;
@@ -139,14 +140,18 @@ class SeenWindowsUiTest {
         }
     }
 
+    /** Notifications come from the session ({@link SessionAlerts}, as the app starts it), not from the window's view. */
     @Test
     void aMessageWhileNotSeenStillNotifies() throws Exception {
         ScriptedChatService svc = new ScriptedChatService();
         Notifier notifier = FxWait.fx(() -> new Notifier(() -> { }, () -> { }, id -> { }, () -> { }));
+        SessionAlerts[] alerts = new SessionAlerts[1];
         MainView view = FxWait.fx(() -> {
             Stage stage = stage("main");
             MainView v = new MainView(svc, stage, notifier, () -> { }, url -> { });
             stage.setScene(new Scene(v, 900, 600));
+            alerts[0] = new SessionAlerts(svc, stage, notifier, v::currentChatId, () -> { });
+            alerts[0].start();
             stage.show();
             return v;
         });
@@ -160,6 +165,7 @@ class SeenWindowsUiTest {
             FxWait.until("the notification posted", () -> "!andres:demo".equals(notifier.lastChatId()));
         } finally {
             FxWait.onFx(() -> {
+                alerts[0].stop();
                 view.dispose();
                 notifier.dispose();
             });
