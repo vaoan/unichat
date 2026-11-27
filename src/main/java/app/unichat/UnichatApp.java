@@ -15,6 +15,7 @@ import app.unichat.support.I18n;
 import app.unichat.support.Os;
 import app.unichat.support.ScreenAway;
 import app.unichat.support.Seen;
+import app.unichat.ui.AwayRelease;
 import app.unichat.ui.Browser;
 import app.unichat.ui.desktop.DockIcon;
 import app.unichat.ui.desktop.MacScreen;
@@ -25,6 +26,7 @@ import app.unichat.ui.login.LoginView;
 import app.unichat.ui.settings.SettingsWindow;
 import app.unichat.ui.desktop.MacQuit;
 import app.unichat.ui.MainView;
+import app.unichat.ui.SessionAlerts;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.ui.Theme;
 import app.unichat.update.UpdateChecker;
@@ -48,8 +50,11 @@ public final class UnichatApp extends Application {
     private Notifier notifier;
     /** The session's service; null on the login screen and after logging out. */
     private volatile @Nullable ChatService service;
-    /** The main window's view; null on the login screen. */
-    private @Nullable MainView mainView;
+    /** The main window's view, let go while the window is closed a while and built again on opening. */
+    @SuppressWarnings("NullAway.Init") // start() sets it first: JavaFX calls nothing of this class before start()
+    private AwayRelease window;
+    /** The session's notifications and unread count, with the window's view or without it; null on the login screen. */
+    private @Nullable SessionAlerts alerts;
     /** The person's own storage, kept up to date while a real session runs; null in the demo. */
     private app.unichat.cloud.@Nullable Cloud cloud;
 
@@ -113,6 +118,7 @@ public final class UnichatApp extends Application {
         scene = new Scene(new javafx.scene.layout.StackPane(), stage.getWidth(), stage.getHeight());
         Theme.register(scene);
         stage.setScene(scene);
+        window = new AwayRelease(stage, scene);
         // Without a Dock icon there's no app menu either, and ⌘Q lives in that menu.
         if (MainView.MAC) scene.getAccelerators().put(new javafx.scene.input.KeyCodeCombination(javafx.scene.input.KeyCode.Q,
                 javafx.scene.input.KeyCombination.SHORTCUT_DOWN), this::quit);
@@ -159,17 +165,17 @@ public final class UnichatApp extends Application {
         if (System.getProperty("unichat.snapshot") != null) stage.toBack();
         // -Dunichat.startLogin=<protocol id>: open Ajustes > Cuentas with that network's login wizard.
         String startLogin = System.getProperty("unichat.startLogin");
-        if (startLogin != null && mainView != null) {
+        if (startLogin != null && window.view() != null) {
             javafx.animation.PauseTransition wait = new javafx.animation.PauseTransition(javafx.util.Duration.seconds(3));
             wait.setOnFinished(e -> {
-                MainView view = mainView;
+                MainView view = window.view();
                 Network n = Network.fromProtocolId(startLogin); // an unknown id opens no login
                 if (view != null && n != null) view.addAccount(n);
             });
             wait.play();
         }
         String snapshot = System.getProperty("unichat.snapshot");
-        if (snapshot != null) new SnapshotRun(mainView, scene, this::quit).start(snapshot);
+        if (snapshot != null) new SnapshotRun(window.view(), scene, this::quit).start(snapshot);
         else UpdateChecker.get().start(); // diagnostics never ask GitHub
         // The passkey probe, only when asked for (-Dunichat.passkeyProbe=true or --passkey-probe), never in a snapshot.
         if (snapshot == null) { var _ = app.unichat.cloud.PasskeyProbe.onStart(uri -> Browser.open(uri.toString())); }
@@ -182,8 +188,10 @@ public final class UnichatApp extends Application {
     }
 
     private void showLogin() {
-        if (mainView != null) mainView.dispose();
-        mainView = null;
+        SessionAlerts a = alerts;
+        if (a != null) a.stop();
+        alerts = null;
+        window.clear();
         scene.setRoot(new LoginView(this::showMain, () -> {
             Settings.get().setBackend("demo");
             showMain(demoService());
@@ -257,11 +265,10 @@ public final class UnichatApp extends Application {
                 notifier.downloadFailed(what, chat, messageId, why);
             }
         });
-        mainView = new MainView(svc, stage, notifier, this::logout, Browser::open);
         // Never in the demo (its made-up chats would reach the person's account), but for a snapshot of Ajustes → Nube.
         if (!(svc instanceof MockChatService) || System.getProperty("unichat.snapshot") != null) {
             cloud = app.unichat.cloud.Cloud.create(Settings.dataDir(), svc::preferencesJson, svc::adoptPreferences,
-                    () -> Platform.runLater(() -> { if (mainView != null) mainView.settingsSynced(); }),
+                    () -> Platform.runLater(() -> window.whenBuilt(MainView::settingsSynced)),
                     () -> app.unichat.autosave.AutoSave.of(svc).folders(),
                     new app.unichat.cloud.Cloud.Texts(app.unichat.autosave.AutoSave.textsDir(), app.unichat.autosave.AutoSave::isTextCopy,
                             app.unichat.autosave.AutoSave.of(svc)::textsArrived),
@@ -272,33 +279,37 @@ public final class UnichatApp extends Application {
             app.unichat.autosave.AutoSave.of(svc).setTextSync(() -> { var _ = c.textsNow(); }, c::textsNow);
             // What it's doing: on the tray (its menu's lines and ring) and on the settings gear.
             c.addListener(new app.unichat.ui.CloudShown(c::status, notifier::setCloud, java.awt.EventQueue::invokeLater,
-                    st -> { if (mainView != null) mainView.cloudChanged(st); }, Platform::runLater));
+                    st -> {
+                        MainView view = window.view(); // none while let go: the next one shows the next change
+                        if (view != null) view.cloudChanged(st);
+                    }, Platform::runLater));
             cloud.start(java.time.Duration.ofMinutes(1));
         }
-        mainView.useCloud(cloud);
-        scene.setRoot(mainView);
-        Theme.applyAll();
+        window.start(() -> {
+            MainView view = new MainView(svc, stage, notifier, this::logout, Browser::open);
+            view.useCloud(cloud);
+            return view;
+        });
+        SessionAlerts a = new SessionAlerts(svc, stage, notifier, window::currentChatId);
+        alerts = a;
+        a.start();
         svc.start();
     }
 
     /**
      * Rebuilds the window in the language just chosen: the same chat stays open, and the settings window, where the
      * change was made, reopens on the same page. Texts already built (open viewers, the demo's chats) keep the old one.
+     * A view let go is built in the new language on opening.
      */
     private void relocalize() {
         notifier.relabel();
-        if (mainView == null || service == null) return;
-        String chat = mainView.currentChatId();
+        if (window.view() == null || service == null) return;
         String page = SettingsWindow.currentPage();
         Stage settings = SettingsWindow.current();
         if (settings != null) settings.close();
-        mainView.dispose();
-        mainView = new MainView(service, stage, notifier, this::logout, Browser::open);
-        scene.setRoot(mainView);
-        Theme.applyAll();
-        if (chat != null) mainView.openChatId(chat);
-        if (page != null) {
-            mainView.showSettings();
+        MainView view = window.rebuild();
+        if (view != null && page != null) {
+            view.showSettings();
             SettingsWindow.select(page);
         }
     }
@@ -391,15 +402,12 @@ public final class UnichatApp extends Application {
         showWindow();
         String id = NotificationTarget.chat(target);
         String message = NotificationTarget.message(target);
-        Platform.runLater(() -> {
-            if (mainView == null) return;
-            mainView.openChatId(id);
-            if (message != null) mainView.showMessage(id, message); // a notice about one message (a file not saved)
-            Platform.runLater(() -> {
-                MainView view = mainView;
-                if (view != null) System.err.println("Notification click: " + view.openOutcome(id));
-            });
-        });
+        // After the window's showing: a view let go is built again first (a loading screen meanwhile), then its chat opens.
+        Platform.runLater(() -> window.whenBuilt(view -> {
+            view.openChatId(id);
+            if (message != null) view.showMessage(id, message); // a notice about one message (a file not saved)
+            Platform.runLater(() -> System.err.println("Notification click: " + view.openOutcome(id)));
+        }));
     }
 
     private void showWindow() {
