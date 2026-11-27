@@ -264,6 +264,7 @@ public final class MainView extends StackPane {
         thread.dispose();
         audio.stop();
         uploads.dispose();
+        forwards.dispose();
         exploring.dispose();
         resting.dispose();
         olderChats.dispose();

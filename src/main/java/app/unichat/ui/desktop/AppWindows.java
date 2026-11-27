@@ -121,6 +121,14 @@ public final class AppWindows {
         return w.isShowing() && !(w instanceof PopupWindow);
     }
 
+    /**
+     * Another window of Unichat's open, minimised or not: what the main window's view must stay for ({@code AwayRelease}).
+     * Not a menu or popup, nor a window nobody looks at ({@link #NOT_LOOKED_AT}: a notification card).
+     */
+    public static boolean open(Window w) {
+        return counts(w) && !w.getProperties().containsKey(NOT_LOOKED_AT);
+    }
+
     /** A window someone can see: one that {@link #counts}, not minimised, not marked {@link #NOT_LOOKED_AT}. */
     static boolean onScreen(Window w) {
         return counts(w) && !(w instanceof Stage s && s.isIconified())

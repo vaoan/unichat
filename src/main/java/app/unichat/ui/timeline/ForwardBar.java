@@ -17,10 +17,14 @@ import org.jspecify.annotations.Nullable;
 /**
  * On top of the window while messages are forwarded, like the upload bar: to which chats, how far, which message goes
  * now, and a way to stop what's left. Forwards go one at a time (a GIF made from a video takes seconds), and nothing
- * said so. Stays after the end to say how it went: a few seconds when all went, until closed when some didn't.
+ * said so. Stays after the end to say how it went: a few seconds when all went, until closed when some didn't. The job
+ * shown is kept per service, so a bar built again (the window let go while closed) follows it on, or still says what
+ * failed.
  */
 public final class ForwardBar extends TaskBar {
     private static final Duration DONE_SHOWN = Duration.seconds(5);
+    /** The forward each service's bar follows, until it's closed: outlives the bar (the window's view let go). */
+    private static final java.util.Map<ChatReader, Forwarding.Job> FOLLOWED = new java.util.WeakHashMap<>();
 
     private final ChatReader chats;
     private final Button stop;
@@ -29,6 +33,9 @@ public final class ForwardBar extends TaskBar {
     private final PauseTransition hideLater = new PauseTransition(DONE_SHOWN);
     private Forwarding.@Nullable Job job;
     private @Nullable String chatId;
+    /** Told by the job on each change; removed when another is followed or the bar is let go. */
+    @SuppressWarnings("UnnecessaryLambda") // one instance: removeListener takes away what addListener added
+    private final Runnable onChange = redraw::request;
 
     public ForwardBar(ChatReader chats, java.util.function.Consumer<String> openChat) {
         super("forward-bar");
@@ -44,23 +51,55 @@ public final class ForwardBar extends TaskBar {
         hideLater.setOnFinished(e -> dismiss());
         actions(stop, close);
         Nodes.show(this, false);
+        Forwarding.Job followed = followed(chats);
+        // One still going, or whose failures weren't read yet; one that all went said so already.
+        if (followed != null && (!followed.finished() || followed.failed() > 0)) show(followed);
+        else forget(chats, followed);
     }
 
     /** Follows {@code forwarding} from now on, in place of the one before (which goes on, unseen). */
     public void show(Forwarding.Job forwarding) {
         hideLater.stop();
+        Forwarding.Job before = job;
+        if (before != null) before.removeListener(onChange);
         job = forwarding;
+        synchronized (FOLLOWED) {
+            FOLLOWED.put(chats, forwarding);
+        }
         lead.getChildren().setAll(Icons.icon(Icons.FORWARD, 20));
-        forwarding.addListener(() -> {
-            if (forwarding == job) redraw.request();
-        });
+        forwarding.addListener(onChange);
         refresh();
+    }
+
+    /** The bar let go with its window: the job goes on (a bar built again follows it), no longer telling this one. */
+    public void dispose() {
+        hideLater.stop();
+        Forwarding.Job j = job;
+        if (j != null) j.removeListener(onChange);
     }
 
     private void dismiss() {
         hideLater.stop();
+        Forwarding.Job j = job;
         job = null;
+        if (j != null) {
+            j.removeListener(onChange);
+            forget(chats, j);
+        }
         refresh();
+    }
+
+    private static Forwarding.@Nullable Job followed(ChatReader chats) {
+        synchronized (FOLLOWED) {
+            return FOLLOWED.get(chats);
+        }
+    }
+
+    private static void forget(ChatReader chats, Forwarding.@Nullable Job j) {
+        if (j == null) return;
+        synchronized (FOLLOWED) {
+            FOLLOWED.remove(chats, j);
+        }
     }
 
     private void refresh() {

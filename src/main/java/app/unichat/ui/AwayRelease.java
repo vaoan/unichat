@@ -197,8 +197,16 @@ public final class AwayRelease {
         building = false;
         if (!stage.isShowing()) return; // closed again before it was built: built on the next opening
         String chat = chatLetGo;
+        MainView built;
+        try {
+            built = b.get();
+        } catch (RuntimeException e) { // never a wheel spinning for good: it says so, and the next opening tries again
+            System.err.println("The main window could not be built again: " + e);
+            if (scene.getRoot() instanceof LoadingView loading) loading.fail(I18n.t("main.openFailed", app.unichat.support.Errors.message(e)));
+            return;
+        }
         chatLetGo = null;
-        put(b.get(), chat);
+        put(built, chat);
     }
 
     private void letGoIfAway() {
@@ -212,9 +220,12 @@ public final class AwayRelease {
         letGo(v);
     }
 
-    /** The settings, a photo or a video open: what's in them comes from the view, which stays. */
+    /**
+     * The settings, a photo or a video open: what's in them comes from the view, which stays. A menu, a tooltip or the
+     * notification card isn't one ({@link app.unichat.ui.desktop.AppWindows#open}).
+     */
     private boolean othersShowing() {
-        for (Window w : Window.getWindows()) if (w != stage && w.isShowing()) return true;
+        for (Window w : Window.getWindows()) if (w != stage && app.unichat.ui.desktop.AppWindows.open(w)) return true;
         return false;
     }
 
@@ -231,8 +242,9 @@ public final class AwayRelease {
         empty.snapshot(null, new javafx.scene.image.WritableImage(1, 1));
         Pictures.forget();
         released++;
-        // Collected now, G1 gives the memory back to the system at once instead of keeping it until the heap fills again;
-        // off the FX thread, so a click right after isn't kept waiting by the pause.
+        // Collected now, G1 gives the memory back to the system at once instead of keeping it until the heap fills again.
+        // Its pause stops every thread whichever calls it (the FX one too); harmless while the window is hidden. Asked on
+        // another thread only so this method returns at once.
         Thread.ofVirtual().name("away-gc").start(System::gc);
     }
 }

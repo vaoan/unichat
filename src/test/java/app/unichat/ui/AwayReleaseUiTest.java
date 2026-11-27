@@ -61,6 +61,8 @@ class AwayReleaseUiTest {
     private @Nullable SessionAlerts alerts;
     /** Times the app was told to log out (UnichatApp::logout). */
     private final java.util.concurrent.atomic.AtomicInteger logouts = new java.util.concurrent.atomic.AtomicInteger();
+    /** Building the view throws from now on (a bug in it, the disk gone…). */
+    private volatile boolean buildFails;
 
     @BeforeAll
     static void toolkit() throws Exception {
@@ -102,7 +104,10 @@ class AwayReleaseUiTest {
             stage.setScene(scene);
             notifier = new Notifier(() -> { }, () -> { }, id -> { }, () -> { });
             window = new AwayRelease(stage, scene, after);
-            window.start(() -> new MainView(svc, stage, notifier, logouts::incrementAndGet, url -> { })); // its logout counts too
+            window.start(() -> { // its logout counts too
+                if (buildFails) throw new IllegalStateException("broken (test)");
+                return new MainView(svc, stage, notifier, logouts::incrementAndGet, url -> { });
+            });
             SessionAlerts a = new SessionAlerts(svc, stage, notifier, window::currentChatId, logouts::incrementAndGet);
             alerts = a;
             a.start();
@@ -354,5 +359,177 @@ class AwayReleaseUiTest {
         FxWait.onFx(stage()::show);
         FxWait.settled();
         assertTrue(FxWait.fx(() -> view().lookup(".rail-cloud-ring").isVisible()), "the gear's ring, as the cloud last said");
+    }
+
+    // ------------------------------------------------------------------ a forward going on
+
+    /** A forward still going when the view is let go: the view built again follows it, and the old one isn't kept for it. */
+    @Test
+    @SuppressFBWarnings(value = "DM_GC", justification = "it measures what is kept after a collection (as its NOPMD says)")
+    void aForwardGoingOnIsFollowedByTheViewBuiltAgain() throws Exception {
+        CompletableFuture<Void> going = new CompletableFuture<>(); // the forward never ends until the test says
+        open(new MockChatService() {
+            @Override public CompletableFuture<Void> forward(String chatId, Message message, boolean gifs) { return going; }
+        }, Duration.ZERO);
+        try {
+            app.unichat.service.Forwarding.Job job = forwardOne();
+            FxWait.until("it's going", () -> job.current() != null);
+            WeakReference<MainView> old = new WeakReference<>(view());
+            hideAndLetGo();
+            FxWait.until("the view let go isn't kept by the forward going on", () -> {
+                System.gc(); // NOPMD: DoNotCallGarbageCollectionExplicitly, it measures what is kept after a collection
+                return old.get() == null;
+            });
+            FxWait.onFx(stage()::show);
+            FxWait.settled();
+            assertTrue(FxWait.fx(() -> forwardBar().isVisible()), "the bar built again shows the forward");
+            assertTrue(FxWait.fx(() -> barSays().contains(I18n.t("forwardBar.count", 0, 1))), FxWait.fx(this::barSays));
+            going.complete(null);
+            FxWait.until("and follows it to its end", () -> barSays().contains(I18n.t("forwardBar.count", 1, 1)));
+        } finally {
+            going.complete(null);
+        }
+    }
+
+    /** A forward that failed while nobody looked still says so when the window is built again, until it's closed. */
+    @Test
+    void aForwardThatFailedStillSaysSoAfterALetGo() throws Exception {
+        open(new MockChatService() {
+            @Override public CompletableFuture<Void> forward(String chatId, Message message, boolean gifs) {
+                return CompletableFuture.failedFuture(new java.io.IOException("connection reset (test)"));
+            }
+        }, Duration.ZERO);
+        forwardOne().done().get();
+        hideAndLetGo();
+        FxWait.onFx(stage()::show);
+        FxWait.settled();
+        assertTrue(FxWait.fx(() -> forwardBar().isVisible()), "the failure is still there to read");
+        assertTrue(FxWait.fx(() -> barSays().startsWith(I18n.n("forwardBar.failed", 1, 0))), FxWait.fx(this::barSays));
+    }
+
+    /** One message of the family's to mom, followed by the view's bar as the forward sheet does. */
+    private app.unichat.service.Forwarding.Job forwardOne() throws InterruptedException {
+        List<Message> one = svc.messages(FAMILY).stream().filter(m -> m.type() == app.unichat.model.MessageType.TEXT).limit(1).toList();
+        app.unichat.service.Forwarding.Job job = app.unichat.service.Forwarding.send(svc, one, List.of(MOM), m -> null, true);
+        FxWait.onFx(() -> forwardBar().show(job));
+        FxWait.settled();
+        return job;
+    }
+
+    private app.unichat.ui.timeline.ForwardBar forwardBar() {
+        return (app.unichat.ui.timeline.ForwardBar) Present.of(scene.getRoot().lookup(".forward-bar"));
+    }
+
+    /** What the bar says to a screen reader: what happened, how far, why. */
+    private String barSays() {
+        return String.valueOf(Present.of(forwardBar().lookup(".progress-bar")).getAccessibleText());
+    }
+
+    // ------------------------------------------------------------------ notifications while let go
+
+    @Test
+    void aMessageWhileLetGoNotifies() throws Exception {
+        app.unichat.service.ScriptedChatService scripted = scripted(Duration.ZERO);
+        String chat = notifying();
+        hideAndLetGo();
+        scripted.receive(chat, "¿Estás?");
+        FxWait.until("the notification posted", () -> chat.equals(app.unichat.ui.desktop.NotifierAccess.lastChatId(notifier)));
+        assertNull(FxWait.fx(window::view), "with no view built for it");
+    }
+
+    @Test
+    void aReminderWhileLetGoNotifies() throws Exception {
+        app.unichat.service.ScriptedChatService scripted = scripted(Duration.ZERO);
+        String chat = notifying();
+        hideAndLetGo();
+        scripted.remindNow(chat).get();
+        FxWait.until("the reminder posted", () -> chat.equals(app.unichat.ui.desktop.NotifierAccess.lastChatId(notifier)));
+        assertNull(FxWait.fx(window::view), "with no view built for it");
+    }
+
+    /** The chat open and the window focused in front: what arrives there is being read, so no notification. */
+    @Test
+    void aMessageInTheChatBeingReadDoesntNotify() throws Exception {
+        app.unichat.service.ScriptedChatService scripted = scripted(Duration.ofDays(1));
+        String chat = notifying();
+        FxWait.onFx(() -> {
+            view().openChatId(chat);
+            stage().requestFocus();
+        });
+        FxWait.settled();
+        assertTrue(FxWait.fx(stage()::isFocused), "the window has the focus, as the person reading");
+        scripted.receive(chat, "¿Estás?");
+        FxWait.settled(); // the service's listener has handed it to the FX thread, which ran it
+        assertNull(FxWait.fx(() -> app.unichat.ui.desktop.NotifierAccess.lastChatId(notifier)), "nothing posted for it");
+    }
+
+    /** The same chat with the window let go: nobody is reading it, so it notifies. */
+    @Test
+    void aMessageInTheChatThatWasOpenNotifiesOnceLetGo() throws Exception {
+        app.unichat.service.ScriptedChatService scripted = scripted(Duration.ZERO);
+        String chat = notifying();
+        FxWait.onFx(() -> {
+            view().openChatId(chat);
+            stage().requestFocus();
+        });
+        FxWait.settled();
+        hideAndLetGo();
+        scripted.receive(chat, "¿Estás?");
+        FxWait.until("the notification posted", () -> chat.equals(app.unichat.ui.desktop.NotifierAccess.lastChatId(notifier)));
+    }
+
+    /** The window over a demo where the test plays the others: nothing arrives unless it says so. */
+    private app.unichat.service.ScriptedChatService scripted(Duration after) throws InterruptedException {
+        app.unichat.service.ScriptedChatService s = new app.unichat.service.ScriptedChatService();
+        open(s, after);
+        return s;
+    }
+
+    /** A chat whose messages notify: not muted, archived nor a bridge's bot. */
+    private String notifying() {
+        return svc.chats().stream().filter(c -> !c.muted() && !c.archived() && !c.bridgeBot() && !c.space()
+                && c.members().size() > 1).findFirst().orElseThrow().id();
+    }
+
+    // ------------------------------------------------------------------ what holds it, what doesn't
+
+    /** A notification card (a window nobody looks at) and a popup over it don't keep the view, as a settings window does. */
+    @Test
+    void aNotificationCardOrAPopupDoesntHoldIt() throws Exception {
+        open(Duration.ZERO);
+        FxWait.onFx(() -> {
+            Stage card = new Stage();
+            stages.add(card);
+            card.setOpacity(0);
+            card.setScene(new Scene(new StackPane(), 200, 80));
+            card.getProperties().put(app.unichat.ui.desktop.AppWindows.NOT_LOOKED_AT, true); // as DesktopToast marks it
+            card.show();
+            javafx.stage.Popup popup = new javafx.stage.Popup();
+            popup.getContent().add(new StackPane());
+            popup.show(card);
+            assertTrue(popup.isShowing());
+        });
+        hideAndLetGo();
+        assertEquals(0, FxWait.fx(window::held), "nothing kept it");
+    }
+
+    // ------------------------------------------------------------------ a build that fails
+
+    @Test
+    void aViewThatCantBeBuiltAgainSaysSoAndTheNextOpeningTriesAgain() throws Exception {
+        open(Duration.ZERO);
+        hideAndLetGo();
+        buildFails = true;
+        FxWait.onFx(stage()::show);
+        FxWait.settled();
+        String said = I18n.t("main.openFailed", "broken (test)");
+        LoadingView loading = assertInstanceOf(LoadingView.class, FxWait.fx(scene::getRoot), "still the loading screen");
+        assertEquals(said, FxWait.fx(loading::text), "it says what went wrong, not a wheel spinning for good");
+        assertEquals(said, FxWait.fx(loading::getAccessibleText));
+        buildFails = false;
+        FxWait.onFx(stage()::hide);
+        FxWait.onFx(stage()::show);
+        FxWait.settled();
+        assertSame(view(), FxWait.fx(scene::getRoot), "built on the next opening");
     }
 }
