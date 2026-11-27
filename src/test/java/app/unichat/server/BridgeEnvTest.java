@@ -9,8 +9,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 class BridgeEnvTest {
     @Test
     void aGoBridgeCollectsSoonerWithASoftLimit() {
-        assertEquals(java.util.Map.of("GOGC", "50", "GOMEMLIMIT", "64MiB"), BridgeEnv.forService("telegram"));
-        assertEquals("128MiB", BridgeEnv.forService("discord").get("GOMEMLIMIT"));
+        assertEquals(java.util.Map.of("GOGC", "50", "GOMEMLIMIT", "96MiB"), BridgeEnv.forService("telegram"));
+        assertEquals("256MiB", BridgeEnv.forService("discord").get("GOMEMLIMIT"));
     }
 
     @Test
