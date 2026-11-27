@@ -399,7 +399,7 @@ public final class MainView extends StackPane {
         connection.getStyleClass().removeAll("error");
         if (storage != null || s == ConnectionState.OFFLINE || s == ConnectionState.LOGGED_OUT) connection.getStyleClass().add("error");
         Nodes.show(connection, text != null);
-        if (s == ConnectionState.LOGGED_OUT) onLogout.run();
+        // A session ended elsewhere logs out through SessionAlerts, view or not: once.
     }
 
     // ------------------------------------------------------------------ navigation

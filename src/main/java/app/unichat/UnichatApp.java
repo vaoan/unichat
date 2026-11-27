@@ -19,7 +19,6 @@ import app.unichat.ui.AwayRelease;
 import app.unichat.ui.Browser;
 import app.unichat.ui.desktop.DockIcon;
 import app.unichat.ui.desktop.MacScreen;
-import app.unichat.ui.desktop.NotificationTarget;
 import app.unichat.ui.desktop.TrayReopen;
 import app.unichat.ui.desktop.WindowsScreen;
 import app.unichat.ui.login.LoginView;
@@ -268,7 +267,7 @@ public final class UnichatApp extends Application {
         // Never in the demo (its made-up chats would reach the person's account), but for a snapshot of Ajustes → Nube.
         if (!(svc instanceof MockChatService) || System.getProperty("unichat.snapshot") != null) {
             cloud = app.unichat.cloud.Cloud.create(Settings.dataDir(), svc::preferencesJson, svc::adoptPreferences,
-                    () -> Platform.runLater(() -> window.whenBuilt(MainView::settingsSynced)),
+                    () -> Platform.runLater(window::settingsSynced),
                     () -> app.unichat.autosave.AutoSave.of(svc).folders(),
                     new app.unichat.cloud.Cloud.Texts(app.unichat.autosave.AutoSave.textsDir(), app.unichat.autosave.AutoSave::isTextCopy,
                             app.unichat.autosave.AutoSave.of(svc)::textsArrived),
@@ -279,10 +278,7 @@ public final class UnichatApp extends Application {
             app.unichat.autosave.AutoSave.of(svc).setTextSync(() -> { var _ = c.textsNow(); }, c::textsNow);
             // What it's doing: on the tray (its menu's lines and ring) and on the settings gear.
             c.addListener(new app.unichat.ui.CloudShown(c::status, notifier::setCloud, java.awt.EventQueue::invokeLater,
-                    st -> {
-                        MainView view = window.view(); // none while let go: the next one shows the next change
-                        if (view != null) view.cloudChanged(st);
-                    }, Platform::runLater));
+                    window::cloudChanged, Platform::runLater));
             cloud.start(java.time.Duration.ofMinutes(1));
         }
         window.start(() -> {
@@ -290,7 +286,7 @@ public final class UnichatApp extends Application {
             view.useCloud(cloud);
             return view;
         });
-        SessionAlerts a = new SessionAlerts(svc, stage, notifier, window::currentChatId);
+        SessionAlerts a = new SessionAlerts(svc, stage, notifier, window::currentChatId, this::logout);
         alerts = a;
         a.start();
         svc.start();
@@ -400,14 +396,7 @@ public final class UnichatApp extends Application {
     /** A notification's click: the window, then its chat; the log says what it led to (after the open's own runLaters). */
     private void openFromNotification(String target) {
         showWindow();
-        String id = NotificationTarget.chat(target);
-        String message = NotificationTarget.message(target);
-        // After the window's showing: a view let go is built again first (a loading screen meanwhile), then its chat opens.
-        Platform.runLater(() -> window.whenBuilt(view -> {
-            view.openChatId(id);
-            if (message != null) view.showMessage(id, message); // a notice about one message (a file not saved)
-            Platform.runLater(() -> System.err.println("Notification click: " + view.openOutcome(id)));
-        }));
+        window.openNotified(target); // after the showing: a view let go is built again first
     }
 
     private void showWindow() {

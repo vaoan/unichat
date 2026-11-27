@@ -2,7 +2,6 @@ package app.unichat.ui;
 
 import app.unichat.support.I18n;
 import app.unichat.ui.media.Pictures;
-import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import javafx.animation.PauseTransition;
 import javafx.application.Platform;
 import javafx.scene.Scene;
@@ -36,6 +35,8 @@ public final class AwayRelease {
     private @Nullable MainView view;
     /** The chat that was open when the view was let go, opened again in the next one. */
     private @Nullable String chatLetGo;
+    /** What the cloud said last: a view built again shows it on its gear at once, not at the next change. */
+    private app.unichat.cloud.Cloud.@Nullable Status cloud;
     /** What waits for the view being built again (a notification's chat). */
     private final List<Consumer<MainView>> waiting = new ArrayList<>();
     /** Changes with each session and each build asked for, so a build that comes late can tell it isn't wanted. */
@@ -87,6 +88,7 @@ public final class AwayRelease {
         building = false;
         build = null;
         chatLetGo = null;
+        cloud = null;
         waiting.clear();
         MainView old = view;
         view = null;
@@ -111,6 +113,37 @@ public final class AwayRelease {
         else if (build != null) waiting.add(then);
     }
 
+    /**
+     * A notification's click, once the window is asked to show: its chat (and message) in the view, built again first
+     * when it was let go (the loading screen meanwhile); the log says what it led to.
+     */
+    public void openNotified(String target) {
+        String id = app.unichat.ui.desktop.NotificationTarget.chat(target);
+        String message = app.unichat.ui.desktop.NotificationTarget.message(target);
+        Platform.runLater(() -> whenBuilt(v -> { // queued after the window's showing, which starts the build
+            v.openChatId(id);
+            if (message != null) v.showMessage(id, message); // a notice about one message (a file not saved)
+            Platform.runLater(() -> System.err.println("Notification click: " + v.openOutcome(id)));
+        }));
+    }
+
+    /**
+     * Settings adopted from another computer: what the whole app reads once (the language, the shortcut, the Dock, the
+     * tray) at once, view or not; the view's redraw only when there's one (one built later reads them anyway).
+     */
+    public void settingsSynced() {
+        MainView v = view;
+        if (v != null) v.settingsSynced();
+        else app.unichat.ui.settings.SyncedSettings.apply(() -> { });
+    }
+
+    /** What the cloud is doing, for the view's gear: now if there's one, and on each built again. UI thread. */
+    public void cloudChanged(app.unichat.cloud.Cloud.Status s) {
+        cloud = s;
+        MainView v = view;
+        if (v != null) v.cloudChanged(s);
+    }
+
     /** Views let go so far (for tests: they wait for it). */
     int released() {
         return released;
@@ -125,6 +158,8 @@ public final class AwayRelease {
         view = v;
         scene.setRoot(v);
         Theme.applyAll();
+        app.unichat.cloud.Cloud.Status c = cloud;
+        if (c != null) v.cloudChanged(c);
         if (chat != null) v.openChatId(chat);
         List<Consumer<MainView>> then = List.copyOf(waiting);
         waiting.clear();
@@ -183,7 +218,6 @@ public final class AwayRelease {
         return false;
     }
 
-    @SuppressFBWarnings(value = "DM_GC", justification = "giving the window's memory back now (as its NOPMD says)")
     private void letGo(MainView v) {
         chatLetGo = v.currentChatId();
         v.dispose(); // what it registered on the stage and the app's singletons, or they would keep it
@@ -197,7 +231,8 @@ public final class AwayRelease {
         empty.snapshot(null, new javafx.scene.image.WritableImage(1, 1));
         Pictures.forget();
         released++;
-        // Collected now, G1 gives the memory back to the system at once instead of keeping it until the heap fills again.
-        System.gc(); // NOPMD: DoNotCallGarbageCollectionExplicitly, the memory goes back now (the comment above)
+        // Collected now, G1 gives the memory back to the system at once instead of keeping it until the heap fills again;
+        // off the FX thread, so a click right after isn't kept waiting by the pause.
+        Thread.ofVirtual().name("away-gc").start(System::gc);
     }
 }

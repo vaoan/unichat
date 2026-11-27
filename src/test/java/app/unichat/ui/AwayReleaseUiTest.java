@@ -59,6 +59,8 @@ class AwayReleaseUiTest {
     @SuppressWarnings("NullAway.Init") // open() sets it first, in every test
     private AwayRelease window;
     private @Nullable SessionAlerts alerts;
+    /** Times the app was told to log out (UnichatApp::logout). */
+    private final java.util.concurrent.atomic.AtomicInteger logouts = new java.util.concurrent.atomic.AtomicInteger();
 
     @BeforeAll
     static void toolkit() throws Exception {
@@ -100,8 +102,8 @@ class AwayReleaseUiTest {
             stage.setScene(scene);
             notifier = new Notifier(() -> { }, () -> { }, id -> { }, () -> { });
             window = new AwayRelease(stage, scene, after);
-            window.start(() -> new MainView(svc, stage, notifier, () -> { }, url -> { }));
-            SessionAlerts a = new SessionAlerts(svc, stage, notifier, window::currentChatId);
+            window.start(() -> new MainView(svc, stage, notifier, logouts::incrementAndGet, url -> { })); // its logout counts too
+            SessionAlerts a = new SessionAlerts(svc, stage, notifier, window::currentChatId, logouts::incrementAndGet);
             alerts = a;
             a.start();
             stage.show();
@@ -185,7 +187,7 @@ class AwayReleaseUiTest {
                 stage().show();
                 stage().toFront();
             });
-            Platform.runLater(() -> window.whenBuilt(v -> v.openChatId(MOM)));
+            window.openNotified(MOM); // UnichatApp.openFromNotification's own step
             Platform.runLater(() -> assertInstanceOf(LoadingView.class, scene.getRoot(), "the loading screen while it's built"));
         });
         FxWait.settled();
@@ -303,5 +305,54 @@ class AwayReleaseUiTest {
         FxWait.settled();
         assertNull(FxWait.fx(window::view));
         assertSame(login, FxWait.fx(scene::getRoot), "the login screen stays");
+    }
+
+    /** Revoked on another device: the server says so to the service, and the app logs out even with no view to tell. */
+    @Test
+    void aSessionEndedElsewhereWhileLetGoLogsOut() throws Exception {
+        open(Duration.ZERO);
+        hideAndLetGo();
+        svc.logout().get(); // the demo's way to report LOGGED_OUT, as a server does for a session ended elsewhere
+        FxWait.until("the app is told to log out", () -> logouts.get() == 1);
+    }
+
+    @Test
+    void aSessionEndedElsewhereWithTheViewThereLogsOutOnce() throws Exception {
+        open(Duration.ZERO);
+        svc.logout().get();
+        FxWait.until("the app is told to log out", () -> logouts.get() >= 1);
+        FxWait.settled(); // the view has heard it too
+        assertEquals(1, logouts.get(), "the view doesn't log out a second time");
+    }
+
+    /** Settings adopted from another computer while let go: what the whole app reads once follows at once. */
+    @Test
+    void aSettingAdoptedWhileLetGoAppliesAtOnce() throws Exception {
+        open(Duration.ZERO);
+        hideAndLetGo();
+        boolean was = app.unichat.assist.AiSettings.enabled();
+        try {
+            app.unichat.assist.AiSettings.setEnabled(!was); // as the cloud writes it
+            FxWait.onFx(window::settingsSynced);
+            assertEquals(!was, FxWait.fx(app.unichat.ui.timeline.AiReplyButton.SHOWN::get), "applied now, not at the next opening");
+            assertNull(FxWait.fx(window::view), "and no view built for it");
+        } finally {
+            app.unichat.assist.AiSettings.setEnabled(was);
+            FxWait.onFx(() -> app.unichat.ui.timeline.AiReplyButton.SHOWN.set(was));
+        }
+    }
+
+    /** A view built again shows what the cloud is doing on its gear, not nothing until the next change. */
+    @Test
+    void aViewBuiltAgainShowsWhatTheCloudIsDoing() throws Exception {
+        open(Duration.ZERO);
+        app.unichat.cloud.Cloud.Status up = new app.unichat.cloud.Cloud.Status(true, java.time.Instant.now(), null, 0, 9,
+                new app.unichat.cloud.Cloud.Activity(app.unichat.cloud.Cloud.Step.UPLOADING, 2, 12, "foto.jpg", 450, 1000, 2_400_000),
+                0, null, 0, null);
+        FxWait.onFx(() -> window.cloudChanged(up)); // told while the view was there
+        hideAndLetGo();
+        FxWait.onFx(stage()::show);
+        FxWait.settled();
+        assertTrue(FxWait.fx(() -> view().lookup(".rail-cloud-ring").isVisible()), "the gear's ring, as the cloud last said");
     }
 }

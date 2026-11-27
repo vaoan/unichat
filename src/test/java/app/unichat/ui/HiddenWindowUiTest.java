@@ -63,7 +63,7 @@ class HiddenWindowUiTest {
             stage.setOpacity(0);
             Notifier notifier = new Notifier(() -> { }, () -> { }, id -> { }, () -> { });
             MainView view = new MainView(svc, stage, notifier, () -> { }, url -> { });
-            alerts = new SessionAlerts(svc, stage, notifier, view::currentChatId); // the count and title, as the app has them
+            alerts = new SessionAlerts(svc, stage, notifier, view::currentChatId, () -> { }); // the count and title, as the app has them
             alerts.start();
             Scene sc = new Scene(view, 1100, 760);
             Theme.register(sc);
