@@ -65,6 +65,13 @@ final class HomeserverConfig {
                 # Console commands passed at start (old Discord media cleanup) never stop the server if they fail.
                 admin_execute_errors_ignore = true
                 log = "info"
+                # Caches for one person's server (tuwunel-example.toml, v1.9.4: the read cache defaults to 128 + 64 per CPU
+                # core MB, the write buffers to 48 + 4 per core, and every LRU cache is scaled by cache_capacity_modifier,
+                # default 1.0). On a 10-core Mac that is ~770 MB of read cache allowed; tuwunel sat at 173 MB. Halve the
+                # LRUs and fix the RocksDB caches: a smaller cache only means more disk reads, never a different result.
+                cache_capacity_modifier = 0.5
+                db_cache_capacity_mb = 256.0
+                db_write_buffer_capacity_mb = 64.0
                 """, str(domain), str(dataDir.resolve("tuwunel").resolve("db").toString()), port,
                 str(registrationToken), str(dataDir.resolve("appservices").toString()));
     }

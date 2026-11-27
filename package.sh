@@ -54,7 +54,8 @@ fi
 # of the heap free after one): with Java's defaults it kept the whole 1 GB for ~265 MB live (PackagingJvmTest, package.ps1).
 COMMON="--name Unichat --app-version $VERSION --vendor Unichat --input target/pkg --main-jar unichat.jar
   --main-class app.unichat.Launcher --dest release --java-options -Xmx1g --java-options -XX:G1PeriodicGCInterval=60000
-  --java-options -XX:MinHeapFreeRatio=15 --java-options -XX:MaxHeapFreeRatio=35"
+  --java-options -XX:MinHeapFreeRatio=15 --java-options -XX:MaxHeapFreeRatio=35
+  --java-options -Dprism.maxvram=256m"
 
 case "$(uname -s)" in
   Darwin)

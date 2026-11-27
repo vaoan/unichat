@@ -28,6 +28,16 @@ class HomeserverConfigTest {
         assertTrue(toml.contains("port = 8008"), toml);
     }
 
+    /** The caches tuwunel sizes by CPU core count (768 MB of read cache on 10 cores) are cut for one person's server, nothing else changes. */
+    @Test
+    void theCachesAreSmallForAPersonalServer() {
+        String toml = HomeserverConfig.toml(dir, 8008, "localhost", "secret");
+        assertTrue(toml.contains("cache_capacity_modifier = 0.5"), toml);
+        assertTrue(toml.contains("db_cache_capacity_mb = 256.0"), toml);
+        assertTrue(toml.contains("db_write_buffer_capacity_mb = 64.0"), toml);
+        assertTrue(toml.contains("allow_federation = false") && toml.contains("allow_registration = true"), toml);
+    }
+
     /** The registration token lets anyone create accounts on the server: only the person reads it, like secrets.properties. */
     @Test
     void theTokenFileIsOnlyTheOwners() throws Exception {

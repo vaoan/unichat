@@ -17,9 +17,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * (measured with {@code jcmd}: 794 MB resident, 546 MB once it gave back what it no longer used).
  */
 class PackagingJvmTest {
-    /** A 1 GB ceiling (the animations' budgets assume it), and G1 giving memory back: idle collections, little kept free. */
+    /** A 1 GB ceiling (the animations' budgets assume it), and G1 giving memory back: idle collections, little kept free; and JavaFX's texture pool at 256 MB (512 by default). */
     private static final List<String> OPTIONS = List.of("-Xmx1g", "-XX:G1PeriodicGCInterval=60000", "-XX:MinHeapFreeRatio=15",
-            "-XX:MaxHeapFreeRatio=35");
+            "-XX:MaxHeapFreeRatio=35", "-Dprism.maxvram=256m");
 
     @Test
     void theMacAndLinuxPackageGivesMemoryBack() throws IOException {

@@ -90,6 +90,19 @@ class SupervisorTest {
         assertFalse(sup.isRunning("svc"));
     }
 
+    /** The environment a service is started with reaches its process, and a restart keeps it; one started without any gets none of it. */
+    @Test
+    void theEnvironmentGivenReachesTheProcess() throws Exception {
+        Path with = dir.resolve("with.log");
+        Path without = dir.resolve("without.log");
+        sup.start("with", dir, List.of(fake("env").get(0), "-cp", System.getProperty("java.class.path"), FakeService.class.getName(),
+                "env", "GOGC"), with, java.util.Map.of("GOGC", "50"));
+        sup.start("without", dir, List.of(fake("env").get(0), "-cp", System.getProperty("java.class.path"), FakeService.class.getName(),
+                "env", "GOGC"), without);
+        await(() -> contains(with, "env GOGC=50"));
+        await(() -> contains(without, "env GOGC=") && !contains(without, "env GOGC=50"));
+    }
+
     @Test
     @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void aLogThatCantBeWrittenNeitherBlocksTheProcessNorEndsTheCopy() throws Exception {
