@@ -9,6 +9,11 @@
 set -e
 cd "$(dirname "$0")"
 ./package.sh
+# The patched libglass frees a closed window's IOSurfaces (native/build-glass.sh): never install a package without it.
+if [ ! -f release/Unichat.app/Contents/app/libglass.dylib ]; then
+  echo "Error: this package has no patched libglass.dylib (see native/build-glass.sh); not installing." >&2
+  exit 1
+fi
 # Never replace a copy that runs the local server with one that can't (tuwunel missing: no TUWUNEL_BIN, no download).
 if [ -e /Applications/Unichat.app/Contents/app/server/tuwunel ] && [ ! -e release/Unichat.app/Contents/app/server/tuwunel ]; then
   echo "Error: this package has no tuwunel and the installed app does; not replacing it (see package.sh)." >&2
