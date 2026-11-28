@@ -1,0 +1,46 @@
+diff --git a/modules/javafx.graphics/src/main/native-glass/mac/GlassLayer.m b/modules/javafx.graphics/src/main/native-glass/mac/GlassLayer.m
+index de361028..6260cc17 100644
+--- a/modules/javafx.graphics/src/main/native-glass/mac/GlassLayer.m
++++ b/modules/javafx.graphics/src/main/native-glass/mac/GlassLayer.m
+@@ -60,6 +60,7 @@ static NSArray *allModes = nil;
+             self->painterOffScreen = [mtlLayer getPainterOffscreen];
+             self->glassOffScreen = nil;
+             [self addSublayer:mtlLayer];
++            [mtlLayer release]; // the superlayer keeps it
+         } else {
+             LOG("GlassLayer initGlassLayer using CGLLayer");
+             GlassLayerCGL* cglLayer = [[GlassLayerCGL alloc] initWithSharedContext:(CGLContextObj)ctx
+@@ -69,6 +70,7 @@ static NSArray *allModes = nil;
+             self->painterOffScreen = [cglLayer getPainterOffscreen];
+             self->glassOffScreen = [cglLayer getGlassOffscreen];
+             [self addSublayer:cglLayer];
++            [cglLayer release]; // the superlayer keeps it
+         }
+         self->isHiDPIAware = HiDPIAware;
+         LOG("   GlassLayer context: %p", ctx);
+diff --git a/modules/javafx.graphics/src/main/native-glass/mac/GlassMTLOffscreen.m b/modules/javafx.graphics/src/main/native-glass/mac/GlassMTLOffscreen.m
+index 16bbf016..8045275d 100644
+--- a/modules/javafx.graphics/src/main/native-glass/mac/GlassMTLOffscreen.m
++++ b/modules/javafx.graphics/src/main/native-glass/mac/GlassMTLOffscreen.m
+@@ -66,8 +66,8 @@ static NSArray *allModes = nil;
+     if (self->_fbo != nil) {
+         [(NSObject*)self->_fbo release];
+         self->_fbo = nil;
+-        [super dealloc];
+     }
++    [super dealloc];
+ }
+ 
+ - (unsigned int)width
+diff --git a/modules/javafx.graphics/src/main/native-glass/mac/GlassView3D.m b/modules/javafx.graphics/src/main/native-glass/mac/GlassView3D.m
+index b173e895..f269adb3 100644
+--- a/modules/javafx.graphics/src/main/native-glass/mac/GlassView3D.m
++++ b/modules/javafx.graphics/src/main/native-glass/mac/GlassView3D.m
+@@ -148,6 +148,7 @@
+         }
+         [subView setAutoresizingMask:(NSViewWidthSizable|NSViewHeightSizable)];
+         [self addSubview:subView];
++        [subView release]; // the superview keeps it
+         self->_delegate = [[GlassViewDelegate alloc] initWithView:self withJview:jView];
+         self->_trackingArea = [[NSTrackingArea alloc] initWithRect:frame
+                                                            options:(NSTrackingMouseMoved | NSTrackingActiveAlways | NSTrackingInVisibleRect)

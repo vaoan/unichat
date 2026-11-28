@@ -37,6 +37,12 @@ if [ "$(uname -s)" = Darwin ]; then
     echo "Warning: libolm is missing (native/build-libolm.sh); the bridges won't start." >&2
   fi
 fi
+# macOS: JavaFX's Glass with Unichat's patch (native/patches/javafx): a closed window's layer and IOSurfaces are freed.
+# JavaFX loads a libglass.dylib sitting next to unichat.jar (Contents/app) before its own; without it, its own is used.
+if [ "$(uname -s)" = Darwin ]; then
+  native/build-glass.sh "$PWD/target/pkg/libglass.dylib" >/dev/null \
+    || echo "Warning: without the patched libglass, each closed window keeps its IOSurfaces (hundreds of MB) until the app quits." >&2
+fi
 # Animated stickers for chats that only take WebP (WhatsApp): libwebp's gif2webp (see StickerConverter).
 if [ "$(uname -s)" = Darwin ]; then
   mkdir -p target/pkg/server
