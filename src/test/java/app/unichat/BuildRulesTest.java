@@ -340,7 +340,7 @@ class BuildRulesTest {
             m.put("app.unichat.settings", "0.65");
             m.put("app.unichat.stt", "0.80");
             m.put("app.unichat.support", "0.90");
-            m.put("app.unichat.ui", "0.10");
+            m.put("app.unichat.ui", "0.05");
             m.put("app.unichat.ui.chats", "0.05");
             m.put("app.unichat.ui.desktop", "0.20");
             m.put("app.unichat.ui.emoji", "0.05");
