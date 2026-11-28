@@ -150,6 +150,27 @@ class AwayReleaseUiTest {
     }
 
     @Test
+    void theLastCleanupCollectsThenDrawsAnImageThenCollectsThenDrawsTheRoot() throws Exception {
+        open(Duration.ZERO);
+        hideAndLetGo();
+        // JavaFX frees textures only in a frame or snapshot after the GC queued them (Disposer.cleanUp)
+        FxWait.until("the cleanup ended", () -> window.cleanupSteps.size() == 4);
+        assertEquals(List.of("gc", "image", "gc", "root"), List.copyOf(window.cleanupSteps));
+    }
+
+    @Test
+    void showingTheWindowMidCleanupStopsTheRestOfIt() throws Exception {
+        open(Duration.ZERO);
+        FxWait.onFx(() -> window.collector = () -> Platform.runLater(stage()::show)); // queued before the step after the GC
+        hideAndLetGo();
+        FxWait.until("the first collection", () -> window.cleanupSteps.size() == 1);
+        FxWait.settled(); // shown, the view built again
+        FxWait.onFx(() -> { });
+        assertEquals(List.of("gc"), List.copyOf(window.cleanupSteps), "no snapshot of a window that is back");
+        assertInstanceOf(MainView.class, FxWait.fx(scene::getRoot));
+    }
+
+    @Test
     void itsPicturesGoToo() throws Exception {
         open(Duration.ZERO);
         Path png = dir.resolve("a.png");

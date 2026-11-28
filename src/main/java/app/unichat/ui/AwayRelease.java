@@ -44,6 +44,10 @@ public final class AwayRelease {
     private boolean building;
     private int released;
     private int held;
+    /** The collection of the last cleanup; tests replace it. */
+    volatile Runnable collector = System::gc;
+    /** The steps of the last cleanups, in order (for tests): gc, image, gc, root. */
+    final List<String> cleanupSteps = new java.util.concurrent.CopyOnWriteArrayList<>();
 
     public AwayRelease(Stage stage, Scene scene) {
         this(stage, scene, AWAY_RELEASE);
@@ -242,9 +246,38 @@ public final class AwayRelease {
         empty.snapshot(null, new javafx.scene.image.WritableImage(1, 1));
         Pictures.forget();
         released++;
-        // Collected now, G1 gives the memory back to the system at once instead of keeping it until the heap fills again.
-        // Its pause stops every thread whichever calls it (the FX one too); harmless while the window is hidden. Asked on
-        // another thread only so this method returns at once.
-        Thread.ofVirtual().name("away-gc").start(System::gc);
+        cleanUp(empty);
+    }
+
+    /**
+     * What JavaFX keeps on the graphics card is freed only by {@code Disposer.cleanUp()} on the render thread, which runs at
+     * the end of a painted frame or a snapshot (PresentingPainter:117, UploadingPainter:196, QuantumToolkit:1723): a GC only
+     * queues the textures, and a hidden window paints none. The image textures sit in a WeakHashMap that is purged only when
+     * an ImageView is drawn (BaseResourceFactory:61-63, NGImageView:121). So: GC, a snapshot of a tiny ImageView (the stale
+     * entries drop), GC again (their textures are queued), then a snapshot of the empty root (cleanUp runs). Each GC runs off
+     * the FX thread and the next step comes back to it when it returns; nothing waits. Stops if the window is shown again.
+     */
+    private void cleanUp(StackPane empty) {
+        collectThen(empty, () -> {
+            javafx.scene.image.WritableImage pixel = new javafx.scene.image.WritableImage(1, 1);
+            new javafx.scene.image.ImageView(pixel).snapshot(null, new javafx.scene.image.WritableImage(1, 1));
+            cleanupSteps.add("image");
+            collectThen(empty, () -> {
+                empty.snapshot(null, new javafx.scene.image.WritableImage(1, 1));
+                cleanupSteps.add("root");
+            });
+        });
+    }
+
+    /** A GC on a virtual thread (G1 gives the memory back at once; its pause stops the FX thread too, harmless hidden), then {@code next} on the FX thread, if the window is still away. */
+    private void collectThen(StackPane empty, Runnable next) {
+        Runnable gc = collector;
+        Thread.ofVirtual().name("away-gc").start(() -> {
+            gc.run();
+            cleanupSteps.add("gc");
+            Platform.runLater(() -> {
+                if (!stage.isShowing() && scene.getRoot() == empty) next.run();
+            });
+        });
     }
 }
