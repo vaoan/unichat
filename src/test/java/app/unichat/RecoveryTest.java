@@ -8,6 +8,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -97,7 +98,7 @@ class RecoveryTest {
     @Test
     void whenMemoryIsFullTheLogSaysWhatFillsIt() {
         String h = Recovery.heaviest(5);
-        assertTrue(h.contains("#instances") && h.contains("java."), h);
+        assertTrue((h.contains(" MB") || h.contains(" KB")) && h.contains("java.") && !h.contains("<number>"), h);
         assertTrue(h.lines().count() <= 5 + 4, "only the heaviest: " + h.lines().count());
     }
 
@@ -119,5 +120,45 @@ class RecoveryTest {
             System.setErr(err);
         }
         assertEquals(List.of("a thread ran out of memory (matrix-sync)"), restarts);
+    }
+
+    private static final String HISTOGRAM = """
+             num     #instances         #bytes  class name (module)
+            -------------------------------------------------------
+               1:        298123       40476672  [B (java.base@25.0.5.0.3)
+               2:          5100        120000  java.lang.String (java.base@25.0.5.0.3)
+               3:            12           800  app.Foo
+            Total      12345678     987654321
+            """;
+
+    @Test
+    void theHistogramRowsAreReadableInUnits() {
+        assertEquals("  1. [B (java.base) - 38.6 MB, 298k objects",
+                Recovery.heaviestRow("   1:        298123       40476672  [B (java.base@25.0.5.0.3)"));
+        assertEquals("  3. app.Foo - 800 B, 12 objects", Recovery.heaviestRow("   3:            12           800  app.Foo"));
+        assertEquals("  2. x - 117.2 KB, 5k objects", Recovery.heaviestRow("   2:  5100  120000  x"));
+        assertNull(Recovery.heaviestRow("-------------------------------"));
+        assertNull(Recovery.heaviestRow(" num     #instances         #bytes  class name (module)"));
+    }
+
+    @Test
+    void theWholeHistogramKeepsItsRowsAndTotalAndDropsTheHeaderLines() {
+        String out = Recovery.readable(HISTOGRAM, 2);
+        assertTrue(out.startsWith("Memory: what fills it"), out);
+        assertTrue(out.contains("1. [B (java.base) - 38.6 MB, 298k objects"), out);
+        assertTrue(out.contains("2. java.lang.String (java.base) - 117.2 KB, 5k objects"), out);
+        assertFalse(out.contains("app.Foo"), "only the count heaviest: " + out);
+        assertTrue(out.contains("Total: 941.9 MB, 12.3M objects"), out);
+        assertFalse(out.contains("#instances") || out.contains("-----"), out);
+    }
+
+    @Test
+    void theLogKeepsEveryNumberAfterTheRedactor() {
+        String out = Recovery.readable(HISTOGRAM, 25);
+        assertEquals(out, app.unichat.support.Redactor.redact(out));
+        assertFalse(out.contains("<number>"));
+        String huge = Recovery.readable("   1:     50000000     2147483648  [B (java.base@25)\nTotal 80000000 3000000000", 5);
+        assertEquals(huge, app.unichat.support.Redactor.redact(huge));
+        assertTrue(huge.contains("2048.0 MB, 50.0M objects"), huge);
     }
 }
