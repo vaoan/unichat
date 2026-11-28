@@ -211,10 +211,13 @@ final class Recovery {
         int shown = 0;
         for (String line : histogram.split("\n")) {
             java.util.regex.Matcher total = HISTOGRAM_TOTAL.matcher(line);
-            if (total.matches()) {
-                out.append("\nTotal: ").append(size(total.group(2))).append(", ").append(objects(total.group(1)));
-            } else if (shown < count && heaviestRow(line) != null) {
-                out.append('\n').append(heaviestRow(line));
+            Long totalBytes = total.matches() ? app.unichat.support.Numbers.longOf(total.group(2)) : null;
+            Long totalObjects = total.matches() ? app.unichat.support.Numbers.longOf(total.group(1)) : null;
+            String row = heaviestRow(line);
+            if (totalBytes != null && totalObjects != null) {
+                out.append("\nTotal: ").append(size(totalBytes)).append(", ").append(objects(totalObjects));
+            } else if (shown < count && row != null) {
+                out.append('\n').append(row);
                 shown++;
             }
         }
@@ -225,19 +228,22 @@ final class Recovery {
     static @Nullable String heaviestRow(String line) {
         java.util.regex.Matcher m = HISTOGRAM_ROW.matcher(line);
         if (!m.matches()) return null;
+        Long instances = app.unichat.support.Numbers.longOf(m.group(2));
+        Long bytes = app.unichat.support.Numbers.longOf(m.group(3));
+        if (instances == null || bytes == null) return null; // past a long: not a row we can read
         String name = m.group(4).replaceAll("@[^)\\s]*\\)", ")");
-        return "  " + m.group(1) + ". " + name + " - " + size(m.group(3)) + ", " + objects(m.group(2));
+        return "  " + m.group(1) + ". " + name + " - " + size(bytes) + ", " + objects(instances);
     }
 
-    private static String size(String bytes) {
-        double b = Double.parseDouble(bytes);
+    private static String size(long bytes) {
+        double b = bytes;
         if (b >= 1024 * 1024) return String.format(Locale.ROOT, "%.1f MB", b / (1024 * 1024));
         if (b >= 1024) return String.format(Locale.ROOT, "%.1f KB", b / 1024);
         return String.format(Locale.ROOT, "%.0f B", b);
     }
 
-    private static String objects(String instances) {
-        double n = Double.parseDouble(instances);
+    private static String objects(long instances) {
+        double n = instances;
         if (n < 1000) return String.format(Locale.ROOT, "%.0f objects", n);
         if (n < 1_000_000) return String.format(Locale.ROOT, "%.0fk objects", n / 1000);
         return String.format(Locale.ROOT, "%.1fM objects", n / 1_000_000);
