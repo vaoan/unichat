@@ -128,6 +128,9 @@ final class MessageRowView {
         return A11yText.message(m, replied(m), transcript, ZoneId.systemDefault());
     }
 
+    /** A caption under a small picture still reads as lines, not a word each. */
+    private static final double MIN_CAPTION_WIDTH = 200;
+
     /** How wide a bubble may be in a list this wide: within 200 and 560, so most widths change nothing. */
     static double bubbleWidth(double listWidth) {
         return Math.max(200, Math.min(560, listWidth * 0.68));
@@ -237,12 +240,16 @@ final class MessageRowView {
             into.add(l);
         } else if (m.playsInline() || picture) {
             bubble.getStyleClass().add(m.type() == MessageType.STICKER ? "sticker" : "media");
-            into.add(m.playsInline() ? media.inlineVideoNode(m) : media.imageNode(m));
+            Node shown = m.playsInline() ? media.inlineVideoNode(m) : media.imageNode(m);
+            into.add(shown);
+            if (m.caption() != null) caption(m, into, Math.min(maxWidth, Math.max(MIN_CAPTION_WIDTH, shown.prefWidth(-1))));
         } else if (m.type() == MessageType.AUDIO && m.mediaUrl() != null) {
             into.add(media.audioNode(m, chat.get()));
             into.add(media.transcriptNode(m, maxWidth));
+            caption(m, into, maxWidth - 24);
         } else if (m.isMedia()) {
             into.add(media.fileNode(m));
+            caption(m, into, maxWidth - 24);
         } else if (m.type() == MessageType.TEXT && RichText.isJumboEmoji(m.body()) && m.replyToId() == null) {
             bubble.getStyleClass().add("jumbo");
             into.add(jumbo(m));
@@ -262,20 +269,31 @@ final class MessageRowView {
         return big;
     }
 
+    /** Under a picture, video, voice note or file: the text sent with it, whole, as X and WhatsApp show it. */
+    private void caption(Message m, List<Node> into, double width) {
+        if (m.caption() == null) return;
+        Node text = words(m, width);
+        text.getStyleClass().add("media-caption");
+        into.add(text);
+    }
+
+    /** A message's words: its HTML, or its text with its links. */
+    private Node words(Message m, double textWidth) {
+        String html = m.html();
+        if (html != null && m.type() != MessageType.EMOTE) return HtmlView.of(html, textWidth, media, openLink);
+        String body = m.type() == MessageType.EMOTE ? "* " + m.senderName() + " " + m.body() : m.body();
+        TextFlow flow = new TextFlow();
+        flow.getChildren().addAll(RichText.nodes(body, openLink, textWidth));
+        flow.getStyleClass().add("message-text");
+        flow.setLineSpacing(Theme.lineSpacing());
+        if (m.type() == MessageType.NOTICE) flow.getStyleClass().add("notice");
+        flow.setMaxWidth(textWidth);
+        return flow;
+    }
+
     /** A text message: its HTML or text, its link preview, and players for the videos its links lead to. */
     private void text(Message m, List<Node> into, double textWidth) {
-        if (m.html() != null && m.type() != MessageType.EMOTE) {
-            into.add(HtmlView.of(m.html(), textWidth, media, openLink));
-        } else {
-            String body = m.type() == MessageType.EMOTE ? "* " + m.senderName() + " " + m.body() : m.body();
-            TextFlow flow = new TextFlow();
-            flow.getChildren().addAll(RichText.nodes(body, openLink, textWidth));
-            flow.getStyleClass().add("message-text");
-            flow.setLineSpacing(Theme.lineSpacing());
-            if (m.type() == MessageType.NOTICE) flow.getStyleClass().add("notice");
-            flow.setMaxWidth(textWidth);
-            into.add(flow);
-        }
+        into.add(words(m, textWidth));
         boolean ownMedia = followedByItsOwnMedia(m);
         for (LinkPreview p : m.linkPreviews()) into.add(cardWithItsVideo(p, ownMedia, textWidth));
         if (!m.linkPreviews().isEmpty() || ownMedia) return;

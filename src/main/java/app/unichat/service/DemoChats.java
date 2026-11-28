@@ -252,6 +252,7 @@ final class DemoChats {
             msg.setType(MessageType.IMAGE);
             msg.setMediaUrl("demo://" + name);
             msg.setFileName(name + ".png");
+            msg.setBody(""); // a photo without words: a body beside its name would be drawn as its caption
             msg.setSize(640, 420);
             return this;
         }

@@ -238,6 +238,16 @@ public final class Message {
                 || type == MessageType.FILE || type == MessageType.STICKER;
     }
 
+    /**
+     * The text sent with a picture, video, audio or file, or null when none: a media event's {@code body} is its caption
+     * when a {@code filename} is also given (MSC2530), as X's and WhatsApp's bridges send a photo and its text in one event.
+     * A sticker's body only describes it.
+     */
+    public @Nullable String caption() {
+        if (!isMedia() || type == MessageType.STICKER || fileName == null || body.isBlank() || body.equals(fileName)) return null;
+        return body;
+    }
+
     /** Adds {@code userId}'s reaction, if it isn't there. */
     public void addReaction(String emoji, String userId) {
         Map<String, Set<String>> all = new LinkedHashMap<>(reactions);
@@ -272,6 +282,11 @@ public final class Message {
     /** One-line text for chat list previews and notifications. */
     public String preview() {
         if (deleted) return I18n.t("message.deleted");
+        String caption = caption();
+        return caption == null ? kindPreview() : I18n.t("message.previewCaption", kindPreview(), caption.replace('\n', ' '));
+    }
+
+    private String kindPreview() {
         return switch (type) {
             case IMAGE -> I18n.t("message.previewPhoto");
             case VIDEO -> I18n.t("message.previewVideo");

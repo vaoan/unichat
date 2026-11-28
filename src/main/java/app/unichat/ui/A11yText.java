@@ -21,7 +21,8 @@ public final class A11yText {
         if (m.type() == MessageType.SYSTEM) return m.body();
         if (replied != null) sb.append(I18n.t("a11y.replyingTo", replied.outgoing() ? I18n.t("a11y.toYou") : replied.senderName())).append(". ");
         sb.append(switch (m.type()) {
-            case IMAGE -> I18n.t("media.image") + (m.fileName() == null ? "" : " " + m.fileName());
+            case IMAGE -> I18n.t("media.image") + (m.fileName() == null ? "" : " " + m.fileName())
+                    + (m.caption() == null ? "" : ". " + m.caption());
             case STICKER -> I18n.t("media.sticker");
             default -> m.preview();
         });
