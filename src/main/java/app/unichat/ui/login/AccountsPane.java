@@ -2,6 +2,7 @@ package app.unichat.ui.login;
 
 import app.unichat.ui.Icons;
 import app.unichat.ui.Labels;
+import app.unichat.ui.LoadingView;
 import app.unichat.ui.NetworkIcons;
 import app.unichat.ui.Nodes;
 import app.unichat.ui.chats.Accounts;

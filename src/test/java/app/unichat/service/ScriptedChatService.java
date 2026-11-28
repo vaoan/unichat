@@ -30,6 +30,11 @@ public class ScriptedChatService extends MockChatService {
         skipDemoPauses();
     }
 
+    /** A reminder on {@code chatId} comes due now, as the demo's clock would make it (the demo isn't started in tests). */
+    public CompletableFuture<Void> remindNow(String chatId) {
+        return setReminder(chatId, Instant.now()).thenRun(this::checkReminders);
+    }
+
     /** Someone else in {@code chatId} writes {@code text}, as if it arrived from the network. */
     public void receive(String chatId, String text) {
         incoming(Present.of(chats.get(chatId)), someoneElse(chatId), text, true);

@@ -90,6 +90,31 @@ class SupervisorTest {
         assertFalse(sup.isRunning("svc"));
     }
 
+    /** The environment a service is started with reaches its process, and a restart keeps it; one started without any gets none of it. */
+    @Test
+    void theEnvironmentGivenReachesTheProcess() throws Exception {
+        Path with = dir.resolve("with.log");
+        Path without = dir.resolve("without.log");
+        sup.start("with", dir, List.of(fake("env").get(0), "-cp", System.getProperty("java.class.path"), FakeService.class.getName(),
+                "env", "GOGC"), with, java.util.Map.of("GOGC", "50"));
+        sup.start("without", dir, List.of(fake("env").get(0), "-cp", System.getProperty("java.class.path"), FakeService.class.getName(),
+                "env", "GOGC"), without);
+        await(() -> contains(with, "env GOGC=50"));
+        await(() -> contains(without, "env GOGC=") && !contains(without, "env GOGC=50"));
+    }
+
+    /** A bridge that crashes comes back with the same environment (Service keeps it for the relaunch). */
+    @Test
+    void aRestartKeepsTheEnvironment() throws Exception {
+        Path log = dir.resolve("env-crash.log");
+        sup.start("envcrash", dir, List.of(fake("x").get(0), "-cp", System.getProperty("java.class.path"), FakeService.class.getName(),
+                "env-crash", "GOGC"), log, java.util.Map.of("GOGC", "50"));
+        await(() -> !restarted.isEmpty());
+        await(() -> sup.restarts("envcrash") >= 2);
+        await(() -> count(log, "env GOGC=50") >= 2);
+        assertTrue(Files.readString(log).split("env GOGC=50", -1).length - 1 >= 2, "the relaunch had the variable too: " + Files.readString(log));
+    }
+
     @Test
     @SuppressFBWarnings(value = "UNENCRYPTED_SERVER_SOCKET", justification = "a fake on 127.0.0.1, inside the test")
     void aLogThatCantBeWrittenNeitherBlocksTheProcessNorEndsTheCopy() throws Exception {
@@ -166,6 +191,14 @@ class SupervisorTest {
         assertEquals(List.of("svc:false"), exits, "no restart scheduled");
         assertFalse(sup.isRunning("svc"));
         assertEquals(0, sup.restarts("svc"));
+    }
+
+    private static int count(Path f, String s) {
+        try {
+            return Files.exists(f) ? Files.readString(f).split(java.util.regex.Pattern.quote(s), -1).length - 1 : 0;
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     private static boolean contains(Path f, String s) {

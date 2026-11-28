@@ -102,7 +102,9 @@ $common = @("--name", "Unichat", "--app-version", $Version, "--vendor", "Unichat
             "--dest", "release", "--icon", "packaging\unichat.ico", "--java-options", "-Xmx1g",
             # G1 gives back what it no longer uses, as package.sh says (PackagingJvmTest).
             "--java-options", "-XX:G1PeriodicGCInterval=60000", "--java-options", "-XX:MinHeapFreeRatio=15",
-            "--java-options", "-XX:MaxHeapFreeRatio=35")
+            "--java-options", "-XX:MaxHeapFreeRatio=35",
+            # JavaFX keeps up to 512 MB of textures by default (IOAccelerator was 340 MB); past 256 MB it evicts the least used.
+            "--java-options", "-Dprism.maxvram=256m")
 
 jpackage @common --type app-image
 if ($LASTEXITCODE -ne 0) { throw "jpackage app-image failed" }

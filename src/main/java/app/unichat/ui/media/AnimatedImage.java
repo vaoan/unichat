@@ -205,6 +205,21 @@ public final class AnimatedImage {
         }
     }
 
+    /** Every decoded animation let go (the window let go while closed): what plays keeps its own frames. */
+    static void forget() {
+        synchronized (CACHE) {
+            CACHE.clear();
+            cachedBytes = 0;
+        }
+    }
+
+    /** Bytes the decoded cache holds (package-visible for tests). */
+    static long decodedBytes() {
+        synchronized (CACHE) {
+            return cachedBytes;
+        }
+    }
+
     private static Frames remember(String key, Frames f) {
         synchronized (CACHE) {
             Frames old = CACHE.put(key, f);

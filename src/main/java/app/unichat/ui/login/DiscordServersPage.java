@@ -1,6 +1,7 @@
 package app.unichat.ui.login;
 
 import app.unichat.ui.Labels;
+import app.unichat.ui.LoadingView;
 import app.unichat.ui.SearchFields;
 import app.unichat.ui.chats.ChatFilter;
 import app.unichat.service.BridgeAccess;

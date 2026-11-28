@@ -4,6 +4,8 @@ Startup and wiring: `Launcher` (main of the package), `UnichatApp` (the JavaFX a
 
 Quitting, the tray, the Dock and the menu bar: `ui/desktop/CLAUDE.md`.
 
+`UnichatApp` holds the window's view through `ui/AwayRelease` (let go while closed a while, built again on opening; `ui/CLAUDE.md`), and the session's notifications and count through `ui/SessionAlerts`, which outlive the view: never reach `MainView` for something that must go on with the window closed.
+
 ## Recovery
 - `Recovery` starts Unichat again by itself when it can't go on: an `OutOfMemoryError` (any `VirtualMachineError`) in a thread without its own handler, the old generation still ≥ 95 % full right after a collection, or `FxWatch` (the UI thread unanswered for a minute of awake time; it asks every 5 s, every 60 s while nobody can see Unichat, and forgets its question when seen again). It logs why plus every thread's stack (and, for memory, the 25 classes filling it: `Recovery.heaviest`), starts the same command (`ProcessHandle.info()`: the app's launcher, or the `java` line from sources) with `--unichat-after=<pid>:<count>`, and exits (halted after 20 s if exiting hangs). The new run waits for the old pid to end (`Recovery.Start.waitForThePrevious`), so two never share the data folder or ports; `Supervisor` cleans the old run's bridges. At most 3 in a row; 10 minutes running resets the count.
 - Only `Launcher` installs it: tests and snapshot runs never restart by themselves.

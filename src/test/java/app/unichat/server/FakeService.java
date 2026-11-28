@@ -6,7 +6,7 @@ import java.io.IOException;
 
 /**
  * Child process for SupervisorTest: "run" stays up until its input closes (it's stopped, or the JVM that started it
- * is gone), "crash" exits with an error at once; a second argument is printed. "chatty &lt;port&gt;" writes 1 MB to
+ * is gone), "crash" exits with an error at once, "env &lt;NAME&gt;" prints that environment variable, "env-crash &lt;NAME&gt;" prints it and exits with an error; a second argument is printed. "chatty &lt;port&gt;" writes 1 MB to
  * its output (far more than a pipe holds), connects to the test on that port to say so, waits until the test hangs
  * up and prints "after". "bridge ..." and "broken-bridge ..." are a bridge's setup commands, for BridgeInstallerTest.
  */
@@ -18,9 +18,10 @@ public final class FakeService {
             return;
         }
         System.out.println("started");
-        if (args.length > 1 && !args[0].equals("chatty")) System.out.println(args[1]);
+        if (args.length > 1 && args[0].startsWith("env")) System.out.println("env " + args[1] + "=" + System.getenv(args[1]));
+        if (args.length > 1 && !args[0].equals("chatty") && !args[0].startsWith("env")) System.out.println(args[1]);
         System.out.flush();
-        if (args.length > 0 && args[0].equals("crash")) System.exit(3);
+        if (args.length > 0 && (args[0].equals("crash") || args[0].equals("env-crash"))) System.exit(3);
         if (args.length > 1 && args[0].equals("chatty")) {
             String line = "x".repeat(1023);
             for (int i = 0; i < 1024; i++) System.out.println(line);

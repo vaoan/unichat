@@ -649,7 +649,8 @@ public class MockChatService implements ChatService, FolderForwarding {
         replyLater(candidates.get(random.nextInt(candidates.size())), 4);
     }
 
-    private void checkReminders() {
+    /** Reminders come due now go off (every 5 s once started; a test's scripted service asks at once). */
+    final void checkReminders() {
         Instant now = Instant.now();
         for (Chat c : chats.values()) {
             Instant at = c.reminderAt();

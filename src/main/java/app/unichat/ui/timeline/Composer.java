@@ -36,7 +36,6 @@ import javafx.util.Duration;
 import org.jspecify.annotations.Nullable;
 
 import java.io.File;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -65,7 +64,8 @@ public final class Composer extends VBox {
     private final VBox statuses = new VBox();
     private final Label bannerTitle = new Label();
     private final Label bannerText = new Label();
-    private final Map<String, String> drafts = new HashMap<>();
+    /** The session's, not this box's: a window built again finds what was being written. */
+    private final Map<String, String> drafts;
     private final PauseTransition typingStop = new PauseTransition(Duration.seconds(4));
     private final Consumer<String> onError;
     /** Where a file or a voice note goes in its chat's turn; by default at once. */
@@ -108,6 +108,7 @@ public final class Composer extends VBox {
 
     public Composer(ChatService svc, Consumer<String> onError) {
         this.svc = svc;
+        this.drafts = Drafts.of(svc);
         this.onError = onError;
         getStyleClass().add("composer");
 
@@ -217,10 +218,7 @@ public final class Composer extends VBox {
     }
 
     public void setChat(@Nullable String newChatId) {
-        if (chatId != null) {
-            stopTyping();
-            drafts.put(chatId, editing == null ? input.getText() : "");
-        }
+        keepDraft();
         voice.discardIfRecording(I18n.t("composer.recordingDiscarded"));
         chatId = newChatId;
         replyTo = null;
@@ -229,6 +227,17 @@ public final class Composer extends VBox {
         input.setText(drafts.getOrDefault(chatId, ""));
         input.positionCaret(input.getLength());
         hearAhead();
+    }
+
+    /** Whether a voice note is being recorded: the window isn't let go under it. */
+    public boolean recording() { return voice.recording(); }
+
+    /** What's written in the open chat is kept as its draft (leaving it, or the window let go), and typing stops. */
+    void keepDraft() {
+        String open = chatId;
+        if (open == null) return;
+        stopTyping();
+        drafts.put(open, editing == null ? input.getText() : "");
     }
 
     public void focus() { input.requestFocus(); }

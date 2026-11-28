@@ -412,7 +412,7 @@ public final class MessageMedia {
      * Previews already made, by file (name and size): the message we send shows first as our own copy, then as the
      * server's, and without this its picture vanished and came back each time (downloading the file again to make it).
      */
-    private static final java.util.Map<String, Image> FILE_PREVIEWS = java.util.Collections.synchronizedMap(
+    static final java.util.Map<String, Image> FILE_PREVIEWS = java.util.Collections.synchronizedMap(
             app.unichat.support.BoundedMap.byUse(300)); // 300 of about the square's side (a few dozen px, a screen's scale): a few MB at most
 
     /** The picture in place of the icon once it's here (a video keeps its play mark on top); the icon if it never comes. */

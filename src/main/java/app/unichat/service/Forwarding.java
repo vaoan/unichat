@@ -70,6 +70,9 @@ public final class Forwarding {
         /** Runs on any thread after each change. */
         public void addListener(Runnable r) { listeners.add(r); }
 
+        /** What {@link #addListener} added, no longer told (a bar let go, which it would keep in memory otherwise). */
+        public void removeListener(Runnable r) { listeners.remove(r); }
+
         private void changed() {
             for (Runnable r : listeners) r.run();
         }

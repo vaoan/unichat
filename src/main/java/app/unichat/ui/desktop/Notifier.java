@@ -274,6 +274,11 @@ public final class Notifier {
         });
     }
 
+    /** The unread count the menu bar shows (set on AWT's thread). */
+    public int unread() {
+        return unread;
+    }
+
     public void setUnread(int count) {
         awt(() -> setUnreadNow(count));
     }

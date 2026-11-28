@@ -116,6 +116,7 @@ public final class Supervisor {
         final Path workDir;
         final List<String> command;
         final Path log;
+        final Map<String, String> env;
         volatile @Nullable Process process;
         volatile boolean wanted = true;
         final AtomicInteger restarts = new AtomicInteger();
@@ -123,17 +124,20 @@ public final class Supervisor {
         final AtomicInteger streak = new AtomicInteger();
         volatile long launchedAt;
 
-        Service(String name, Path workDir, List<String> command, Path log) {
+        Service(String name, Path workDir, List<String> command, Path log, Map<String, String> env) {
             this.name = name;
             this.workDir = workDir;
             this.command = command;
             this.log = log;
+            this.env = env;
         }
 
         @SuppressFBWarnings(value = "COMMAND_INJECTION", justification = "the server or a bridge from our install folder with fixed arguments, as a list, no shell")
         void launch() throws IOException {
             Files.createDirectories(PathParts.parent(log));
-            process = new ProcessBuilder(command).directory(workDir.toFile()).redirectErrorStream(true).start();
+            ProcessBuilder builder = new ProcessBuilder(command).directory(workDir.toFile()).redirectErrorStream(true);
+            builder.environment().putAll(env);
+            process = builder.start();
             launchedAt = System.currentTimeMillis();
             Process p = process;
             notePid(name, p);
@@ -158,9 +162,14 @@ public final class Supervisor {
     }
 
     /** Starts {@code name} (replacing a previous one with that name). */
-    public synchronized void start(String name, Path workDir, List<String> command, Path log) throws IOException {
+    public void start(String name, Path workDir, List<String> command, Path log) throws IOException {
+        start(name, workDir, command, log, Map.of());
+    }
+
+    /** As {@link #start(String, Path, List, Path)}, with {@code env} added to the process's environment (kept over restarts). */
+    public synchronized void start(String name, Path workDir, List<String> command, Path log, Map<String, String> env) throws IOException {
         stop(name);
-        Service s = new Service(name, workDir, command, log);
+        Service s = new Service(name, workDir, command, log, Map.copyOf(env));
         services.put(name, s);
         s.launch();
     }

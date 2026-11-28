@@ -30,6 +30,11 @@ final class Stills {
         if (url != null && img != null && !img.isError()) CACHE.put(key(url, w, h), new SoftReference<>(img));
     }
 
+    /** All let go (the window let go while closed). */
+    static void forget() {
+        CACHE.clear();
+    }
+
     private static String key(@Nullable String url, int w, int h) {
         return url + "|" + w + "x" + h;
     }

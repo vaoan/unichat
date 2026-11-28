@@ -123,8 +123,13 @@ public final class ImageCache {
     }
 
     static void clear() {
+        forget();
+        FAILED.clear();
+    }
+
+    /** Every decoded photo let go (the window let go while closed); what failed is still not asked again at once. */
+    static void forget() {
         SMALL_CACHE.clear();
         LARGE_CACHE.clear();
-        FAILED.clear();
     }
 }

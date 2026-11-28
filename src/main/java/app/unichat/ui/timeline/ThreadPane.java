@@ -280,6 +280,7 @@ public final class ThreadPane extends BorderPane {
 
     /** Stops listening to what outlives this pane (the transcripts are the app's): the window is being rebuilt. */
     public void dispose() {
+        composer.keepDraft(); // the next window's box finds it
         Transcripts.get().removeListener(onTranscript);
         messageFixer.removeListener(onTranscript);
         svc.removeListener(messageFixer);

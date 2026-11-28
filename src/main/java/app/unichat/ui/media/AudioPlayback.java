@@ -90,6 +90,11 @@ public final class AudioPlayback {
         else player.play();
     }
 
+    /** Whether something plays or is about to (loading): the window isn't let go under it. */
+    public boolean playing() {
+        return state == State.LOADING || state == State.PLAYING;
+    }
+
     public void pause() {
         if (player != null && state == State.PLAYING) player.pause();
     }

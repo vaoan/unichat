@@ -13,7 +13,6 @@ import app.unichat.ui.chats.NewChatPane;
 import app.unichat.ui.chats.Rail;
 import app.unichat.ui.chats.SidePanel;
 import app.unichat.ui.chats.SpaceTree;
-import app.unichat.ui.desktop.NotificationPolicy;
 import app.unichat.ui.desktop.Notifier;
 import app.unichat.ui.emoji.EmojiGrid;
 import app.unichat.ui.emoji.FavoritesPane;
@@ -36,7 +35,6 @@ import app.unichat.ui.timeline.UploadBar;
 import app.unichat.model.Chat;
 import app.unichat.model.ConnectionState;
 import app.unichat.model.MediaLibrary;
-import app.unichat.model.Message;
 import app.unichat.model.Network;
 import app.unichat.service.ChatService;
 import app.unichat.settings.Settings;
@@ -133,13 +131,7 @@ public final class MainView extends StackPane {
             });
         }
         @Override public void connectionChanged(ConnectionState s) { Platform.runLater(() -> showConnection(s)); }
-        @Override public void incomingMessage(Chat chat, Message m) { Platform.runLater(() -> onIncoming(chat, m)); }
-        @Override public void reminderDue(Chat chat) {
-            Platform.runLater(() -> {
-                notifier.reminder(chat);
-                if (Settings.get().speakMessages()) Speaker.say(I18n.t("main.reminderSpoken", chat.title()));
-            });
-        }
+        // A message's notification, a reminder and the unread count are SessionAlerts': they go on with the view let go.
     };
 
     public MainView(ChatService svc, Stage stage, Notifier notifier, Runnable onLogout, Consumer<String> openLink) {
@@ -261,12 +253,18 @@ public final class MainView extends StackPane {
         if (focused && open != null) svc.markRead(open);
     }
 
+    /** Something going on that letting the view go would cut: audio playing (or loading), a voice note recording. */
+    public boolean busy() {
+        return audio.playing() || thread.composer().recording();
+    }
+
     public void dispose() {
         stage.showingProperty().removeListener(onShowing);
         stage.focusedProperty().removeListener(onFocused);
         thread.dispose();
         audio.stop();
         uploads.dispose();
+        forwards.dispose();
         exploring.dispose();
         resting.dispose();
         olderChats.dispose();
@@ -346,7 +344,6 @@ public final class MainView extends StackPane {
     private void refreshAll() {
         if (!stage.isShowing()) {
             staleWhileHidden = true;
-            showUnread();
             return;
         }
         preloadAvatars();
@@ -374,20 +371,6 @@ public final class MainView extends StackPane {
                 if (infoVisible) panel.refresh();
             }
         }
-        showUnread();
-    }
-
-    private void showUnread() {
-        long unread = svc.chats().stream().filter(ChatFilter::inboxUnread).count();
-        notifier.setUnread((int) unread);
-        stage.setTitle(unread > 0 ? "Unichat (" + unread + ")" : "Unichat");
-    }
-
-    private void onIncoming(Chat chat, Message m) {
-        boolean viewing = stage.isFocused() && stage.isShowing() && chat.id().equals(currentChatId());
-        var settings = Settings.get();
-        if (NotificationPolicy.shouldNotify(chat.archived(), settings.notifyArchived(), viewing)) notifier.notify(chat, m);
-        if (settings.speakMessages() && (!chat.archived() || settings.notifyArchived())) Speaker.say(A11yText.spoken(chat, m, settings.notificationPreview()));
     }
 
     private void showAccountAlerts() {
@@ -417,7 +400,7 @@ public final class MainView extends StackPane {
         connection.getStyleClass().removeAll("error");
         if (storage != null || s == ConnectionState.OFFLINE || s == ConnectionState.LOGGED_OUT) connection.getStyleClass().add("error");
         Nodes.show(connection, text != null);
-        if (s == ConnectionState.LOGGED_OUT) onLogout.run();
+        // A session ended elsewhere logs out through SessionAlerts, view or not: once.
     }
 
     // ------------------------------------------------------------------ navigation

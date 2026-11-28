@@ -39,6 +39,8 @@ class HiddenWindowUiTest {
     @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
     private Stage stage;
     private Scene scene;
+    @SuppressWarnings("NullAway.Init") // the @BeforeEach sets it on the FX thread
+    private SessionAlerts alerts;
 
     @BeforeAll
     static void toolkit() throws Exception {
@@ -59,7 +61,10 @@ class HiddenWindowUiTest {
         scene = fx(() -> {
             stage = new Stage();
             stage.setOpacity(0);
-            MainView view = new MainView(svc, stage, new Notifier(() -> { }, () -> { }, id -> { }, () -> { }), () -> { }, url -> { });
+            Notifier notifier = new Notifier(() -> { }, () -> { }, id -> { }, () -> { });
+            MainView view = new MainView(svc, stage, notifier, () -> { }, url -> { });
+            alerts = new SessionAlerts(svc, stage, notifier, view::currentChatId, () -> { }); // the count and title, as the app has them
+            alerts.start();
             Scene sc = new Scene(view, 1100, 760);
             Theme.register(sc);
             stage.setScene(sc);
@@ -72,6 +77,7 @@ class HiddenWindowUiTest {
 
     @AfterEach
     void closeWindow() throws Exception {
+        alerts.stop();
         svc.stop();
         FxWait.onFx(() -> {
             stage.close();
