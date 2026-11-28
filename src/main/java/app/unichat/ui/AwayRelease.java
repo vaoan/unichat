@@ -258,6 +258,7 @@ public final class AwayRelease {
      * the FX thread and the next step comes back to it when it returns; nothing waits. Stops if the window is shown again.
      */
     private void cleanUp(StackPane empty) {
+        cleanupSteps.clear();
         collectThen(empty, () -> {
             javafx.scene.image.WritableImage pixel = new javafx.scene.image.WritableImage(1, 1);
             new javafx.scene.image.ImageView(pixel).snapshot(null, new javafx.scene.image.WritableImage(1, 1));
@@ -274,10 +275,10 @@ public final class AwayRelease {
         Runnable gc = collector;
         Thread.ofVirtual().name("away-gc").start(() -> {
             gc.run();
-            cleanupSteps.add("gc");
             Platform.runLater(() -> {
                 if (!stage.isShowing() && scene.getRoot() == empty) next.run();
             });
+            cleanupSteps.add("gc"); // after the next step is queued: whoever sees it can queue behind it
         });
     }
 }

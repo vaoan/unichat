@@ -171,6 +171,17 @@ class AwayReleaseUiTest {
     }
 
     @Test
+    void anotherRootMidCleanupStopsTheRestOfIt() throws Exception {
+        open(Duration.ZERO);
+        StackPane other = new StackPane();
+        FxWait.onFx(() -> window.collector = () -> Platform.runLater(() -> scene.setRoot(other))); // queued before the step after the GC
+        hideAndLetGo();
+        FxWait.until("the first collection", () -> window.cleanupSteps.size() == 1);
+        FxWait.onFx(() -> { }); // behind the step after the GC
+        assertEquals(List.of("gc"), List.copyOf(window.cleanupSteps), "no snapshot of a root that isn't the empty one");
+    }
+
+    @Test
     void itsPicturesGoToo() throws Exception {
         open(Duration.ZERO);
         Path png = dir.resolve("a.png");
