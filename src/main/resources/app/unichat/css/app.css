@@ -328,6 +328,8 @@
 .bubble.out.cont-top.cont-bottom { -fx-background-radius: 18 6 6 18; }
 .bubble.media { -fx-padding: 3; }
 .bubble.media .bubble-meta { -fx-padding: 0 8 2 0; }
+/* The text sent with a photo or video: the bubble hugs the picture, its words keep a text bubble's margin. */
+.bubble.media .media-caption { -fx-padding: 0.3em 0.6em 0 0.6em; }
 .bubble.jumbo { -fx-background-color: transparent; -fx-padding: 0; }
 .bubble.jumbo .bubble-meta .label { -fx-text-fill: -text-3; }
 .bubble.jumbo .bubble-meta .icon { -fx-background-color: -text-3; }

@@ -71,9 +71,11 @@ final class SyncEvents {
         if (filename != null && !filename.equals(b)) {
             m.setFileName(filename);
             m.setBody(b);
+            m.setHtml(m.caption() == null ? null : html); // the caption's formatting, drawn under the file
         } else {
             m.setFileName(b.isEmpty() ? null : b);
             m.setBody("");
+            m.setHtml(null);
         }
         applyMedia(m, content);
     }
