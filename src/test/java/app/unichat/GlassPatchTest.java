@@ -37,7 +37,12 @@ class GlassPatchTest {
             files = s.filter(p -> p.toString().endsWith(".patch")).toList();
         }
         assertEquals(List.of("glass-layer-leak.patch"), files.stream().map(p -> PATCHES.relativize(p).toString()).toList());
-        Matcher m = Pattern.compile("(?m)^diff --git a/(\\S+) b/(\\S+)$").matcher(Files.readString(files.get(0)));
+        String patch = Files.readString(files.get(0));
+        Matcher plus = Pattern.compile("(?m)^\\+\\+\\+ b/(\\S+)$").matcher(patch);
+        List<String> added = new java.util.ArrayList<>();
+        while (plus.find()) added.add(plus.group(1));
+        assertEquals(List.of(GLASS + "GlassLayer.m", GLASS + "GlassMTLOffscreen.m", GLASS + "GlassView3D.m"), added);
+        Matcher m = Pattern.compile("(?m)^diff --git a/(\\S+) b/(\\S+)$").matcher(patch);
         List<String> touched = new java.util.ArrayList<>();
         while (m.find()) {
             assertEquals(m.group(1), m.group(2));
@@ -50,6 +55,9 @@ class GlassPatchTest {
     void theMacPackageShipsItNextToTheJar() throws IOException {
         String pkg = Files.readString(Path.of("package.sh"));
         assertTrue(pkg.contains("native/build-glass.sh \"$PWD/target/pkg/libglass.dylib\""), "package.sh must put libglass.dylib beside unichat.jar");
+        assertTrue(pkg.contains("REQUIRE_GLASS"), "package.sh must be able to refuse a package without the patch");
+        assertTrue(Files.readString(Path.of(".github/workflows/build.yml")).contains("REQUIRE_GLASS"), "CI's macOS package must require it");
+        assertTrue(Files.readString(Path.of("install-mac.sh")).contains("libglass.dylib"), "install-mac.sh must refuse a package without it");
     }
 
     private static String find(String text, String regex) {

@@ -1,6 +1,7 @@
 #!/bin/sh
 # Builds JavaFX's macOS libglass.dylib from the pinned OpenJFX tag with Unichat's patches (every file in
-# native/patches/javafx/): Glass never freed a closed window's view, layers and Metal textures (hundreds of MB of IOSurface kept).
+# native/patches/javafx/): Glass never released the layer and the view it added to a window (hundreds of MB of
+# IOSurface kept per closed window). The sources come from git's objects at the pinned commit, never from a working tree.
 # A drop-in for the libglass.dylib in org.openjfx:javafx-graphics:$JFX_VERSION:mac-aarch64 (same sources, flags and
 # exported symbols as OpenJFX's buildSrc/mac.gradle); NativeLibLoader loads it first when it sits next to unichat.jar.
 # Usage: build-glass.sh <out dylib> [jfx checkout at the tag]   Env: ARCH (default: this Mac's), JAVA_HOME (JDK 25+).
@@ -35,7 +36,7 @@ GLASS=modules/javafx.graphics/src/main
 if [ -z "$SRC" ]; then
   SRC="$CACHE/jfx27u-$JFX_TAG" # cloned once; the patches are applied to a copy in $WORK
   if [ "$(git -C "$SRC" rev-parse HEAD 2>/dev/null)" != "$JFX_COMMIT" ]; then
-    rm -rf "$SRC"
+    rm -rf "$SRC" "$SRC.part"
     git clone --quiet --depth 1 --branch "$JFX_TAG" --filter=blob:none --sparse https://github.com/openjdk/jfx27u "$SRC.part"
     git -C "$SRC.part" sparse-checkout set "$GLASS/native-glass/mac" "$GLASS/java/com/sun/glass"
     mv "$SRC.part" "$SRC"
@@ -43,14 +44,27 @@ if [ -z "$SRC" ]; then
 fi
 [ "$(git -C "$SRC" rev-parse HEAD)" = "$JFX_COMMIT" ] || { echo "$SRC is not $JFX_TAG ($JFX_COMMIT)" >&2; exit 1; }
 # Without module-info.java: javac would compile the module and want all of javafx.base's sources.
-mkdir -p "$WORK/src/$GLASS/java/com/sun"
-cp -R "$SRC/$GLASS/native-glass" "$WORK/src/$GLASS/"
-cp -R "$SRC/$GLASS/java/com/sun/glass" "$WORK/src/$GLASS/java/com/sun/"
-for p in "$HERE"/patches/javafx/*.patch; do (cd "$WORK/src" && git apply --check "$p" && git apply "$p"); done
+# From the commit's objects (git archive), so an edited or extra file in the checkout is never compiled.
+mkdir -p "$WORK/src"
+git -C "$SRC" archive "$JFX_COMMIT" -- "$GLASS/native-glass/mac" "$GLASS/java/com/sun/glass" | tar -x -C "$WORK/src"
+# patch(1), not git apply: git apply skips paths silently when the work dir sits inside another repository.
+for p in "$HERE"/patches/javafx/*.patch; do (cd "$WORK/src" && patch -p1 --quiet --forward --no-backup-if-mismatch < "$p"); done
+# Each hunk landed: every line a patch adds is in the file it names.
+for p in "$HERE"/patches/javafx/*.patch; do
+  while IFS= read -r line; do
+    case "$line" in
+      "+++ b/"*) file="$WORK/src/${line#+++ b/}" ;;
+      "+++"*) ;;
+      "+"*) grep -qF -- "${line#+}" "$file" || { echo "$(basename "$p"): not applied: ${line#+}" >&2; exit 1; } ;;
+    esac
+  done < "$p"
+done
 
 # JNI headers, as mac.gradle's javahInclude: com/sun/glass/events/**, com/sun/glass/ui/*, com/sun/glass/ui/mac/*.
 J="$WORK/src/$GLASS/java"
-CP="$(fetch javafx-base "$BASE_SHA256"):$(fetch javafx-graphics "$GRAPHICS_SHA256")"
+BASE_JAR="$(fetch javafx-base "$BASE_SHA256")"
+GRAPHICS_JAR="$(fetch javafx-graphics "$GRAPHICS_SHA256")"
+CP="$BASE_JAR:$GRAPHICS_JAR"
 find "$J/com/sun/glass/events" "$J/com/sun/glass/ui" -maxdepth 1 -name '*.java' > "$WORK/javah.txt"
 find "$J/com/sun/glass/events" -mindepth 2 -name '*.java' >> "$WORK/javah.txt"
 find "$J/com/sun/glass/ui/mac" -name '*.java' >> "$WORK/javah.txt"
@@ -60,19 +74,26 @@ find "$J/com/sun/glass/ui/mac" -name '*.java' >> "$WORK/javah.txt"
 # Compile and link as mac.gradle does (MAC.glass: ccFlags + -DGL_SILENCE_DEPRECATION ... -Werror; linkFlags).
 SDK="$(xcrun --sdk macosx --show-sdk-path)"
 N="$WORK/src/$GLASS/native-glass/mac"
-COMMON="-mmacosx-version-min=$MACOS_MIN -isysroot $SDK -iframework$SDK/System/Library/Frameworks -arch $ARCH"
-CFLAGS="$COMMON -I$JAVA_HOME/include -I$JAVA_HOME/include/darwin -std=c99 -c -O3 -DNDEBUG -DGL_SILENCE_DEPRECATION
-  -DMACOS_MIN_VERSION_MAJOR=${MACOS_MIN%.*} -DMACOS_MIN_VERSION_MINOR=${MACOS_MIN#*.} -Werror -ffile-prefix-map=$WORK/src/= -I$WORK/headers -I$N -I$N/a11y"
+# Flags as positional parameters, so a path with spaces (JAVA_HOME, the SDK) stays one word.
+set -- -mmacosx-version-min=$MACOS_MIN -isysroot "$SDK" "-iframework$SDK/System/Library/Frameworks" -arch "$ARCH"
+set -- "$@" -I"$JAVA_HOME/include" -I"$JAVA_HOME/include/darwin" -std=c99 -c -O3 -DNDEBUG -DGL_SILENCE_DEPRECATION \
+  -DMACOS_MIN_VERSION_MAJOR=${MACOS_MIN%.*} -DMACOS_MIN_VERSION_MINOR=${MACOS_MIN#*.} -Werror -ffile-prefix-map="$WORK/src/=" \
+  -I"$WORK/headers" -I"$N" -I"$N/a11y"
 mkdir -p "$WORK/obj"
-export CFLAGS WORK
-# shellcheck disable=SC2016
-ls "$N"/*.m "$N"/a11y/*.m | xargs -P "$(sysctl -n hw.ncpu)" -n 1 sh -c \
-  'clang $CFLAGS -o "$WORK/obj/$(basename "$0" .m).o" "$0"'
+pids=""
+for f in "$N"/*.m "$N"/a11y/*.m; do
+  clang "$@" -o "$WORK/obj/$(basename "$f" .m).o" "$f" &
+  pids="$pids $!"
+done
+for pid in $pids; do wait "$pid" || { echo "compiling Glass failed" >&2; exit 1; }; done
 mkdir -p "$(dirname "$OUT")"
-# shellcheck disable=SC2086
-clang++ $COMMON -framework AppKit -framework ApplicationServices -framework Carbon -framework OpenGL \
+# Linked and signed in $WORK, moved to $OUT last: a failed step leaves nothing behind.
+OUT_TMP="$WORK/libglass.dylib"
+set -- -mmacosx-version-min=$MACOS_MIN -isysroot "$SDK" "-iframework$SDK/System/Library/Frameworks" -arch "$ARCH"
+clang++ "$@" -framework AppKit -framework ApplicationServices -framework Carbon -framework OpenGL \
   -framework QuartzCore -framework Security -framework Network -framework Metal -dynamiclib -lobjc \
-  -install_name @rpath/libglass.dylib -o "$OUT" "$WORK"/obj/*.o
-strip -x "$OUT" # as OpenJFX's bundles do (MAC.stripArgs)
-codesign --force -s - "$OUT"
+  -install_name @rpath/libglass.dylib -o "$OUT_TMP" "$WORK"/obj/*.o
+strip -x "$OUT_TMP" # as OpenJFX's bundles do (MAC.stripArgs)
+codesign --force -s - "$OUT_TMP"
+mv "$OUT_TMP" "$OUT"
 echo "$OUT"

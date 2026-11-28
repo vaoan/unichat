@@ -14,7 +14,8 @@ Unichat's own code is [0BSD](LICENSE). Unichat's packages also carry the compone
 | libpng (inside lottieconverter) | 1.6.59 | libpng-2.0 | the frames of Lottie animations |
 | libolm | 3.2.16 | Apache-2.0 | needed by the bridges on macOS |
 | tuwunel | v1.9.4 | Apache-2.0 | local Matrix server |
-| JavaFX / OpenJFX | 23.0.1 | GPL-2.0 with classpath exception; WebKit, GStreamer and GLib with LGPL parts | user interface |
+| JavaFX / OpenJFX | 27.0.1 | GPL-2.0 with classpath exception; WebKit, GStreamer and GLib with LGPL parts | user interface |
+| libglass.dylib (macOS), a modified build of OpenJFX's Glass | 27.0.1-ga (commit 11cb6cba8ffaf3e2b16e6adbb3abdda133da66a0) + `glass-layer-leak.patch` | GPL-2.0 with classpath exception | window drawing on macOS (replaces the one in JavaFX's jar) |
 | Jackson (core, databind, annotations, YAML) | 2.17.2 | Apache-2.0 | JSON and YAML |
 | SnakeYAML | 2.2 | Apache-2.0 | YAML |
 | SQLite JDBC (includes SQLite) | 3.46.1.3 | Apache-2.0; SQLite is public domain | reading the bridges' databases |
@@ -48,6 +49,7 @@ The Java runtime's notices are in the runtime's own `legal` folder. A package bu
 
 - **Emoji list**: `emoji/emoji.txt` is made from Unicode's `emoji-test.txt` (Emoji 15.0), under the Unicode License v3 (<https://www.unicode.org/license.txt>).
 - **LGPL in JavaFX**: WebKit and GStreamer/GLib ship as separate native libraries inside JavaFX. Their source is at <https://github.com/openjdk/jfx>.
+- **Modified libglass.dylib**: the macOS app ships OpenJFX's Glass library rebuilt from the sources of tag 27.0.1-ga (<https://github.com/openjdk/jfx27u>, commit 11cb6cba8ffaf3e2b16e6adbb3abdda133da66a0) with one change, `glass-layer-leak.patch` (three small fixes in GlassLayer.m, GlassView3D.m and GlassMTLOffscreen.m). The patch is in the app, `Contents/app/licenses/glass-layer-leak.patch`; the upstream source plus that patch is the corresponding source of the library. Same licence as JavaFX (GPL-2.0 with the Classpath Exception).
 - **MPL-2.0**: tuwunel's `as_variant` crate. Its source is at <https://github.com/matrix-construct/tuwunel> and its dependencies.
 - **MPL-2.0 in rlottie**: `src/vector/vinterpolator.cpp`, inside lottieconverter. Its source is at <https://github.com/Samsung/rlottie>.
 - **JAAD**: JCodec carries an AAC decoder in package `net.sourceforge.jaad`, with no notice of its own in JCodec's source; it's listed under JCodec's license.

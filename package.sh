@@ -40,8 +40,15 @@ fi
 # macOS: JavaFX's Glass with Unichat's patch (native/patches/javafx): a closed window's layer and IOSurfaces are freed.
 # JavaFX loads a libglass.dylib sitting next to unichat.jar (Contents/app) before its own; without it, its own is used.
 if [ "$(uname -s)" = Darwin ]; then
-  native/build-glass.sh "$PWD/target/pkg/libglass.dylib" >/dev/null \
-    || echo "Warning: without the patched libglass, each closed window keeps its IOSurfaces (hundreds of MB) until the app quits." >&2
+  if native/build-glass.sh "$PWD/target/pkg/libglass.dylib" >/dev/null; then
+    # The modified library's corresponding source is the upstream tag plus this patch (THIRD-PARTY.md): it ships with it.
+    mkdir -p target/pkg/licenses && cp native/patches/javafx/*.patch target/pkg/licenses/
+  elif [ -n "${REQUIRE_GLASS:-}" ]; then
+    echo "Error: libglass.dylib could not be built (native/build-glass.sh) and REQUIRE_GLASS is set." >&2
+    exit 1
+  else
+    echo "Warning: without the patched libglass, each closed window keeps its IOSurfaces (hundreds of MB) until the app quits." >&2
+  fi
 fi
 # Animated stickers for chats that only take WebP (WhatsApp): libwebp's gif2webp (see StickerConverter).
 if [ "$(uname -s)" = Darwin ]; then

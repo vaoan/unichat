@@ -171,6 +171,9 @@ jobs:
       - run: ./package.sh
         env:
           GH_TOKEN: ${{ github.token }}
+          REQUIRE_GLASS: "1"
+      - name: The package has the patched libglass
+        run: test -f release/Unichat.app/Contents/app/libglass.dylib
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: unichat-macos
