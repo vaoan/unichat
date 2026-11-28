@@ -191,11 +191,56 @@ final class Recovery {
             Object out = ManagementFactory.getPlatformMBeanServer().invoke(
                     new javax.management.ObjectName("com.sun.management:type=DiagnosticCommand"), "gcClassHistogram",
                     new Object[] {new String[0]}, new String[] {String[].class.getName()});
-            String[] lines = String.valueOf(out).split("\n");
-            return "Memory: what fills it\n" + String.join("\n", Arrays.copyOf(lines, Math.min(lines.length, count + 3)));
+            return readable(String.valueOf(out), count);
         } catch (Exception e) {
             return "Memory: no class histogram (" + e + ")";
         }
+    }
+
+    private static final java.util.regex.Pattern HISTOGRAM_ROW =
+            java.util.regex.Pattern.compile("^\\s*(\\d+):\\s+(\\d+)\\s+(\\d+)\\s+(.+?)\\s*$");
+    private static final java.util.regex.Pattern HISTOGRAM_TOTAL =
+            java.util.regex.Pattern.compile("^\\s*Total\\s+(\\d+)\\s+(\\d+)\\s*$");
+
+    /**
+     * The histogram as the log can keep it: the {@code Redactor} turns any run of 7+ digits into {@code <number>},
+     * and a histogram is nothing else, so counts and sizes are written in units ({@code 38.6 MB, 298k objects}).
+     */
+    static String readable(String histogram, int count) {
+        StringBuilder out = new StringBuilder("Memory: what fills it (classes by size)");
+        int shown = 0;
+        for (String line : histogram.split("\n")) {
+            java.util.regex.Matcher total = HISTOGRAM_TOTAL.matcher(line);
+            if (total.matches()) {
+                out.append("\nTotal: ").append(size(total.group(2))).append(", ").append(objects(total.group(1)));
+            } else if (shown < count && heaviestRow(line) != null) {
+                out.append('\n').append(heaviestRow(line));
+                shown++;
+            }
+        }
+        return out.toString();
+    }
+
+    /** One histogram row ({@code 1:  298123  38600000  [B (java.base@25)}) in units, or null when it isn't a row. */
+    static @Nullable String heaviestRow(String line) {
+        java.util.regex.Matcher m = HISTOGRAM_ROW.matcher(line);
+        if (!m.matches()) return null;
+        String name = m.group(4).replaceAll("@[^)\\s]*\\)", ")");
+        return "  " + m.group(1) + ". " + name + " - " + size(m.group(3)) + ", " + objects(m.group(2));
+    }
+
+    private static String size(String bytes) {
+        double b = Double.parseDouble(bytes);
+        if (b >= 1024 * 1024) return String.format(Locale.ROOT, "%.1f MB", b / (1024 * 1024));
+        if (b >= 1024) return String.format(Locale.ROOT, "%.1f KB", b / 1024);
+        return String.format(Locale.ROOT, "%.0f B", b);
+    }
+
+    private static String objects(String instances) {
+        double n = Double.parseDouble(instances);
+        if (n < 1000) return String.format(Locale.ROOT, "%.0f objects", n);
+        if (n < 1_000_000) return String.format(Locale.ROOT, "%.0fk objects", n / 1000);
+        return String.format(Locale.ROOT, "%.1fM objects", n / 1_000_000);
     }
 
     /** Restarts when the heap is still {@link #NEARLY_FULL} right after a collection: the step before running out. */
