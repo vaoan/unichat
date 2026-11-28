@@ -525,6 +525,7 @@ final class SyncProcessor {
         if (body == null) return;
         if (t.isMedia() && text(nc, "url") == null) {
             t.setBody(body.equals(t.fileName()) ? "" : body);
+            t.setHtml(t.caption() == null ? null : MessageHtml.of(nc)); // the new caption's formatting, not the old one's
         } else {
             String msgtype = text(nc, "msgtype");
             if (msgtype == null) msgtype = "m.text";

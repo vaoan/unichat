@@ -131,4 +131,15 @@ class A11yTextTest {
         assertEquals("Mensaje de Laura en Familia, WhatsApp", A11yText.spoken(group, m, false));
         assertEquals("Mensaje de Ana, Telegram", A11yText.spoken(chat("Ana", Network.TELEGRAM), m, false));
     }
+
+    @Test
+    void aPhotosTextIsSaidAfterItsName() {
+        Message m = message(false, "Three styles to choose from");
+        m.setType(MessageType.IMAGE);
+        m.setFileName("0a1b2c3d.jpg");
+        String d = A11yText.message(m, null, null, UTC);
+        assertTrue(d.endsWith("Imagen 0a1b2c3d.jpg. Three styles to choose from"), d);
+        m.setBody("0a1b2c3d.jpg");
+        assertTrue(A11yText.message(m, null, null, UTC).endsWith("Imagen 0a1b2c3d.jpg"), "its name is no text of its own");
+    }
 }

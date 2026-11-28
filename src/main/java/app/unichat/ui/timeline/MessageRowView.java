@@ -242,7 +242,7 @@ final class MessageRowView {
             bubble.getStyleClass().add(m.type() == MessageType.STICKER ? "sticker" : "media");
             Node shown = m.playsInline() ? media.inlineVideoNode(m) : media.imageNode(m);
             into.add(shown);
-            caption(m, into, Math.min(maxWidth, Math.max(MIN_CAPTION_WIDTH, shown.prefWidth(-1))));
+            if (m.caption() != null) caption(m, into, Math.min(maxWidth, Math.max(MIN_CAPTION_WIDTH, shown.prefWidth(-1))));
         } else if (m.type() == MessageType.AUDIO && m.mediaUrl() != null) {
             into.add(media.audioNode(m, chat.get()));
             into.add(media.transcriptNode(m, maxWidth));
